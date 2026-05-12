@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.6'
     id 'io.spring.dependency-management' version '1.1.7'
+    // spotBugs
+    id 'com.github.spotbugs' version '6.0.9'
 }
 
 group = 'org.example'
@@ -20,16 +22,50 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    testImplementation 'com.h2database:h2' // Test용 인메모리 DB
+
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
     compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'com.mysql:mysql-connector-j'
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
-tasks.named('test') {
+// env : root env를 build.gradle이 받을 수 있게 설정
+def envFile = file('.env')
+
+if (envFile.exists()) {
+    envFile.readLines().each { line ->
+        if (line.contains('=')) {
+            def (key, value) = line.split('=', 2)
+            environment key.trim(), value.trim()
+        }
+    }
+}
+
+// 스팟 버그 설정
+spotbugs {
+    ignoreFailures = true
+    effort = 'max'
+    reportLevel = 'medium'
+    excludeFilter = file('spotbugs-exclude.xml')
+}
+
+spotbugsMain {
+    reports {
+        html { required = true }
+    }
+}
+
+// 테스트 설정
+test {
     useJUnitPlatform()
 }
