@@ -9,12 +9,6 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class DriftLogApplicationTests {
 
-    @Value("${DB_PORT:없음}")
-    String dbPort;
-
-    @Value("${DB_NAME:없음}")
-    String dbName;
-
     @Test
     void contextLoads() {
 
