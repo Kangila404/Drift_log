@@ -1,0 +1,12 @@
+package org.example.drift_log.user.domain.repository;
+
+import org.example.drift_log.user.domain.model.User;
+
+public interface UserRepository {
+
+    void save(User user);
+
+    boolean existsByEmail(String email);
+
+    boolean existsByName(String name);
+}

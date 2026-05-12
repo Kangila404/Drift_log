@@ -27,6 +27,7 @@ dependencies {
     testImplementation 'com.h2database:h2' // Test용 인메모리 DB
 
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
