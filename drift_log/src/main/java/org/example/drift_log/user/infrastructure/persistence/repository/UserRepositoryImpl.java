@@ -22,8 +22,4 @@ public class UserRepositoryImpl implements UserRepository {
 
     }
 
-    @Override
-    public boolean existsByName(String name) {
-        return userJpaRepository.existsByName(name);
-    }
 }

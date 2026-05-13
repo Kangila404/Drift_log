@@ -1,6 +1,5 @@
 package org.example.drift_log.user.application;
 
-import jakarta.xml.bind.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
@@ -27,7 +26,6 @@ public class AuthServiceImpl implements AuthService{
         // 입력 데이터 정합성 검증
         validateEmailNotDuplicated(request.email());
         validatePasswordConfirm(request.password(), request.passwordConfirm());
-        validateNameNotDuplicated(request.name());
 
         // 비밀번호 인코딩
         String encodedPassword = passwordEncoder.encode(request.password());
@@ -54,7 +52,7 @@ public class AuthServiceImpl implements AuthService{
     }
 
 
-    // 회원가입 정합성 검증(email 중복 체크, 비밀번호 = 비밀번호 확인 검증, 이름 중복 검증)
+    // 회원가입 정합성 검증(email 중복 체크, 비밀번호 = 비밀번호 확인 검증)
     // 1. 이메일 중복 체크
     private void validateEmailNotDuplicated(String email){
         if(userRepository.existsByEmail(email)){
@@ -69,10 +67,5 @@ public class AuthServiceImpl implements AuthService{
         }
     }
 
-    // 3. 이름 검증
-    private void validateNameNotDuplicated(String name){
-        if(userRepository.existsByName(name)){
-            throw new IllegalArgumentException("중복 이름입니다.");
-        }
-    }
+
 }
