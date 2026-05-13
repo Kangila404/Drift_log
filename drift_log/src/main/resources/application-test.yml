@@ -5,11 +5,11 @@ spring:
     username: sa
     password:
 
-    jpa:
-      hibernate:
-        ddl-auto: create-drop
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
 
-    jwt:
-      secret: ${JWT_SECRET}
-      access-token-expiration: 1800000 # 30분
-      refresh-token-expiration: 604800000g # 7일
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 1800000 # 30분
+    refresh-token-expiration: 604800000g # 7일
