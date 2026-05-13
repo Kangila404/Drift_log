@@ -1,0 +1,74 @@
+package org.example.drift_log.user.domain.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.example.drift_log.common.entity.BaseEntity;
+import org.example.drift_log.user.domain.enums.AuthType;
+import org.example.drift_log.user.domain.enums.UserRole;
+import org.example.drift_log.user.domain.enums.UserStatus;
+
+@Builder
+@Getter
+@Entity
+@Table(name = "users")
+@RequiredArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+public class User extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Long id;
+
+    @Column(name = "user_id", nullable = false, unique = true)
+    private String userId;
+
+    @Column(name = "email", nullable = false, unique = true)
+    private String email;
+
+    @Column(name = "password", nullable = true)
+    private String password;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_type", nullable = false)
+    private AuthType authType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_role", nullable = false)
+    private UserRole userRole;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_status", nullable = false)
+    private UserStatus userStatus;
+
+    // 비즈니스 로직
+
+    // 1. 회원가입
+    public static User createLocalUser(String email, String password, String name){
+        return User.builder()
+            .userId(UUID.randomUUID().toString())
+            .email(email)
+            .password(password)
+            .name(name)
+            .authType(AuthType.LOCAL)
+            .userRole(UserRole.USER)
+            .userStatus(UserStatus.ACTIVE)
+            .build();
+    }
+}
