@@ -1,8 +1,12 @@
 package org.example.drift_log.user.application;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.user.domain.model.RefreshToken;
 import org.example.drift_log.user.domain.model.User;
+import org.example.drift_log.user.domain.repository.RefreshTokenRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
+import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -18,8 +22,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService{
 
+    private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public SignUpResponse signup(SignUpRequest request) {
@@ -32,8 +39,14 @@ public class AuthServiceImpl implements AuthService{
 
         User user = User.createLocalUser(request.email(), encodedPassword, request.name());
 
+        // 회원가입 완료
         userRepository.save(user);
-        return SignUpResponse.from(user);
+
+        // Jwt 토큰 발급
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+        String refreshToken = saveRefreshToken(user.getId());
+
+        return SignUpResponse.from(user, accessToken, refreshToken);
     }
 
     @Override
@@ -52,7 +65,7 @@ public class AuthServiceImpl implements AuthService{
     }
 
 
-    // 회원가입 정합성 검증(email 중복 체크, 비밀번호 = 비밀번호 확인 검증)
+    // ============ 회원가입 정합성 검증 ============ //
     // 1. 이메일 중복 체크
     private void validateEmailNotDuplicated(String email){
         if(userRepository.existsByEmail(email)){
@@ -67,5 +80,17 @@ public class AuthServiceImpl implements AuthService{
         }
     }
 
-
+    // ============ Jwt 관련 함수 ============ //
+    // 1. Jwt RefreshToken 생성 및 저장
+    private String saveRefreshToken(Long userId){
+        String refreshToken = jwtTokenProvider.createRefreshToken(userId);
+        refreshTokenRepository.save(
+            RefreshToken.builder()
+                .userId(userId)
+                .token(refreshToken)
+                .expirationAt(LocalDateTime.now().plusDays(7))
+                .build()
+        );
+        return refreshToken;
+    }
 }
