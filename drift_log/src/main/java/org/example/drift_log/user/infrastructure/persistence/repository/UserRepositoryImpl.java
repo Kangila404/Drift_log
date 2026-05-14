@@ -1,5 +1,6 @@
 package org.example.drift_log.user.infrastructure.persistence.repository;
 
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
@@ -21,5 +22,11 @@ public class UserRepositoryImpl implements UserRepository {
         return userJpaRepository.existsByEmail(email);
 
     }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userJpaRepository.findByEmail(email);
+    }
+
 
 }

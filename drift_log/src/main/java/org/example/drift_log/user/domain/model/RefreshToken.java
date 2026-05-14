@@ -33,4 +33,13 @@ public class RefreshToken extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime expirationAt;
 
+
+
+
+    // ================= 비즈니스 로직 ================= //
+    // 1. 재로그인 시 토큰 날짜 업데이트
+    public void updateToken(String refreshToken, LocalDateTime expirationAt){
+        this.token = refreshToken;
+        this.expirationAt = expirationAt;
+    }
 }
