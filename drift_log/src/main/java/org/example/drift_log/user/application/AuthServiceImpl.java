@@ -104,7 +104,7 @@ public class AuthServiceImpl implements AuthService{
     }
 
 
-    // ============ 회원가입 정합성 검증 ============ //
+    // ============ 회원가입 정합성 검증  ============ //
     // 1. 이메일 중복 체크
     private void validateEmailNotDuplicated(String email){
         if(userRepository.existsByEmail(email)){
