@@ -14,10 +14,12 @@ import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
 import org.example.drift_log.user.presentation.dto.req.SocialLoginRequest;
+import org.example.drift_log.user.presentation.dto.req.TokenRefreshRequest;
 import org.example.drift_log.user.presentation.dto.res.LoginResponse;
 import org.example.drift_log.user.presentation.dto.res.LogoutResponse;
 import org.example.drift_log.user.presentation.dto.res.SignUpResponse;
 import org.example.drift_log.user.presentation.dto.res.SocialLoginResponse;
+import org.example.drift_log.user.presentation.dto.res.TokenRefreshResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -78,12 +80,27 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public LogoutResponse logout(LogoutRequest request) {
 
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
-            .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다."));
+        findRefreshTokenOrThrow(request.refreshToken());
 
             refreshTokenRepository.deleteByToken(request.refreshToken());
 
         return new LogoutResponse(true);
+    }
+
+    @Override
+    public TokenRefreshResponse reissue(TokenRefreshRequest request) {
+        // 리프레시 토큰을 받음 -> 어세스 발급 ,리프레시 토큰 업데이트
+        RefreshToken refreshToken = findRefreshTokenOrThrow(request.refreshToken());
+        validateRefreshTokenExpired(refreshToken);
+
+        User user = findUserByIdOrThrow(refreshToken.getUserId());
+
+        validateUserStatus(user.getUserStatus());
+
+        String issuedRefreshToken = saveRefreshToken(user.getId());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+
+        return TokenRefreshResponse.from(issuedRefreshToken, accessToken);
     }
 
 
@@ -129,6 +146,19 @@ public class AuthServiceImpl implements AuthService{
         return refreshToken;
     }
 
+    // 2. 리프레시 토큰 찾거나 없으면 버리기
+    private RefreshToken findRefreshTokenOrThrow(String refreshToken){
+        return refreshTokenRepository.findByToken(refreshToken)
+            .orElseThrow(()-> new IllegalArgumentException("리프레시 토큰이  올바르지 않습니다."));
+    }
+
+    // 3. 리프레시 토큰 만료 여부 확인
+    private void validateRefreshTokenExpired(RefreshToken refreshToken){
+        if(refreshToken.isExpired()){
+            throw new IllegalArgumentException("날짜가 지난 리프레시 토큰입니다");
+        }
+    }
+
     // ============ 로그인 관련 함수 ============ //
     // 1. 이메일 -> 유저 조회
     private User findUserOrThrowByEmail(String email){
@@ -136,15 +166,21 @@ public class AuthServiceImpl implements AuthService{
             .orElseThrow(()->new IllegalArgumentException("로그인 실패입니다."));
     }
 
+    // 2. 리프레시 토큰에 담긴 userId(long) -> User 찾기
+    User findUserByIdOrThrow(Long id){
+        return userRepository.findById(id)
+            .orElseThrow(()->new IllegalArgumentException("해당 토큰에 해당하는 유저가 없습니다"));
+    }
 
-    // 2. 유저 상태 확인
+
+    // 3. 유저 상태 확인
     private void validateUserStatus(UserStatus userStatus){
         if(userStatus.equals(UserStatus.SUSPENDED)){
             throw new IllegalArgumentException(("정지된 유저입니다."));
         }
     }
 
-    // 2. 유저 정보 = 패스워드 맞는지 확인
+    // 4. 유저 정보 = 패스워드 맞는지 확인
     private void validatePassword(String rawPassword, String encodedPassword){
         if(!passwordEncoder.matches(rawPassword, encodedPassword)){
             throw new IllegalArgumentException("비밀번호가 틀립니다");

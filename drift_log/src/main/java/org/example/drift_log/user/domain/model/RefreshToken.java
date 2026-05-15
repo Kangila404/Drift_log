@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.drift_log.common.entity.BaseEntity;
 
@@ -17,6 +18,7 @@ import org.example.drift_log.common.entity.BaseEntity;
 @Table(name = "refresh_token")
 @NoArgsConstructor
 @AllArgsConstructor
+@Getter
 @Builder
 public class RefreshToken extends BaseEntity {
 
@@ -41,5 +43,10 @@ public class RefreshToken extends BaseEntity {
     public void updateToken(String refreshToken, LocalDateTime expirationAt){
         this.token = refreshToken;
         this.expirationAt = expirationAt;
+    }
+
+    // 2. 토큰 날짜가 만료 되었는지 확인
+    public boolean isExpired(){
+        return LocalDateTime.now().isAfter(this.expirationAt);
     }
 }
