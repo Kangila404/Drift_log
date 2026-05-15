@@ -3,6 +3,7 @@ package org.example.drift_log.user.application;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.user.domain.enums.AuthType;
 import org.example.drift_log.user.domain.enums.UserStatus;
 import org.example.drift_log.user.domain.model.RefreshToken;
 import org.example.drift_log.user.domain.model.User;
@@ -56,7 +57,11 @@ public class AuthServiceImpl implements AuthService{
     public LoginResponse login(LoginRequest request) {
         User user = findUserOrThrowByEmail(request.email());
         validateUserStatus(user.getUserStatus());
-        validatePassword(request.password(), user.getPassword());
+
+        // 로컬 회원만 비밀번호 검사
+        if(user.getAuthType().equals(AuthType.LOCAL)){
+            validatePassword(request.password(), user.getPassword());
+        }
 
         // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
