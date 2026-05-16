@@ -19,20 +19,21 @@ public class VoyageServiceImpl implements VoyageService {
     private final UserRepository userRepository;
     private final VoyageStatusRepository voyageStatusRepository;
 
+    // 1. 항해 상태 조회
     @Override
     public VoyageStatusResponse getVoyageStatus(VoyageStatusRequest request) {
 
-        // 1. 클라이언트로부터 온 String userId -> 내부 통신에선, Long으로 voyageStatus 가져올 것
+        // 1) 클라이언트로부터 온 String userId -> 내부 통신에선, Long으로 voyageStatus 가져올 것
         User user = findUserByUserIdOrThrow(request.userId());
 
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
-        // 만약 정박 중이라면 -> 모든 도시 + 항해가능 도시(현재 도시 제외) 반환
+        // 2-1) 만약 정박 중이라면 -> 모든 도시 + 항해가능 도시(현재 도시 제외) 반환
         if(voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
 
         }
 
-        //만약 항해 중이라면 -> 모든 도시 + 출발지, 목적지, 진척도 반환
+        // 2-2) 만약 항해 중이라면 -> 모든 도시 + 출발지, 목적지, 진척도 반환
         if(voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
 
         }
@@ -40,9 +41,20 @@ public class VoyageServiceImpl implements VoyageService {
         return VoyageStatusResponse.from(voyageStatus);
     }
 
+    // 2. 항해 시작
     @Override
     public VoyageStartResponse voyageStart(VoyageStartRequest request) {
-        return null;
+        User user = findUserByUserIdOrThrow(request.userId());
+        VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        // 항해 상태가 ANCHORED가 아닐 때 -> 예외
+        if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
+            new IllegalArgumentException("현재 정박 중이 아닙니다");
+        }
+
+        // City 개발 후 진행 예정
+
+        return VoyageStartResponse.from();
     }
 
 

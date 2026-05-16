@@ -32,7 +32,8 @@ public class VoyageController {
     // 2. 목적지 선택 후, 항해 시작
     @PostMapping("/start")
     public ResponseEntity<VoyageStartResponse> start(@Valid @RequestBody VoyageStartRequest request){
-        return ResponseEntity.ok(new VoyageStartResponse());
+        VoyageStartResponse response = voyageService.voyageStart(request);
+        return ResponseEntity.ok(response);
     }
 
 }
