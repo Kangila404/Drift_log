@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.voyage.application.VoyageService;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageStatusRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStatusResponse;
 import org.springframework.http.ResponseEntity;

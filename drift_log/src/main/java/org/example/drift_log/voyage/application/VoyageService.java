@@ -2,7 +2,6 @@ package org.example.drift_log.voyage.application;
 
 
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageStatusRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStatusResponse;
 

@@ -7,7 +7,6 @@ import org.example.drift_log.voyage.domain.entity.VoyageStatus;
 import org.example.drift_log.voyage.domain.enums.VoyageState;
 import org.example.drift_log.voyage.domain.repository.VoyageStatusRepository;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageStatusRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStatusResponse;
 import org.springframework.stereotype.Service;
