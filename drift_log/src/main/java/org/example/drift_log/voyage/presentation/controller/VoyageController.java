@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -23,8 +24,8 @@ public class VoyageController {
 
     // 1. 현재 배 위치 불러 오기
     @GetMapping("/status")
-    public ResponseEntity<VoyageStatusResponse> getStatus(@Valid @RequestBody VoyageStatusRequest request){
-        VoyageStatusResponse response = voyageService.getVoyageStatus(request);
+    public ResponseEntity<VoyageStatusResponse> getStatus(@RequestParam String userId){
+        VoyageStatusResponse response = voyageService.getVoyageStatus(userId);
         return ResponseEntity.ok(response);
     }
 

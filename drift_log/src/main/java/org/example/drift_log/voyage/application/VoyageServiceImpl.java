@@ -21,10 +21,10 @@ public class VoyageServiceImpl implements VoyageService {
 
     // 1. 항해 상태 조회
     @Override
-    public VoyageStatusResponse getVoyageStatus(VoyageStatusRequest request) {
+    public VoyageStatusResponse getVoyageStatus(String userId) {
 
         // 1) 클라이언트로부터 온 String userId -> 내부 통신에선, Long으로 voyageStatus 가져올 것
-        User user = findUserByUserIdOrThrow(request.userId());
+        User user = findUserByUserIdOrThrow(userId);
 
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
