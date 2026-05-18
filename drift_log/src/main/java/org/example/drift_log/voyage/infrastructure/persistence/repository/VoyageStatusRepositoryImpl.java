@@ -17,4 +17,9 @@ public class VoyageStatusRepositoryImpl implements VoyageStatusRepository {
 
         return voyageStatusJpaRepository.findByUserId(userId);
     }
+
+    @Override
+    public void save(VoyageStatus voyageStatus) {
+        voyageStatusJpaRepository.save(voyageStatus);
+    }
 }
