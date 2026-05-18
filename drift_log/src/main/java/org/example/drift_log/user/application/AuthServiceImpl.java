@@ -20,6 +20,9 @@ import org.example.drift_log.user.presentation.dto.res.LogoutResponse;
 import org.example.drift_log.user.presentation.dto.res.SignUpResponse;
 import org.example.drift_log.user.presentation.dto.res.SocialLoginResponse;
 import org.example.drift_log.user.presentation.dto.res.TokenRefreshResponse;
+import org.example.drift_log.voyage.domain.entity.VoyageStatus;
+import org.example.drift_log.voyage.domain.enums.VoyageState;
+import org.example.drift_log.voyage.domain.repository.VoyageStatusRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +34,7 @@ public class AuthServiceImpl implements AuthService{
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
 
+    private final VoyageStatusRepository voyageStatusRepository;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
@@ -47,6 +51,16 @@ public class AuthServiceImpl implements AuthService{
 
         // 회원가입 완료
         userRepository.save(user);
+
+        // 초기 VoyageStatus 생성(서울 시작)
+        VoyageStatus voyageStatus = VoyageStatus.builder()
+            .userId(user.getId())
+            .voyageState(VoyageState.ANCHORED)
+            .departedCityId(1L)  // 서울
+            .progress(0.0f)
+            .isFamilyReunited(false)
+            .build();
+        voyageStatusRepository.save(voyageStatus);
 
         // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
