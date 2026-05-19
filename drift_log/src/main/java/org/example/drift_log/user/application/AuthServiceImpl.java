@@ -56,7 +56,7 @@ public class AuthServiceImpl implements AuthService{
         VoyageStatus voyageStatus = VoyageStatus.builder()
             .userId(user.getId())
             .voyageState(VoyageState.ANCHORED)
-            .departedCityId(1L)  // 서울
+            .currentCityId(1L)  // 서울 시작
             .progress(0.0f)
             .isFamilyReunited(false)
             .build();
