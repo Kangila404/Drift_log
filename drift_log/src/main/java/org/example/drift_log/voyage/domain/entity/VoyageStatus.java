@@ -68,5 +68,11 @@ public class VoyageStatus extends BaseEntity {
         this.progress = 0f;
     }
 
+    // 3. 항해 진척도 갱신
+    public void updateProgress(float delta) {
+        this.progress = Math.min(this.progress + delta, 1.0f);
+    }
+
+
 
 }
