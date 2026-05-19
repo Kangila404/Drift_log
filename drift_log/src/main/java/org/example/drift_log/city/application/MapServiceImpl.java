@@ -31,16 +31,14 @@ public class MapServiceImpl implements MapService{
 
         // 1-1) 만약 유저가 정박 중이라면 -> 모든 도시 정보 , 정박한 도시 반환
         if(voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
-            Long anchoredCityId = voyageStatus.getDestinationCityId();
-            City anchoredCity = getCityByCityId(anchoredCityId);
-            return MapResponse.ofAnchored(cities, anchoredCity);
+            City currentCity = getCityByCityId(voyageStatus.getCurrentCityId());
+            return MapResponse.ofAnchored(cities, currentCity);
         }
         // 1-2) 만약 유저가 현재 항해 상태라면 -> 모든 도시 정보, 출발 도시, 목적 도시 반환
         if(voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
             City departedCity = getCityByCityId(voyageStatus.getDepartedCityId());
             City destinationCity = getCityByCityId(voyageStatus.getDestinationCityId());
-            return MapResponse.ofSailing(cities, departedCity, destinationCity, voyageStatus.getProgress());
-        }
+            return MapResponse.ofSailing(cities, departedCity, destinationCity, voyageStatus.getProgress());  }
         throw new IllegalStateException("알 수 없는 항해 상태입니다.");
     }
 

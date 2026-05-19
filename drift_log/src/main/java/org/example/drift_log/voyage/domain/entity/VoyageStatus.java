@@ -38,11 +38,35 @@ public class VoyageStatus extends BaseEntity {
     @Column(nullable = false)
     private Float progress;
 
+    private Long currentCityId;
+
     private Long departedCityId;
 
     private Long destinationCityId;
 
     @Column(nullable = false)
     private boolean isFamilyReunited;
+
+
+
+    // 비즈니스 로직
+    // 1. 정박 -> 항해 시작
+    public void startSailing(Long destinationCityId){
+        this.departedCityId = this.currentCityId;
+        this.destinationCityId = destinationCityId;
+        this.currentCityId = null;
+        this.voyageState = voyageState.SAILING;
+        this.progress = 0f;
+    }
+
+    // 2. 항해 -> 정박
+    public void arrive(){
+        this.currentCityId = this.destinationCityId;
+        this.departedCityId = null;
+        this.destinationCityId = null;
+        this.voyageState = voyageState.ARRIVED;
+        this.progress = 0f;
+    }
+
 
 }
