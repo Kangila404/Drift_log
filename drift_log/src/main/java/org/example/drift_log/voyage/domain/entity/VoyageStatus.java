@@ -69,13 +69,17 @@ public class VoyageStatus extends BaseEntity {
     }
 
 
-    // 4. 항해 -> 정박
+    // 4. 항해 -> 도착
     public void arrive(){
         this.currentCityId = this.destinationCityId;
-        this.departedCityId = null;
-        this.destinationCityId = null;
         this.voyageState = voyageState.ANCHORED;
         this.progress = 0f;
+    }
+
+    // 5. 도착 -> 정박
+    public void complete(){
+        this.departedCityId = null;
+        this.destinationCityId = null;
     }
 
     // 5. 항해 진척도 갱신

@@ -1,11 +1,14 @@
 package org.example.drift_log.voyage.presentation.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.voyage.application.VoyageService;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "항해 관련 api")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/voyages")
@@ -51,6 +55,13 @@ public class VoyageController {
     @PostMapping("/resume")
     public ResponseEntity<VoyageResumeResponse> resume(@Valid @RequestBody VoyageResumeRequest request){
         VoyageResumeResponse response = voyageService.voyageResume(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 5. 항해 도착
+    @PostMapping("/complete")
+    public ResponseEntity<VoyageCompleteResponse> complete(@Valid @RequestBody VoyageCompleteRequest request){
+        VoyageCompleteResponse response = voyageService.voyageComplete(request);
         return ResponseEntity.ok(response);
     }
 }

@@ -1,8 +1,19 @@
 package org.example.drift_log.voyage.application;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.trace.domain.model.DiscoveredTrace;
+import org.example.drift_log.trace.domain.model.Trace;
+import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
+import org.example.drift_log.trace.domain.repository.TraceRepository;
+import org.example.drift_log.voyage.domain.repository.VoyageLogRepository;
+import org.example.drift_log.voyage.domain.entity.VoyageLog;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +37,10 @@ public class VoyageServiceImpl implements VoyageService {
     private final UserRepository userRepository;
     private final VoyageStatusRepository voyageStatusRepository;
     private final CityRouteRepository cityRouteRepository;
+    private final VoyageLogRepository voyageLogRepository;
+    private final TraceRepository traceRepository;
+    private final DiscoveredTraceRepository discoveredTraceRepository;
+    private final CityRepository cityRepository;
 
     // 1. 항해 상태 조회
     @Override
@@ -101,6 +116,56 @@ public class VoyageServiceImpl implements VoyageService {
         return new VoyageResumeResponse("success");
     }
 
+    @Override
+    public VoyageCompleteResponse voyageComplete(VoyageCompleteRequest request) {
+        User user = findUserByUserIdOrThrow(request.userId());
+        VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
+            throw new IllegalStateException("도착 상태가 아닙니다.");
+        }
+
+        Long departedCityId = voyageStatus.getDepartedCityId();
+        Long arrivedCityId = voyageStatus.getCurrentCityId();
+
+        City arrivedCity = findCityByIdORThrow(arrivedCityId);
+
+
+        // 1. Voyage 로그 생성
+        VoyageLog voyageLog = VoyageLog.builder()
+            .userId(user.getId())
+            .fromCityId(departedCityId)
+            .toCityId(arrivedCityId)
+            .autoText("추후에 들어갈 텍스트")
+            .weatherTheme("날씨에서 가져올 예정")
+            .build();
+
+        voyageLogRepository.save(voyageLog);
+
+
+// 2. 도착 시 -> Trace 조회
+        Trace trace = findByCityIdOrNull(arrivedCityId);
+
+// 흔적 있을 때만 처리
+        if(trace != null){
+            DiscoveredTrace discoveredTrace = findByUserIdAndTraceIdOrNull(user.getId(), trace.getId());
+            if(discoveredTrace == null){
+                discoveredTrace = DiscoveredTrace.builder()
+                    .userId(user.getId())
+                    .traceId(trace.getId())
+                    .discoveredAt(LocalDateTime.now())
+                    .build();
+                discoveredTraceRepository.save(discoveredTrace);
+            }
+        }
+
+        // 2. complete 호출
+        voyageStatus.complete();
+        voyageStatusRepository.save(voyageStatus);
+
+        return VoyageCompleteResponse.of(arrivedCity, trace, voyageLog);
+    }
+
 
     // ========== ========== //
     // 1. String userId -> user 조회
@@ -130,5 +195,23 @@ public class VoyageServiceImpl implements VoyageService {
     private CityRoute findCityRouteByCityIdsOrThrow(Long departedCityId, Long destinationCityId){
         return cityRouteRepository.findByFromCityIdAndToCityId(departedCityId, destinationCityId)
             .orElseThrow(()-> new IllegalArgumentException("해당 경로가 존재하지 않습니다."));
+    }
+
+    // 4. CityId -> Trace(흔적) 조회
+    private Trace findByCityIdOrNull(Long cityId){
+        return traceRepository.findByCityId(cityId)
+            .orElse(null);
+    }
+
+    // 5. Long userId -> discoveredTrace 조회
+    private DiscoveredTrace findByUserIdAndTraceIdOrNull(Long userId, Long traceId){
+        return discoveredTraceRepository.findByUserIdAndTraceId(userId, traceId)
+            .orElse(null);
+    }
+
+    // 6. cityId -> City 조회
+    private City findCityByIdORThrow(Long cityId){
+        return cityRepository.findById(cityId)
+            .orElseThrow(()-> new IllegalArgumentException("해당 도시는 존재하지 않습니다"));
     }
 }
