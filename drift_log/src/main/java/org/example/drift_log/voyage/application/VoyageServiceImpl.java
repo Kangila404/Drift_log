@@ -1,6 +1,9 @@
 package org.example.drift_log.voyage.application;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
+import org.example.drift_log.city.domain.model.CityRoute;
+import org.example.drift_log.city.domain.repository.CityRouteRepository;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageStatus;
@@ -13,10 +16,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class VoyageServiceImpl implements VoyageService {
 
     private final UserRepository userRepository;
     private final VoyageStatusRepository voyageStatusRepository;
+    private final CityRouteRepository cityRouteRepository;
 
     // 1. 항해 상태 조회
     @Override
@@ -27,15 +32,21 @@ public class VoyageServiceImpl implements VoyageService {
 
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
-        // 2-1) 만약 정박 중이라면 -> 모든 도시 + 항해가능 도시(현재 도시 제외) 반환
-        if(voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
-
+        if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
+            throw new IllegalStateException("현재 항해 중이 아닙니다.");
         }
 
-        // 2-2) 만약 항해 중이라면 -> 모든 도시 + 출발지, 목적지, 진척도 반환
-        if(voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
+        // 2) 조회(10 초 폴링)마다 -> 진척률 갱신
+        CityRoute cityRoute = findCityRouteByCityIdsOrThrow(voyageStatus.getDepartedCityId(), voyageStatus.getDestinationCityId());
+        float delta = 10f / (cityRoute.getDurationMinutes() * 60f);
+        voyageStatus.updateProgress(delta);
 
+        // 진척률 >= 1.0 -> 도착
+        if(voyageStatus.getProgress() >= 1.0f){
+            voyageStatus.arrive();
         }
+
+        voyageStatusRepository.save(voyageStatus);
 
         return VoyageStatusResponse.from(voyageStatus);
     }
@@ -48,7 +59,7 @@ public class VoyageServiceImpl implements VoyageService {
 
         // 항해 상태가 ANCHORED가 아닐 때 -> 예외
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
-            new IllegalArgumentException("현재 정박 중이 아닙니다");
+            throw new IllegalArgumentException("현재 정박 중이 아닙니다");
         }
 
         // City 개발 후 진행 예정
@@ -79,5 +90,11 @@ public class VoyageServiceImpl implements VoyageService {
             }
 
             return voyageStatus;
+    }
+
+    // 3. VoyageStatus -> CityRoute 조회
+    private CityRoute findCityRouteByCityIdsOrThrow(Long departedCityId, Long destinationCityId){
+        return cityRouteRepository.findByFromCityIdAndToCityId(departedCityId, destinationCityId)
+            .orElseThrow(()-> new IllegalArgumentException("해당 경로가 존재하지 않습니다."));
     }
 }
