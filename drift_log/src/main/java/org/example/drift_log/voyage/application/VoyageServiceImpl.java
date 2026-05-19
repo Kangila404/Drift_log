@@ -1,6 +1,10 @@
 package org.example.drift_log.voyage.application;
 
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.drift_log.city.domain.model.CityRoute;
 import org.example.drift_log.city.domain.repository.CityRouteRepository;
@@ -65,6 +69,36 @@ public class VoyageServiceImpl implements VoyageService {
         // City 개발 후 진행 예정
 
         return VoyageStartResponse.from();
+    }
+
+    // 항해 중 -> 일시 정지
+    @Override
+    public VoyageStopResponse voyageStop(VoyageStopRequest request) {
+        User user = findUserByUserIdOrThrow(request.userId());
+        VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
+            throw new IllegalStateException("항해 중이 아닙니다.");
+        }
+
+        voyageStatus.pause();
+        voyageStatusRepository.save(voyageStatus);
+        return new VoyageStopResponse("success");
+    }
+
+    // 일시정지 -> 항해 재개
+    @Override
+    public VoyageResumeResponse voyageResume(VoyageResumeRequest request) {
+        User user = findUserByUserIdOrThrow(request.userId());
+        VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        if(!voyageStatus.getVoyageState().equals(VoyageState.PAUSED)){
+            throw new IllegalStateException("일시정지 중이 아닙니다.");
+        }
+
+        voyageStatus.resume();
+        voyageStatusRepository.save(voyageStatus);
+        return new VoyageResumeResponse("success");
     }
 
 
