@@ -1,9 +1,13 @@
 package org.example.drift_log.voyage.application;
 
 
+import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStatusResponse;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 
 public interface VoyageService {
 
@@ -13,4 +17,9 @@ public interface VoyageService {
     // 2. 목적지 선택 후 항해 시작
     public VoyageStartResponse voyageStart(VoyageStartRequest request);
 
+    // 3. 항해 중 일시 정지
+    public VoyageStopResponse voyageStop(VoyageStopRequest request);
+
+    // 4. 일시 정지 후 -> 항해 재개
+    public VoyageResumeResponse voyageResume(VoyageResumeRequest request);
 }

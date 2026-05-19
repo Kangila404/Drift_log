@@ -3,7 +3,11 @@ package org.example.drift_log.voyage.presentation.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.voyage.application.VoyageService;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStartResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStatusResponse;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +40,18 @@ public class VoyageController {
         return ResponseEntity.ok(response);
     }
 
+    // 3. 항해 중, 일시 정지
+    @PostMapping("/stop")
+    public ResponseEntity<VoyageStopResponse> stop(@Valid @RequestBody VoyageStopRequest request){
+        VoyageStopResponse response = voyageService.voyageStop(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 4. 일지 정지 -> 항해 개시
+    @PostMapping("/resume")
+    public ResponseEntity<VoyageResumeResponse> resume(@Valid @RequestBody VoyageResumeRequest request){
+        VoyageResumeResponse response = voyageService.voyageResume(request);
+        return ResponseEntity.ok(response);
+    }
 }
 
