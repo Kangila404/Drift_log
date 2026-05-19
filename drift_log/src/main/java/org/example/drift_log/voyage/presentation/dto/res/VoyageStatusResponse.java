@@ -17,7 +17,12 @@ public record VoyageStatusResponse(
 ) {
 
     public static VoyageStatusResponse from(VoyageStatus voyageStatus) {
-        return new VoyageStatusResponse(VoyageState.SAILING, voyageStatus.getProgress(), voyageStatus.getDepartedCityId(), voyageStatus.getDestinationCityId(), voyageStatus.isFamilyReunited());
+        return new VoyageStatusResponse(
+            voyageStatus.getVoyageState(),
+            voyageStatus.getProgress(),
+            voyageStatus.getDepartedCityId(),
+            voyageStatus.getDestinationCityId(),
+            voyageStatus.isFamilyReunited());
     }
 
 }
