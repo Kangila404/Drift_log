@@ -76,6 +76,11 @@ public class VoyageServiceImpl implements VoyageService {
     public VoyageStopResponse voyageStop(VoyageStopRequest request) {
         User user = findUserByUserIdOrThrow(request.userId());
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
+            throw new IllegalStateException("항해 중이 아닙니다.");
+        }
+
         voyageStatus.pause();
         voyageStatusRepository.save(voyageStatus);
         return new VoyageStopResponse("success");
@@ -86,6 +91,11 @@ public class VoyageServiceImpl implements VoyageService {
     public VoyageResumeResponse voyageResume(VoyageResumeRequest request) {
         User user = findUserByUserIdOrThrow(request.userId());
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
+
+        if(!voyageStatus.getVoyageState().equals(VoyageState.PAUSED)){
+            throw new IllegalStateException("일시정지 중이 아닙니다.");
+        }
+
         voyageStatus.resume();
         voyageStatusRepository.save(voyageStatus);
         return new VoyageResumeResponse("success");
