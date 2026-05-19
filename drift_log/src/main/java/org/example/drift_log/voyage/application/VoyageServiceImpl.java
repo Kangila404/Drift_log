@@ -1,6 +1,5 @@
 package org.example.drift_log.voyage.application;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
@@ -144,20 +143,20 @@ public class VoyageServiceImpl implements VoyageService {
         voyageLogRepository.save(voyageLog);
 
 
-        // 2. 도착 시 -> Trace 조회
+// 2. 도착 시 -> Trace 조회
         Trace trace = findByCityIdOrNull(arrivedCityId);
 
-        // 2. 처음 발견 -> DiscoveredTrace 저장
-        DiscoveredTrace discoveredTrace = findByUserIdAndTraceIdOrNull(user.getId(), trace.getId());
-
-        if(discoveredTrace == null){
-            discoveredTrace = DiscoveredTrace.builder()
-                .userId(user.getId())
-                .traceId(trace.getId())
-                .discoveredAt(LocalDateTime.now())
-                .build();
-
-            discoveredTraceRepository.save(discoveredTrace);
+// 흔적 있을 때만 처리
+        if(trace != null){
+            DiscoveredTrace discoveredTrace = findByUserIdAndTraceIdOrNull(user.getId(), trace.getId());
+            if(discoveredTrace == null){
+                discoveredTrace = DiscoveredTrace.builder()
+                    .userId(user.getId())
+                    .traceId(trace.getId())
+                    .discoveredAt(LocalDateTime.now())
+                    .build();
+                discoveredTraceRepository.save(discoveredTrace);
+            }
         }
 
         // 2. complete 호출

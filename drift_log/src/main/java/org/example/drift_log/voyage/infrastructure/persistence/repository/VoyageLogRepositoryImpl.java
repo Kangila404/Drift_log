@@ -13,6 +13,6 @@ public class VoyageLogRepositoryImpl implements VoyageLogRepository {
 
     @Override
     public void save(VoyageLog voyageLog) {
-
+        voyageLogJpaRepository.save(voyageLog);
     }
 }

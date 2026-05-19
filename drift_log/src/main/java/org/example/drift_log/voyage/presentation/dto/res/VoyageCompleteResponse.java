@@ -64,7 +64,7 @@ public record VoyageCompleteResponse(
     public static VoyageCompleteResponse of(City city, Trace trace, VoyageLog log){
         return new VoyageCompleteResponse(
             CityInfo.from(city),
-            TraceInfo.from(trace),
+            trace != null ? TraceInfo.from(trace) : null,
             LogInfo.from(log)
         );
     }
