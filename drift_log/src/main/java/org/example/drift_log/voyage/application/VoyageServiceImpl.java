@@ -73,10 +73,19 @@ public class VoyageServiceImpl implements VoyageService {
         User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
-        // 항해 상태가 ANCHORED가 아닐 때 -> 예외
+        // ======= 검증 ========= //
+        // 1. 항해 상태가 ANCHORED가 아닐 때 -> 예외
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
             throw new IllegalArgumentException("현재 정박 중이 아닙니다");
         }
+        // 2. 목적지가 실제로 있는 도시인지 확인
+        validateCityId(request.destinationCityId());
+        // 3. 같은 도시를 보내는 게 아닌지 확인
+        if(request.destinationCityId().equals(voyageStatus.getCurrentCityId())){
+            throw new IllegalArgumentException("같은 도시로 이동할 수 없습니다");
+        }
+
+
         voyageStatus.startSailing(request.destinationCityId());
 
         voyageStatusRepository.save(voyageStatus);
@@ -165,7 +174,7 @@ public class VoyageServiceImpl implements VoyageService {
     }
 
 
-    // ========== ========== //
+    // ========== 조회 메서드 ========== //
     // 1. String userId -> user 조회
     private User findUserByUserIdOrThrow(String userId){
         return userRepository.findByUserId(userId)
@@ -212,4 +221,12 @@ public class VoyageServiceImpl implements VoyageService {
         return cityRepository.findById(cityId)
             .orElseThrow(()-> new IllegalArgumentException("해당 도시는 존재하지 않습니다"));
     }
+
+    // ====== 검증 메서드 ======= //
+    private void validateCityId(Long cityId){
+        if(!cityRepository.existsById(cityId)){
+            throw new IllegalArgumentException("존재하지 않는 도시입니다");
+        }
+    }
+
 }
