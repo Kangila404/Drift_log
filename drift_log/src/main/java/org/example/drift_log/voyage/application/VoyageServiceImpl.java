@@ -129,13 +129,13 @@ public class VoyageServiceImpl implements VoyageService {
         Long arrivedCityId = voyageStatus.getCurrentCityId();
 
         City arrivedCity = findCityByIdORThrow(arrivedCityId);
-
+        City departedCity = findCityByIdORThrow(departedCityId);
 
         // 1. Voyage 로그 생성
         VoyageLog voyageLog = VoyageLog.builder()
             .userId(user.getId())
-            .fromCityId(departedCityId)
-            .toCityId(arrivedCityId)
+            .fromCity(departedCity)
+            .toCity(arrivedCity)
             .autoText("추후에 들어갈 텍스트")
             .weatherTheme("날씨에서 가져올 예정")
             .build();
