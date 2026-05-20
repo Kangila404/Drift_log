@@ -28,7 +28,7 @@ public final class JwtTokenProvider {
     }
 
     // 1. AccessToken 생성
-    public String createAccessToken(Long userId){
+    public String createAccessToken(String userId){
         return Jwts.builder()
             .setSubject(String.valueOf(userId))
             .setIssuedAt(new Date())
@@ -48,8 +48,8 @@ public final class JwtTokenProvider {
     }
 
     // 3. 토큰 -> user의 Id 추출
-    public long getUserId(String token){
-        return Long.parseLong(getClaims(token).getSubject());
+    public String getUserId(String token){
+        return getClaims(token).getSubject();
     }
 
     // 4. 토큰 유효성 검증

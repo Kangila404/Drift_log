@@ -28,9 +28,15 @@ public class VoyageLogServiceImpl implements VoyageLogService{
     }
 
     @Override
-    public WriteVoyageLogResponse writeLog(Long logId, WriteVoyageLogRequest request) {
+    public WriteVoyageLogResponse writeLog(String userId, Long logId, WriteVoyageLogRequest request) {
 
         VoyageLog voyageLog = findVoyageByIdOrThrow(logId);
+
+        User user = findUserByIdOrThrow(voyageLog.getUserId());
+
+        if(!user.getUserId().equals(userId)){
+            throw new IllegalArgumentException("해당 유저가 작성한 항해 일지가 아닙니다.");
+        }
 
         voyageLog.writeVoyageLog(request.userText());
 
@@ -52,7 +58,12 @@ public class VoyageLogServiceImpl implements VoyageLogService{
     // 3. (String) userId -> User 조회
     private User findUserByUserId(String userId){
         return userRepository.findByUserId(userId)
-            .orElseThrow(()->new IllegalArgumentException("존재하지 않는 유저입니다."));
+            .orElseThrow(()->new IllegalArgumentException("존재하지 않는 유저입니다(1)"));
     }
 
+    // 4. Long userId -> User 조회
+    private User findUserByIdOrThrow(Long userId){
+        return userRepository.findById(userId)
+            .orElseThrow(()->new IllegalArgumentException("존재하지 않는 유저입니다(2)"));
+    }
 }

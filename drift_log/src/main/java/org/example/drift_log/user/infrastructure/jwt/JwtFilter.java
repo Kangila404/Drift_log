@@ -23,7 +23,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         // 유저가 올바른 토큰을 지니고 있을 때
         if(token != null && jwtTokenProvider.validateToken(token)) {
-            Long userId = jwtTokenProvider.getUserId(token);
+            String userId = jwtTokenProvider.getUserId(token);
 
             UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(userId, null, null);
