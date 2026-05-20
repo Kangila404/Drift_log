@@ -8,4 +8,6 @@ public interface CityRepository {
     List<City> findAll();
 
     Optional<City> findById(Long id);
+
+    boolean existsById(Long id);
 }

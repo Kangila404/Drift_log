@@ -9,6 +9,7 @@ import org.example.drift_log.voyage.presentation.dto.req.WriteVoyageLogRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageLogResponse;
 import org.example.drift_log.voyage.presentation.dto.res.WriteVoyageLogResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +28,7 @@ public class VoyageLogController {
 
     @GetMapping
     public ResponseEntity<List<VoyageLogResponse>> getLogs(
-        @RequestParam String userId
+        @AuthenticationPrincipal String userId
     ){
         List<VoyageLogResponse> response = voyageLogService.getLogList(userId);
 
@@ -36,9 +37,10 @@ public class VoyageLogController {
 
     @PostMapping("{logId}")
     public ResponseEntity<WriteVoyageLogResponse> writeLog(
+        @AuthenticationPrincipal String userId,
         @PathVariable Long logId,
         @Valid @RequestBody WriteVoyageLogRequest request){
-        WriteVoyageLogResponse response = voyageLogService.writeLog(logId, request);
+        WriteVoyageLogResponse response = voyageLogService.writeLog(userId,logId, request);
         return  ResponseEntity.ok(response);
     }
 

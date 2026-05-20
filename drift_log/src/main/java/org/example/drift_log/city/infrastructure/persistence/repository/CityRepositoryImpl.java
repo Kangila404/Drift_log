@@ -22,4 +22,9 @@ public class CityRepositoryImpl implements CityRepository {
     public Optional<City> findById(Long id) {
         return cityJpaRepository.findById(id);
     }
+
+    @Override
+    public boolean existsById(Long id) {
+        return cityJpaRepository.existsById(id);
+    }
 }

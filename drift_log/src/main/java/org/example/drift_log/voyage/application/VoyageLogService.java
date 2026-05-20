@@ -8,5 +8,5 @@ import org.example.drift_log.voyage.presentation.dto.res.WriteVoyageLogResponse;
 public interface VoyageLogService {
     List<VoyageLogResponse> getLogList(String userId);
 
-    WriteVoyageLogResponse writeLog(Long logId, WriteVoyageLogRequest request);
+    WriteVoyageLogResponse writeLog(String userId, Long logId, WriteVoyageLogRequest request);
 }
