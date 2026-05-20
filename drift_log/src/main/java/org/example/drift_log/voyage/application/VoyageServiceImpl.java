@@ -10,11 +10,8 @@ import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
 import org.example.drift_log.trace.domain.repository.TraceRepository;
 import org.example.drift_log.voyage.domain.repository.VoyageLogRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageResumeResponse;
-import org.example.drift_log.voyage.presentation.dto.req.VoyageStopRequest;
+import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
-import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.drift_log.city.domain.model.CityRoute;
@@ -72,24 +69,25 @@ public class VoyageServiceImpl implements VoyageService {
 
     // 2. 항해 시작
     @Override
-    public VoyageStartResponse voyageStart(VoyageStartRequest request) {
-        User user = findUserByUserIdOrThrow(request.userId());
+    public VoyageStartResponse voyageStart(String userId, VoyageStartRequest request) {
+        User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         // 항해 상태가 ANCHORED가 아닐 때 -> 예외
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
             throw new IllegalArgumentException("현재 정박 중이 아닙니다");
         }
+        voyageStatus.startSailing(request.destinationCityId());
 
-        // City 개발 후 진행 예정
+        voyageStatusRepository.save(voyageStatus);
 
         return VoyageStartResponse.from();
     }
 
     // 항해 중 -> 일시 정지
     @Override
-    public VoyageStopResponse voyageStop(VoyageStopRequest request) {
-        User user = findUserByUserIdOrThrow(request.userId());
+    public VoyageStopResponse voyageStop(String userId) {
+        User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
@@ -103,8 +101,8 @@ public class VoyageServiceImpl implements VoyageService {
 
     // 일시정지 -> 항해 재개
     @Override
-    public VoyageResumeResponse voyageResume(VoyageResumeRequest request) {
-        User user = findUserByUserIdOrThrow(request.userId());
+    public VoyageResumeResponse voyageResume(String userId) {
+        User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.PAUSED)){
@@ -117,8 +115,8 @@ public class VoyageServiceImpl implements VoyageService {
     }
 
     @Override
-    public VoyageCompleteResponse voyageComplete(VoyageCompleteRequest request) {
-        User user = findUserByUserIdOrThrow(request.userId());
+    public VoyageCompleteResponse voyageComplete(String userId) {
+        User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){

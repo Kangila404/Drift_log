@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.application.MapService;
 import org.example.drift_log.city.presentation.dto.res.MapResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,7 +20,9 @@ public class CityController {
     private final MapService mapService;
 
     @GetMapping
-    public ResponseEntity<MapResponse> getMap(@RequestParam String userId){
+    public ResponseEntity<MapResponse> getMap(
+        @AuthenticationPrincipal String userId
+    ){
         MapResponse response = mapService.getMap(userId);
         return ResponseEntity.ok(response);
     }
