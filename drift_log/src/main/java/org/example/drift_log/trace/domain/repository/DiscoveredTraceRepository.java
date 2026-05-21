@@ -10,4 +10,5 @@ public interface DiscoveredTraceRepository {
     List<DiscoveredTrace> findAllByUserId(Long userId);
 
     void save(DiscoveredTrace discoveredTrace);
+    Long countByUserId(Long userId);
 }

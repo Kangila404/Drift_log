@@ -28,4 +28,9 @@ public class DiscoveredTraceRepositoryImpl implements DiscoveredTraceRepository 
     public void save(DiscoveredTrace discoveredTrace) {
         discoveredTraceJpaRepository.save(discoveredTrace);
     }
+
+    @Override
+    public Long countByUserId(Long userId) {
+        return discoveredTraceJpaRepository.countByUserId(userId);
+    }
 }

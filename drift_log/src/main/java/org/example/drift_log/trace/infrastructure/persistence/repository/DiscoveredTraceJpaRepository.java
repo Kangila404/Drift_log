@@ -10,4 +10,6 @@ public interface DiscoveredTraceJpaRepository extends JpaRepository<DiscoveredTr
     Optional<DiscoveredTrace> findByUserIdAndTraceId(Long userId, Long traceId);
 
     List<DiscoveredTrace> findAllByUserId(Long userId);
+
+    Long countByUserId(Long userId);
 }

@@ -88,5 +88,9 @@ public class VoyageStatus extends BaseEntity {
     }
 
 
+    // 6. 엔딩
+    public void familyReunited(){
+        this.isFamilyReunited = true;
+    }
 
 }

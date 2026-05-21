@@ -2,6 +2,7 @@ package org.example.drift_log.voyage.presentation.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.voyage.application.VoyageService;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
@@ -72,5 +73,7 @@ public class VoyageController {
         VoyageCompleteResponse response = voyageService.voyageComplete(userId);
         return ResponseEntity.ok(response);
     }
+
+
 }
 

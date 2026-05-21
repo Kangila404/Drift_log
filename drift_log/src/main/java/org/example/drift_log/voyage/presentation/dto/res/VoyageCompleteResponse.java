@@ -8,7 +8,8 @@ import org.example.drift_log.voyage.domain.entity.VoyageLog;
 public record VoyageCompleteResponse(
     CityInfo arrivedCity,
     TraceInfo discoverdTrace,
-    LogInfo voyageLog
+    LogInfo voyageLog,
+    boolean isEnding
 ) {
 
     // 1. CityInfo
@@ -61,11 +62,12 @@ public record VoyageCompleteResponse(
 
 
     // 전체 정적 팩토리 메서드
-    public static VoyageCompleteResponse of(City city, Trace trace, VoyageLog log){
+    public static VoyageCompleteResponse of(City city, Trace trace, VoyageLog log, boolean isEnding){
         return new VoyageCompleteResponse(
             CityInfo.from(city),
             trace != null ? TraceInfo.from(trace) : null,
-            LogInfo.from(log)
+            LogInfo.from(log),
+            isEnding
         );
     }
 }

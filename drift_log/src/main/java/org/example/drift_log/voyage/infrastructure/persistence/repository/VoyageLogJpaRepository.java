@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface VoyageLogJpaRepository extends JpaRepository<VoyageLog,Long> {
     List<VoyageLog> findAllByUserId(Long userId);
+
+    Long countDistinctToCityByUserId(Long userId);
 }
