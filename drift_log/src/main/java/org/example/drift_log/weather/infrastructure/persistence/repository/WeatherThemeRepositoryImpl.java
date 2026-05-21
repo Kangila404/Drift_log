@@ -1,6 +1,7 @@
 package org.example.drift_log.weather.infrastructure.persistence.repository;
 
 import java.time.LocalDate;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
@@ -20,5 +21,10 @@ public class WeatherThemeRepositoryImpl implements WeatherThemeRepository {
     @Override
     public boolean existsByDate(LocalDate date) {
         return weatherThemeJpaRepository.existsByDate(date);
+    }
+
+    @Override
+    public Optional<WeatherTheme> findByDate(LocalDate date) {
+        return weatherThemeJpaRepository.findByDate(date);
     }
 }

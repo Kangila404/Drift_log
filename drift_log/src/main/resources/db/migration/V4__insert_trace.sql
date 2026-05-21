@@ -7,12 +7,15 @@
 -- image_url NULL = 텍스트만 표시
 -- =============================================
 
-INSERT INTO trace (id, city_id, family_member, content, image_url, created_at, updated_at)
+DELETE FROM trace;
+
+INSERT INTO trace (id, city_id, family_member, name, content, image_url, created_at, updated_at)
 VALUES
     (
         1,
         2,
         'MOM',
+        '인천 구항 창고 붉은 글씨',
         '인천 구항 창고 옥상에 붉은 페인트로 크게 쓰여 있었다. 엄마 여기 왔던 것 같다. 식량을 찾으러 왔으리라. 대전으로 향했다.',
         NULL,
         NOW(),
@@ -22,6 +25,7 @@ VALUES
         2,
         3,
         'DAD',
+        '대전 육교 난간의 방수포',
         '대전 육교 난간에 방수포가 묶여 있었다. 매직으로 빼곡히 적혀 있었다. 아빠가 강원도로 향한 것 같다. 가장 덜 잠겼기 때문이리라.',
         '/trace/daejeon_dad.png',
         NOW(),
@@ -31,6 +35,7 @@ VALUES
         3,
         4,
         'SIBLING',
+        '강원도 절벽의 방수백',
         '강원도 절벽 위 돌무더기 사이에 방수백이 끼워져 있었다. 안에 쪽지가 있었다. 동생은 부산으로 향했다. 가장 많은 배가 있기 때문일 것이다.',
         '/trace/gangwon_sibling.png',
         NOW(),
@@ -40,6 +45,7 @@ VALUES
         4,
         5,
         'MOM',
+        '부산 방파제 등대의 파란 드럼통',
         '부산 방파제 등대에 파란 드럼통이 묶여 있었다. 흰 페인트로 쓰여 있었다. 나를 제외한 모두가 모여 있는 듯하다. 서둘러 만나러 가자.',
         NULL,
         NOW(),
