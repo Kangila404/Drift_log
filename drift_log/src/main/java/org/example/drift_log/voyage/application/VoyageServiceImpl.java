@@ -146,7 +146,13 @@ public class VoyageServiceImpl implements VoyageService {
         String autoText = departedCity.getName() + "을(를) 떠나 " + arrivedCity.getName() + "에 도착했다.";
 
         WeatherTheme todayWeatherTheme = weatherThemeRepository.findByDate(LocalDate.now(ZoneId.of("Asia/Seoul")))
-            .orElseThrow(() -> new IllegalStateException("오늘의 날씨가 없습니다."));
+            .orElse(null);
+
+
+        // 날씨 없을 때 기본 값
+        String weatherThemeName = todayWeatherTheme != null
+            ? todayWeatherTheme.getTheme().getTheme()
+            : "잔잔한 수면";
 
         // 1. Voyage 로그 생성
         VoyageLog voyageLog = VoyageLog.builder()
@@ -154,7 +160,7 @@ public class VoyageServiceImpl implements VoyageService {
             .fromCity(departedCity)
             .toCity(arrivedCity)
             .autoText(autoText)
-            .weatherTheme(todayWeatherTheme.getTheme().getTheme())
+            .weatherTheme(weatherThemeName)
             .build();
 
         voyageLogRepository.save(voyageLog);
