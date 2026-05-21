@@ -1,13 +1,13 @@
 package org.example.drift_log.weather.application;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.weather.domain.model.Weather;
 import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.port.WeatherApiPort;
 import org.example.drift_log.weather.domain.repository.WeatherRepository;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
-import org.example.drift_log.weather.infrastructure.persistence.repository.WeatherThemeJpaRepository;
 import org.example.drift_log.weather.presentation.dto.WeatherRawData;
 import org.springframework.stereotype.Service;
 
@@ -70,7 +70,7 @@ public class WeatherServiceImpl implements WeatherService{
 
     // 2. 금일 WeatherTheme 이미 존재 확인
     private void validateTodayWeatherTheme(){
-       boolean isWeatherExist =  weatherThemeRepository.existsByDate(LocalDate.now());
+       boolean isWeatherExist =  weatherThemeRepository.existsByDate(LocalDate.now(ZoneId.of("Asia/Seoul")));
        if(isWeatherExist){
            throw new IllegalStateException("이미 오늘의 날씨가 존재합니다");
        }

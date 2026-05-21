@@ -16,4 +16,4 @@ spring:
 
   weather:
     api:
-      key: znofxMibTQK6H8TImy0CsA
+      key: ${WEATHER_API_KEY}
