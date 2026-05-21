@@ -159,7 +159,8 @@ public class VoyageServiceImpl implements VoyageService {
             if(discoveredTrace == null){
                 discoveredTrace = DiscoveredTrace.builder()
                     .userId(user.getId())
-                    .traceId(trace.getId())
+                    .trace(trace)
+                    .city(arrivedCity)
                     .discoveredAt(LocalDateTime.now())
                     .build();
                 discoveredTraceRepository.save(discoveredTrace);

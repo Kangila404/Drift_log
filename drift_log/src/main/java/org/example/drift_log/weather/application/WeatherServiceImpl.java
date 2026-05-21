@@ -3,16 +3,18 @@ package org.example.drift_log.weather.application;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.drift_log.weather.domain.model.Weather;
 import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.port.WeatherApiPort;
 import org.example.drift_log.weather.domain.repository.WeatherRepository;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
-import org.example.drift_log.weather.presentation.dto.WeatherRawData;
+import org.example.drift_log.weather.presentation.dto.res.WeatherRawData;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WeatherServiceImpl implements WeatherService{
 
     private final WeatherRepository weatherRepository;
@@ -26,6 +28,8 @@ public class WeatherServiceImpl implements WeatherService{
 
         WeatherRawData raw = weatherApiPort.fetchTodayWeather();
         long inGameWeatherId = convertToInGameWeather(raw.sky(), raw.pty(), raw.wsd());
+
+        log.info("인게임 날씨 id={}",inGameWeatherId);
 
         Weather weather = weatherRepository.findById(inGameWeatherId)
             .orElseThrow(() -> new IllegalArgumentException("날씨를 찾을 수 없습니다"));

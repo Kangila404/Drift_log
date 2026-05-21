@@ -1,4 +1,4 @@
-package org.example.drift_log.weather.presentation.dto;
+package org.example.drift_log.weather.presentation.dto.res;
 
 public record WeatherRawData(
     String skyText,

@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.drift_log.common.entity.BaseEntity;
@@ -18,6 +19,7 @@ import org.example.drift_log.trace.domain.enums.FamilyMember;
 @Entity
 @Table(name = "trace")
 @Getter
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Trace extends BaseEntity {
 
@@ -27,6 +29,9 @@ public class Trace extends BaseEntity {
 
     @Column(nullable = false)
     private Long cityId;
+
+    @Column(nullable = false)
+    private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
