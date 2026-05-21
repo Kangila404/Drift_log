@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,7 +48,7 @@ public class WeatherTheme extends BaseEntity {
     // 1. 날씨 바꾸기
     public static WeatherTheme changeWeather(String realWeather, Weather theme, boolean isAbnormal) {
         return WeatherTheme.builder()
-            .date(LocalDate.now())
+            .date(LocalDate.now(ZoneId.of("Asia/Seoul")))
             .realWeather(realWeather)
             .theme(theme)
             .isAbnormal(isAbnormal)
