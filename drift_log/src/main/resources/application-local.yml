@@ -13,3 +13,7 @@ spring:
     secret: ${JWT_SECRET}
     access-token-expiration: 1800000 # 30분
     refresh-token-expiration: 604800000 # 7일
+
+  weather:
+    api:
+      key: znofxMibTQK6H8TImy0CsA
