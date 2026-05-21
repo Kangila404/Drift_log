@@ -6,5 +6,5 @@ import org.example.drift_log.trace.domain.model.Trace;
 
 public interface TraceRepository {
     Optional<Trace> findByCityId(Long cityId);
-
+    Long count();
 }

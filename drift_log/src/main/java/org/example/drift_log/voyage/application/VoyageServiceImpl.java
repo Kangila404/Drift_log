@@ -1,6 +1,8 @@
 package org.example.drift_log.voyage.application;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
 import org.example.drift_log.city.domain.repository.CityRepository;
@@ -13,6 +15,8 @@ import org.example.drift_log.voyage.domain.entity.VoyageLog;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
+import org.example.drift_log.weather.domain.model.WeatherTheme;
+import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.drift_log.city.domain.model.CityRoute;
 import org.example.drift_log.city.domain.repository.CityRouteRepository;
@@ -38,6 +42,7 @@ public class VoyageServiceImpl implements VoyageService {
     private final TraceRepository traceRepository;
     private final DiscoveredTraceRepository discoveredTraceRepository;
     private final CityRepository cityRepository;
+    private final WeatherThemeRepository weatherThemeRepository;
 
     // 1. 항해 상태 조회
     @Override
@@ -138,13 +143,24 @@ public class VoyageServiceImpl implements VoyageService {
         City arrivedCity = findCityByIdORThrow(arrivedCityId);
         City departedCity = findCityByIdORThrow(departedCityId);
 
+        String autoText = departedCity.getName() + "을(를) 떠나 " + arrivedCity.getName() + "에 도착했다.";
+
+        WeatherTheme todayWeatherTheme = weatherThemeRepository.findByDate(LocalDate.now(ZoneId.of("Asia/Seoul")))
+            .orElse(null);
+
+
+        // 날씨 없을 때 기본 값
+        String weatherThemeName = todayWeatherTheme != null
+            ? todayWeatherTheme.getTheme().getTheme()
+            : "잔잔한 수면";
+
         // 1. Voyage 로그 생성
         VoyageLog voyageLog = VoyageLog.builder()
             .userId(user.getId())
             .fromCity(departedCity)
             .toCity(arrivedCity)
-            .autoText("추후에 들어갈 텍스트")
-            .weatherTheme("날씨에서 가져올 예정")
+            .autoText(autoText)
+            .weatherTheme(weatherThemeName)
             .build();
 
         voyageLogRepository.save(voyageLog);
@@ -167,11 +183,18 @@ public class VoyageServiceImpl implements VoyageService {
             }
         }
 
-        // 2. complete 호출
+        // 2. 엔딩 체크
+        boolean isEnding = checkEndingCondition(user.getId(), arrivedCityId, voyageStatus);
+        if(isEnding){
+            voyageStatus.familyReunited();
+        }
+
+
+        // 3. complete 호출
         voyageStatus.complete();
         voyageStatusRepository.save(voyageStatus);
 
-        return VoyageCompleteResponse.of(arrivedCity, trace, voyageLog);
+        return VoyageCompleteResponse.of(arrivedCity, trace, voyageLog, isEnding);
     }
 
 
@@ -224,10 +247,31 @@ public class VoyageServiceImpl implements VoyageService {
     }
 
     // ====== 검증 메서드 ======= //
+    // 1. 도시 아이디가 있는지를 검증
     private void validateCityId(Long cityId){
         if(!cityRepository.existsById(cityId)){
             throw new IllegalArgumentException("존재하지 않는 도시입니다");
         }
+    }
+
+    // 2. 유저가 엔딩 조건을 만족했는지 검증
+    private boolean checkEndingCondition(Long userId, Long arrivedCityId, VoyageStatus voyageStatus){
+        // 이미 엔딩 봤으면 false (연출 다시 안 보여줌)
+        if(voyageStatus.isFamilyReunited()) return false;
+
+        // 1. 조건 1 : 강원도(cityId = 4)에 도착
+        if(!arrivedCityId.equals(4L)){
+            return false;
+        }
+        // 조건 2: 모든 도시 방문 여부 (서울 제외 4개 도시)
+        long visitedCityCount = voyageLogRepository.countDistinctToCityByUserId(userId);
+        if(visitedCityCount < 4){
+            return false;
+        }
+
+        // 조건 3: 모든 흔적 수집 여부 (흔적 4개)
+        long discoveredTraceCount = discoveredTraceRepository.countByUserId(userId);
+        return discoveredTraceCount >= 4;
     }
 
 }

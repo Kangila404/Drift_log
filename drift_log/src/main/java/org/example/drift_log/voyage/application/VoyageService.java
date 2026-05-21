@@ -24,4 +24,5 @@ public interface VoyageService {
 
     // 5. 항해 종료
     public VoyageCompleteResponse voyageComplete(String userId);
+
 }

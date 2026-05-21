@@ -18,5 +18,10 @@ public class TraceRepositoryImpl implements TraceRepository {
         return traceJpaRepository.findByCityId(cityId);
     }
 
+    @Override
+    public Long count() {
+        return traceJpaRepository.count();
+    }
+
 
 }
