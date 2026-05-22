@@ -4,6 +4,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
 import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.city.exception.CityErrorCode;
+import org.example.drift_log.city.exception.CityException;
 import org.example.drift_log.city.presentation.dto.res.MapResponse;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
@@ -39,7 +41,7 @@ public class MapServiceImpl implements MapService{
             City departedCity = getCityByCityId(voyageStatus.getDepartedCityId());
             City destinationCity = getCityByCityId(voyageStatus.getDestinationCityId());
             return MapResponse.ofSailing(cities, departedCity, destinationCity, voyageStatus.getProgress());  }
-        throw new IllegalStateException("알 수 없는 항해 상태입니다.");
+        throw new CityException(CityErrorCode.UNKNOWN_VOYAGE_STATE);
     }
 
 
@@ -48,7 +50,7 @@ public class MapServiceImpl implements MapService{
     // 1. userId -> user.id 조회
     private User getUserByUserIdOrThrow(String userId) {
         return userRepository.findByUserId(userId)
-            .orElseThrow(()-> new IllegalArgumentException("city : 유저를 찾을 수 없습니다."));
+            .orElseThrow(()-> new CityException(CityErrorCode.USER_NOT_FOUND));
     }
     // 2. user.id -> VoyageStatus 조회
     private VoyageStatus getVoyageStatusByUserIdOrThrow(Long userId) {
@@ -59,6 +61,6 @@ public class MapServiceImpl implements MapService{
     // 3. cityId -> City 조회
     private City getCityByCityId(Long cityId) {
         return cityRepository.findById(cityId)
-            .orElseThrow(()-> new IllegalArgumentException("city : 도시를 찾을 수 없습니다."));
+            .orElseThrow(()-> new CityException(CityErrorCode.CITY_NOT_FOUND));
     }
 }

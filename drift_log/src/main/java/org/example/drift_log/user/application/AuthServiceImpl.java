@@ -9,6 +9,8 @@ import org.example.drift_log.user.domain.model.RefreshToken;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.RefreshTokenRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
+import org.example.drift_log.user.exception.UserErrorCode;
+import org.example.drift_log.user.exception.UserException;
 import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
@@ -126,14 +128,15 @@ public class AuthServiceImpl implements AuthService{
     // 1. 이메일 중복 체크
     private void validateEmailNotDuplicated(String email){
         if(userRepository.existsByEmail(email)){
-            throw new IllegalArgumentException("이메일이 이미 존재합니다.");
+            throw new UserException(UserErrorCode.EMAIL_ALREADY_EXISTS);
+
         }
     }
 
     // 2. 비밀번호 = 비밀번호 확인 검증
     private void validatePasswordConfirm(String password, String passwordConfirm){
         if(!password.equals(passwordConfirm)){
-            throw new IllegalArgumentException("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+            throw new UserException(UserErrorCode.PASSWORD_NOT_MATCHED);
         }
     }
 
@@ -167,13 +170,13 @@ public class AuthServiceImpl implements AuthService{
     // 2. 리프레시 토큰 찾거나 없으면 버리기
     private RefreshToken findRefreshTokenOrThrow(String refreshToken){
         return refreshTokenRepository.findByToken(refreshToken)
-            .orElseThrow(()-> new IllegalArgumentException("리프레시 토큰이  올바르지 않습니다."));
+            .orElseThrow(()-> new UserException(UserErrorCode.INVALID_REFRESH_TOKEN));
     }
 
     // 3. 리프레시 토큰 만료 여부 확인
     private void validateRefreshTokenExpired(RefreshToken refreshToken){
         if(refreshToken.isExpired()){
-            throw new IllegalArgumentException("날짜가 지난 리프레시 토큰입니다");
+            throw new UserException(UserErrorCode.EXPIRED_REFRESH_TOKEN);
         }
     }
 
@@ -181,27 +184,27 @@ public class AuthServiceImpl implements AuthService{
     // 1. 이메일 -> 유저 조회
     private User findUserOrThrowByEmail(String email){
         return userRepository.findByEmail(email)
-            .orElseThrow(()->new IllegalArgumentException("로그인 실패입니다."));
+            .orElseThrow(()->new UserException(UserErrorCode.USER_NOT_FOUND));
     }
 
     // 2. 리프레시 토큰에 담긴 userId(long) -> User 찾기
     User findUserByIdOrThrow(Long id){
         return userRepository.findById(id)
-            .orElseThrow(()->new IllegalArgumentException("해당 토큰에 해당하는 유저가 없습니다"));
+            .orElseThrow(()->new UserException((UserErrorCode.USER_NOT_FOUND_BY_ID)));
     }
 
 
     // 3. 유저 상태 확인
     private void validateUserStatus(UserStatus userStatus){
         if(userStatus.equals(UserStatus.SUSPENDED)){
-            throw new IllegalArgumentException(("정지된 유저입니다."));
+            throw new UserException(UserErrorCode.USER_SUSPENDED);
         }
     }
 
     // 4. 유저 정보 = 패스워드 맞는지 확인
     private void validatePassword(String rawPassword, String encodedPassword){
         if(!passwordEncoder.matches(rawPassword, encodedPassword)){
-            throw new IllegalArgumentException("비밀번호가 틀립니다");
+            throw new UserException(UserErrorCode.INVALID_PASSWORD);
         }
     }
 }

@@ -6,6 +6,8 @@ import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
 import org.example.drift_log.voyage.domain.repository.VoyageLogRepository;
+import org.example.drift_log.voyage.exception.VoyageErrorCode;
+import org.example.drift_log.voyage.exception.VoyageException;
 import org.example.drift_log.voyage.presentation.dto.req.WriteVoyageLogRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageLogResponse;
 import org.example.drift_log.voyage.presentation.dto.res.WriteVoyageLogResponse;
@@ -35,7 +37,7 @@ public class VoyageLogServiceImpl implements VoyageLogService{
         User user = findUserByIdOrThrow(voyageLog.getUserId());
 
         if(!user.getUserId().equals(userId)){
-            throw new IllegalArgumentException("해당 유저가 작성한 항해 일지가 아닙니다.");
+            throw new VoyageException(VoyageErrorCode.VOYAGE_LOG_NOT_OWNER);
         }
 
         voyageLog.writeVoyageLog(request.userText());
@@ -51,19 +53,19 @@ public class VoyageLogServiceImpl implements VoyageLogService{
     // 1. logId -> VoyageLog 조회
     private VoyageLog findVoyageByIdOrThrow(Long logId){
         return voyageLogRepository.findById(logId)
-            .orElseThrow(()-> new IllegalArgumentException("해당 항해 기록을 조회할 수 없습니다."));
+            .orElseThrow(()-> new VoyageException(VoyageErrorCode.VOYAGE_LOG_NOT_FOUND));
     }
 
 
     // 3. (String) userId -> User 조회
     private User findUserByUserId(String userId){
         return userRepository.findByUserId(userId)
-            .orElseThrow(()->new IllegalArgumentException("존재하지 않는 유저입니다(1)"));
+            .orElseThrow(()->new VoyageException(VoyageErrorCode.USER_NOT_FOUND));
     }
 
     // 4. Long userId -> User 조회
     private User findUserByIdOrThrow(Long userId){
         return userRepository.findById(userId)
-            .orElseThrow(()->new IllegalArgumentException("존재하지 않는 유저입니다(2)"));
+            .orElseThrow(()->new VoyageException(VoyageErrorCode.USER_NOT_FOUND));
     }
 }

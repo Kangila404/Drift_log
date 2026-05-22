@@ -4,6 +4,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.trace.domain.model.DiscoveredTrace;
 import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
+import org.example.drift_log.trace.exception.TraceErrorCode;
+import org.example.drift_log.trace.exception.TraceException;
 import org.example.drift_log.trace.presentation.dto.res.DiscoveredTraceResponse;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
@@ -31,7 +33,7 @@ public class DiscoveredTraceServiceImpl implements DiscoverdTraceService {
     // 1. (String) userId -> User 조회
     private User findUserByUserId(String userId){
         return userRepository.findByUserId(userId)
-            .orElseThrow(()-> new IllegalArgumentException("해당 유저가 존재하지 않습니다."));
+            .orElseThrow(()-> new TraceException(TraceErrorCode.USER_NOT_FOUND));
     }
 
 

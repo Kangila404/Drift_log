@@ -10,6 +10,8 @@ import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.port.WeatherApiPort;
 import org.example.drift_log.weather.domain.repository.WeatherRepository;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
+import org.example.drift_log.weather.exception.WeatherErrorCode;
+import org.example.drift_log.weather.exception.WeatherException;
 import org.example.drift_log.weather.presentation.dto.res.WeatherRawData;
 import org.springframework.stereotype.Service;
 
@@ -45,7 +47,7 @@ public class WeatherServiceImpl implements WeatherService{
         log.info("인게임 날씨 id={}, 이상날씨={}", inGameWeatherId, isAbnormal);
 
         Weather weather = weatherRepository.findById(inGameWeatherId)
-            .orElseThrow(() -> new IllegalArgumentException("날씨를 찾을 수 없습니다"));
+            .orElseThrow(() -> new WeatherException(WeatherErrorCode.WEATHER_NOT_FOUND));
 
         weatherThemeRepository.save(
             WeatherTheme.changeWeather(realWeatherText, weather, isAbnormal)
@@ -86,7 +88,7 @@ public class WeatherServiceImpl implements WeatherService{
     private void validateTodayWeatherTheme(){
        boolean isWeatherExist =  weatherThemeRepository.existsByDate(LocalDate.now(ZoneId.of("Asia/Seoul")));
        if(isWeatherExist){
-           throw new IllegalStateException("이미 오늘의 날씨가 존재합니다");
+           throw new WeatherException(WeatherErrorCode.TODAY_WEATHER_ALREADY_EXISTS);
        }
     }
 

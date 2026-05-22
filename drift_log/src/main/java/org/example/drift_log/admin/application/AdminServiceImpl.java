@@ -5,6 +5,8 @@ import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.drift_log.admin.exception.AdminErrorCode;
+import org.example.drift_log.admin.exception.AdminException;
 import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
 import org.example.drift_log.feedback.domain.model.EndingFeedback;
@@ -61,7 +63,7 @@ public class AdminServiceImpl implements AdminService{
         User user = findUserByUserIdOrThrow(userId);
 
         VoyageStatus voyageStatus = voyageStatusRepository.findByUserId(user.getId())
-            .orElseThrow(() -> new IllegalArgumentException("항해 상태를 찾을 수 없습니다"));
+            .orElseThrow(() -> new AdminException(AdminErrorCode.VOYAGE_STATUS_NOT_FOUND));
         // 스토리 클리어 유무
         boolean isStoryClear = voyageStatus.isFamilyReunited();
 
@@ -96,6 +98,6 @@ public class AdminServiceImpl implements AdminService{
     // 1. (String)userId -> User 찾기
     private User findUserByUserIdOrThrow(String userId) {
         return userRepository.findByUserId(userId)
-            .orElseThrow(()-> new IllegalArgumentException("해당 유저는 존재하지 않습니다"));
+            .orElseThrow(()-> new AdminException(AdminErrorCode.ADMIN_USER_NOT_FOUND));
     }
 }
