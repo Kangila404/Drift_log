@@ -16,6 +16,8 @@ import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
 import org.example.drift_log.trace.domain.repository.TraceRepository;
 import org.example.drift_log.voyage.domain.repository.VoyageLogRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
+import org.example.drift_log.voyage.exception.VoyageErrorCode;
+import org.example.drift_log.voyage.exception.VoyageException;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
@@ -61,7 +63,7 @@ public class VoyageServiceImpl implements VoyageService {
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
-            throw new IllegalStateException("현재 항해 중이 아닙니다.");
+            throw new VoyageException(VoyageErrorCode.NOT_SAILING);
         }
 
         // 2) 조회(10 초 폴링)마다 -> 진척률 갱신
@@ -88,13 +90,13 @@ public class VoyageServiceImpl implements VoyageService {
         // ======= 검증 ========= //
         // 1. 항해 상태가 ANCHORED가 아닐 때 -> 예외
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
-            throw new IllegalArgumentException("현재 정박 중이 아닙니다");
+            throw new VoyageException(VoyageErrorCode.NOT_ANCHORED);
         }
         // 2. 목적지가 실제로 있는 도시인지 확인
         validateCityId(request.destinationCityId());
         // 3. 같은 도시를 보내는 게 아닌지 확인
         if(request.destinationCityId().equals(voyageStatus.getCurrentCityId())){
-            throw new IllegalArgumentException("같은 도시로 이동할 수 없습니다");
+            throw new VoyageException(VoyageErrorCode.SAME_CITY);
         }
 
 
@@ -112,7 +114,7 @@ public class VoyageServiceImpl implements VoyageService {
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
-            throw new IllegalStateException("항해 중이 아닙니다.");
+            throw new VoyageException(VoyageErrorCode.NOT_SAILING);
         }
 
         voyageStatus.pause();
@@ -127,7 +129,7 @@ public class VoyageServiceImpl implements VoyageService {
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.PAUSED)){
-            throw new IllegalStateException("일시정지 중이 아닙니다.");
+            throw new VoyageException(VoyageErrorCode.NOT_PAUSED);
         }
 
         voyageStatus.resume();
@@ -141,7 +143,7 @@ public class VoyageServiceImpl implements VoyageService {
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
         if(!voyageStatus.getVoyageState().equals(VoyageState.ANCHORED)){
-            throw new IllegalStateException("도착 상태가 아닙니다.");
+            throw new VoyageException(VoyageErrorCode.NOT_ARRIVED);
         }
 
         Long departedCityId = voyageStatus.getDepartedCityId();
@@ -176,7 +178,7 @@ public class VoyageServiceImpl implements VoyageService {
         if(request.eventIds() != null && !request.eventIds().isEmpty()){
             for(Long eventId : request.eventIds()){
                 RandomEvent randomEvent = randomEventRepository.findById(eventId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이벤트입니다."));
+                    .orElseThrow(() -> new VoyageException(VoyageErrorCode.EVENT_NOT_FOUND));
                 VoyageEvent voyageEvent = VoyageEvent.builder()
                     .voyageLog(voyageLog)
                     .randomEvent(randomEvent)
@@ -223,7 +225,7 @@ public class VoyageServiceImpl implements VoyageService {
     // 1. String userId -> user 조회
     private User findUserByUserIdOrThrow(String userId){
         return userRepository.findByUserId(userId)
-            .orElseThrow(()->new IllegalArgumentException("알맞은 유저가 아닙니다"));
+            .orElseThrow(()->new VoyageException(VoyageErrorCode.USER_NOT_FOUND));
     }
 
     // 2. Long userId -> VoyageStatus 조회
@@ -246,7 +248,7 @@ public class VoyageServiceImpl implements VoyageService {
     // 3. VoyageStatus -> CityRoute 조회
     private CityRoute findCityRouteByCityIdsOrThrow(Long departedCityId, Long destinationCityId){
         return cityRouteRepository.findByFromCityIdAndToCityId(departedCityId, destinationCityId)
-            .orElseThrow(()-> new IllegalArgumentException("해당 경로가 존재하지 않습니다."));
+            .orElseThrow(()-> new VoyageException(VoyageErrorCode.CITY_ROUTE_NOT_FOUND));
     }
 
     // 4. CityId -> Trace(흔적) 조회
@@ -264,14 +266,14 @@ public class VoyageServiceImpl implements VoyageService {
     // 6. cityId -> City 조회
     private City findCityByIdORThrow(Long cityId){
         return cityRepository.findById(cityId)
-            .orElseThrow(()-> new IllegalArgumentException("해당 도시는 존재하지 않습니다"));
+            .orElseThrow(()-> new VoyageException(VoyageErrorCode.CITY_NOT_FOUND));
     }
 
     // ====== 검증 메서드 ======= //
     // 1. 도시 아이디가 있는지를 검증
     private void validateCityId(Long cityId){
         if(!cityRepository.existsById(cityId)){
-            throw new IllegalArgumentException("존재하지 않는 도시입니다");
+            throw new VoyageException(VoyageErrorCode.CITY_INVALID);
         }
     }
 
