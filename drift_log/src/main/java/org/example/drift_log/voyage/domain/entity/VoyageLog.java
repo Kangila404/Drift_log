@@ -53,6 +53,7 @@ public class VoyageLog extends BaseEntity {
 
     String weatherTheme;
 
+    @Builder.Default
     @OneToMany(mappedBy = "voyageLog", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<VoyageEvent> voyageEvents = new ArrayList<>();
 

@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -57,6 +58,9 @@ public class User extends BaseEntity {
     @Column(name = "user_status", nullable = false)
     private UserStatus userStatus;
 
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
     // 비즈니스 로직
 
     // 1. 회원가입
@@ -69,6 +73,22 @@ public class User extends BaseEntity {
             .authType(AuthType.LOCAL)
             .userRole(UserRole.USER)
             .userStatus(UserStatus.ACTIVE)
+            .lastLoginAt(LocalDateTime.now())
             .build();
+    }
+
+    // 2. 마지막 로그인 업데이트
+    public void updateLastLoginAt(){
+        this.lastLoginAt = LocalDateTime.now();
+    }
+
+    // 3. 유저 밴
+    public void banUser(){
+        this.userStatus = UserStatus.SUSPENDED;
+    }
+
+    // 4. 유저 활성화
+    public void activateUser(){
+        this.userStatus = UserStatus.ACTIVE;
     }
 }

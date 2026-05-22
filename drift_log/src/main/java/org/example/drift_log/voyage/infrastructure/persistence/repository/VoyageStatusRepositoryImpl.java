@@ -22,4 +22,9 @@ public class VoyageStatusRepositoryImpl implements VoyageStatusRepository {
     public void save(VoyageStatus voyageStatus) {
         voyageStatusJpaRepository.save(voyageStatus);
     }
+
+    @Override
+    public Long countClearUser() {
+        return voyageStatusJpaRepository.countClearUser();
+    }
 }
