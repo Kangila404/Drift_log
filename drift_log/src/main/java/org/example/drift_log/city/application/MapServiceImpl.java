@@ -55,7 +55,7 @@ public class MapServiceImpl implements MapService{
     // 2. user.id -> VoyageStatus 조회
     private VoyageStatus getVoyageStatusByUserIdOrThrow(Long userId) {
         return voyageStatusRepository.findByUserId(userId)
-            .orElseThrow(()-> new IllegalArgumentException("voyage : 항해 일지를 찾을 수 없습니다."));
+            .orElseThrow(()-> new CityException(CityErrorCode.VOYAGE_STATUS_NOT_FOUND));
     }
 
     // 3. cityId -> City 조회

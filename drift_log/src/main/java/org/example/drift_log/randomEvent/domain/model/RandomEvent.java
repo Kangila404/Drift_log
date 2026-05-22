@@ -7,9 +7,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.drift_log.common.entity.BaseEntity;
+
 
 @Entity
 @Table(name = "random_event")
@@ -35,5 +37,13 @@ public class RandomEvent extends BaseEntity {
 
     @Column
     private String imageUrl;
+
+    @Builder
+    public RandomEvent(Long id, String name, String text, Integer cooldownMinutes) {
+        this.id = id;
+        this.name = name;
+        this.text = text;
+        this.cooldownMinutes = cooldownMinutes;
+    }
 
 }
