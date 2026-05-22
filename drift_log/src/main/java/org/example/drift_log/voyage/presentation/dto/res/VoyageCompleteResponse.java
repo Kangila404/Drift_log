@@ -1,6 +1,8 @@
 package org.example.drift_log.voyage.presentation.dto.res;
 
+import java.util.List;
 import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.randomEvent.domain.model.VoyageEvent;
 import org.example.drift_log.trace.domain.model.DiscoveredTrace;
 import org.example.drift_log.trace.domain.model.Trace;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
@@ -49,12 +51,29 @@ public record VoyageCompleteResponse(
     // 3. LogInfo
     public record LogInfo(
         String autoText,
-        String weatherTheme
+        String weatherTheme,
+        List<EventInfo> events
     ){
         public static LogInfo from(VoyageLog log) {
             return new LogInfo(
                 log.getAutoText(),
-                log.getWeatherTheme()
+                log.getWeatherTheme(),
+                log.getVoyageEvents().stream()
+                    .map(EventInfo::from)
+                    .toList()
+            );
+        }
+    }
+
+    // 4. EventInfo 추가
+    public record EventInfo(
+        Long eventId,
+        String eventName
+    ){
+        public static EventInfo from(VoyageEvent voyageEvent) {
+            return new EventInfo(
+                voyageEvent.getRandomEvent().getId(),
+                voyageEvent.getRandomEvent().getName()
             );
         }
     }

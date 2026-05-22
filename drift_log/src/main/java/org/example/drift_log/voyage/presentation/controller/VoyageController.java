@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.voyage.application.VoyageService;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
@@ -68,9 +69,10 @@ public class VoyageController {
     // 5. 항해 도착
     @PostMapping("/complete")
     public ResponseEntity<VoyageCompleteResponse> complete(
-        @AuthenticationPrincipal String userId
+        @AuthenticationPrincipal String userId,
+        @Valid @RequestBody VoyageCompleteRequest request
     ){
-        VoyageCompleteResponse response = voyageService.voyageComplete(userId);
+        VoyageCompleteResponse response = voyageService.voyageComplete(userId, request);
         return ResponseEntity.ok(response);
     }
 

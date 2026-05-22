@@ -1,6 +1,7 @@
 package org.example.drift_log.voyage.application;
 
 
+import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.req.VoyageStartRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
@@ -23,6 +24,6 @@ public interface VoyageService {
     public VoyageResumeResponse voyageResume(String userId);
 
     // 5. 항해 종료
-    public VoyageCompleteResponse voyageComplete(String userId);
+    public VoyageCompleteResponse voyageComplete(String userId, VoyageCompleteRequest request);
 
 }

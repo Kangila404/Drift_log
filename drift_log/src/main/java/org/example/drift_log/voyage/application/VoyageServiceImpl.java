@@ -6,12 +6,17 @@ import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
 import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.randomEvent.domain.model.RandomEvent;
+import org.example.drift_log.randomEvent.domain.model.VoyageEvent;
+import org.example.drift_log.randomEvent.domain.repository.RandomEventRepository;
+import org.example.drift_log.randomEvent.domain.repository.VoyageEventRepository;
 import org.example.drift_log.trace.domain.model.DiscoveredTrace;
 import org.example.drift_log.trace.domain.model.Trace;
 import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
 import org.example.drift_log.trace.domain.repository.TraceRepository;
 import org.example.drift_log.voyage.domain.repository.VoyageLogRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
+import org.example.drift_log.voyage.presentation.dto.req.VoyageCompleteRequest;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageResumeResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageCompleteResponse;
 import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
@@ -43,6 +48,8 @@ public class VoyageServiceImpl implements VoyageService {
     private final DiscoveredTraceRepository discoveredTraceRepository;
     private final CityRepository cityRepository;
     private final WeatherThemeRepository weatherThemeRepository;
+    private final RandomEventRepository randomEventRepository;
+    private final VoyageEventRepository voyageEventRepository;
 
     // 1. 항해 상태 조회
     @Override
@@ -129,7 +136,7 @@ public class VoyageServiceImpl implements VoyageService {
     }
 
     @Override
-    public VoyageCompleteResponse voyageComplete(String userId) {
+    public VoyageCompleteResponse voyageComplete(String userId, VoyageCompleteRequest request) {
         User user = findUserByUserIdOrThrow(userId);
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
@@ -165,8 +172,22 @@ public class VoyageServiceImpl implements VoyageService {
 
         voyageLogRepository.save(voyageLog);
 
+        // 2. voyageEvent 저장
+        if(request.eventIds() != null && !request.eventIds().isEmpty()){
+            for(Long eventId : request.eventIds()){
+                RandomEvent randomEvent = randomEventRepository.findById(eventId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이벤트입니다."));
+                VoyageEvent voyageEvent = VoyageEvent.builder()
+                    .voyageLog(voyageLog)
+                    .randomEvent(randomEvent)
+                    .occurredAt(LocalDateTime.now())
+                    .build();
+                voyageEventRepository.save(voyageEvent);
+            }
+        }
 
-// 2. 도착 시 -> Trace 조회
+
+// 3. 도착 시 -> Trace 조회
         Trace trace = findByCityIdOrNull(arrivedCityId);
 
 // 흔적 있을 때만 처리

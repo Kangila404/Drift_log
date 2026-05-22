@@ -1,5 +1,10 @@
 package org.example.drift_log.randomEvent.domain.repository;
 
-public interface RandomEventRepository {
+import java.util.Optional;
+import org.example.drift_log.randomEvent.domain.model.RandomEvent;
 
+public interface RandomEventRepository {
+    Optional<RandomEvent> findById(Long id);
+
+    Optional<RandomEvent> findRandom();
 }
