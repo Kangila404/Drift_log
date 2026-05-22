@@ -1,5 +1,7 @@
 package org.example.drift_log.user.infrastructure.persistence.repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.domain.model.User;
@@ -36,6 +38,21 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public Optional<User> findByUserId(String userId) {
         return userJpaRepository.findByUserId(userId);
+    }
+
+    @Override
+    public Long countByLastLoginAtAfter(LocalDateTime startOfDay) {
+        return userJpaRepository.countByLastLoginAtAfter(startOfDay);
+    }
+
+    @Override
+    public Long count() {
+        return userJpaRepository.count();
+    }
+
+    @Override
+    public List<User> findAll() {
+        return userJpaRepository.findAll();
     }
 
 
