@@ -17,7 +17,7 @@ public class WeatherController {
 
     private final WeatherThemeService weatherThemeService;
 
-    @GetMapping("today")
+    @GetMapping("/today")
     public ResponseEntity<TodayWeatherResponse> getTodayWeather(){
         TodayWeatherResponse response = weatherThemeService.getTodayWeather();
         return ResponseEntity.ok(response);
