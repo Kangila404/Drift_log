@@ -2,6 +2,7 @@ package org.example.drift_log.weather.application;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.drift_log.weather.domain.model.Weather;
@@ -20,27 +21,36 @@ public class WeatherServiceImpl implements WeatherService{
     private final WeatherRepository weatherRepository;
     private final WeatherThemeRepository weatherThemeRepository;
     private final WeatherApiPort weatherApiPort;
-
+    private final Random random = new Random();
 
     @Override
     public void updateTodayWeather() {
         validateTodayWeatherTheme();
 
-        WeatherRawData raw = weatherApiPort.fetchTodayWeather();
-        long inGameWeatherId = convertToInGameWeather(raw.sky(), raw.pty(), raw.wsd());
+        // 1. 이상날씨 우선 체크 (10일에 1번)
+        long inGameWeatherId;
+        String realWeatherText;
+        boolean isAbnormal = isAbnormalDay();
 
-        log.info("인게임 날씨 id={}",inGameWeatherId);
+        if (isAbnormal) {
+            // 일식(8) or 붉은 달(9) 랜덤
+            inGameWeatherId = (random.nextInt(2) == 0) ? 8L : 9L;
+            realWeatherText = "이상날씨";
+        } else {
+            WeatherRawData raw = weatherApiPort.fetchTodayWeather();
+            inGameWeatherId = convertToInGameWeather(raw.sky(), raw.pty(), raw.wsd());
+            realWeatherText = raw.skyText();
+        }
+
+        log.info("인게임 날씨 id={}, 이상날씨={}", inGameWeatherId, isAbnormal);
 
         Weather weather = weatherRepository.findById(inGameWeatherId)
             .orElseThrow(() -> new IllegalArgumentException("날씨를 찾을 수 없습니다"));
 
-        // 5 이상부터 이상 날씨
-        boolean isAbnormal = inGameWeatherId >= 5L;
-
         weatherThemeRepository.save(
-            WeatherTheme.changeWeather(raw.skyText(), weather, isAbnormal)
+            WeatherTheme.changeWeather(realWeatherText, weather, isAbnormal)
         );
-        }
+    }
 
 
     // ========== 관련 메서드 ========== //
@@ -78,5 +88,11 @@ public class WeatherServiceImpl implements WeatherService{
        if(isWeatherExist){
            throw new IllegalStateException("이미 오늘의 날씨가 존재합니다");
        }
+    }
+
+    // 3. 10일에 1번 이상날씨 발동
+    private boolean isAbnormalDay() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        return today.getDayOfMonth() % 10 == 0; // 10일, 20일, 30일
     }
 }
