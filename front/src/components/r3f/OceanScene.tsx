@@ -1,16 +1,20 @@
 import { Canvas } from "@react-three/fiber";
 import { useWeather } from "../../contexts/WeatherContext";
 import { useTimeOfDay } from "../../hooks/useTimeOfDay";
-import { resolveScene } from "../../constants/scenePreset";
+import { resolveScene, type ScenePreset } from "../../constants/scenePreset";
 import OceanWater from "./OceanWater";
 import OceanSky from "./OceanSky";
 import WakeParticles from "./WakeParticles";
 
-export default function OceanScene() {
+interface OceanSceneProps {
+  preset?: ScenePreset;
+}
+
+export default function OceanScene({ preset: presetProp }: OceanSceneProps) {
   const { weatherId, abnormalType } = useWeather();
   const timeOfDay = useTimeOfDay();
 
-  const preset = resolveScene({ weatherId, abnormalType, timeOfDay });
+  const preset = presetProp ?? resolveScene({ weatherId, abnormalType, timeOfDay });
 
   return (
     <Canvas camera={{ position: [0, 2, 8], fov: 60 }}>

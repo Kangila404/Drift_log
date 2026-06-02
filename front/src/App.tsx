@@ -8,7 +8,7 @@ import AdminPage from './pages/AdminPage'
 import { WeatherProvider, useWeather } from "./contexts/WeatherContext";
 import ProtectedRoute from './routes/ProtectedRoute'
 import AdminRoute from './routes/AdminRoute'
-
+import ScenePreview from './pages/ScenePreview'
 
 function App() {
   return (
@@ -21,7 +21,7 @@ function App() {
             </WeatherProvider>
           </ProtectedRoute>
         }/>
-
+        <Route path="/scene-preview" element={<ScenePreview />} />
         <Route path="/login" element={<LoginPage/>}/>
         <Route path="/signup" element={<SignupPage/>}/>
         

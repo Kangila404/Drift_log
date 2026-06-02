@@ -53,7 +53,7 @@ export function useVoyageActions() {
       }
     }
 
-    setDiscoveredTrace(data.discoverdTrace ?? null)
+    setDiscoveredTrace(data.discoveredTrace ?? null)
     if (data.isEnding) setIsFamilyReunited(true)
 
     setVoyageState('ANCHORED')

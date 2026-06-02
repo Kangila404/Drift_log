@@ -14,6 +14,7 @@ import { useWeather } from '../../contexts/WeatherContext'
 import { useTimeOfDay } from '../../hooks/useTimeOfDay'
 import { useEclipse } from '../../hooks/useEclipse'
 import { resolveScene } from '../../constants/scenePreset'
+import { bgm } from '../../audio/bgmManager'
 
 // 도시 SVG
 import Seoul from './cities/Seoul'
@@ -103,6 +104,7 @@ export default function CityView() {
   const [buttonsVisible, setButtonsVisible] = useState(false)
   const [traceOpen, setTraceOpen] = useState(false)
   const [voyageOpen, setVoyageOpen] = useState(false)
+  const [muted, setMuted] = useState(bgm.isMuted())
 
   // 첫 방문 흔적 자동 오픈 — 한 번만
   const autoOpenedRef = useRef(false)
@@ -195,6 +197,35 @@ export default function CityView() {
         background: 'linear-gradient(to bottom, rgba(4,10,24,0.5), transparent)',
         pointerEvents: 'none', zIndex: 6,
       }} />
+
+      {/* BGM 음소거 — 우상단 */}
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: buttonsVisible ? 1 : 0 }}
+        transition={{ duration: 1, ease: 'easeInOut' }}
+        onClick={() => setMuted(bgm.toggleMute())}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.92 }}
+        className="absolute top-8 right-8 z-20 w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all duration-300 bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/80 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70"
+        style={{ pointerEvents: buttonsVisible ? 'auto' : 'none' }}
+        aria-label={muted ? '소리 켜기' : '소리 끄기'}
+        title={muted ? '소리 켜기' : '소리 끄기'}
+      >
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+          {muted ? (
+            <>
+              <line x1="22" y1="9" x2="16" y2="15" />
+              <line x1="16" y1="9" x2="22" y2="15" />
+            </>
+          ) : (
+            <>
+              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+              <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+            </>
+          )}
+        </svg>
+      </motion.button>
 
       {/* 도시 이름 */}
       <div style={{

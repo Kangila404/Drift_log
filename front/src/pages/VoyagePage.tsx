@@ -127,23 +127,33 @@ export default function VoyagePage() {
   return (
     <div className="w-full h-screen relative bg-[#07111d] overflow-hidden">
 
-      {/* 오션 씬 — arriving까지 유지 */}
+{/* 오션 씬 — arriving까지 유지 */}
       {(scene === 'ocean' || scene === 'arriving') && (
         <motion.div
           className="absolute inset-0"
           animate={{ opacity: scene === 'arriving' ? 0 : 1 }}
           transition={{ duration: 1.8, ease: 'easeInOut' }}
         >
+          {/* 하늘 배경 — preset의 skyTop → skyBottom 그라데이션 */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to bottom, ${preset.skyTop} 0%, ${preset.skyBottom} 100%)`,
+            }}
+          />
+
           <Canvas
             dpr={[1.5, 2]}
             camera={{ position: [0, 1.45, 10.8], fov: 46 }}
             gl={{
               antialias: true,
+              alpha: true,
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.18,
             }}
+            style={{ background: 'transparent' }}
           >
-            <color attach="background" args={[preset.fogColor]} />
+            {/* <color attach="background" .../> 제거 — 그라데이션 div가 배경 담당 */}
             <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
             <ambientLight intensity={0.48 * preset.ambientIntensity * (1 - coverage * 0.9)} color="#6fa4d8" />
             <directionalLight position={[0, 8, -12]} intensity={1.6 * (1 - coverage * 0.9)} color="#dcecff" />
@@ -163,12 +173,8 @@ export default function VoyagePage() {
             }} />
           )}
 
-          {/* 날씨 연출 */}
           <WeatherEffects effects={preset.effects} />
-
-          {/* 랜덤 이벤트 */}
           <EventOverlay event={randomEvent} />
-
           <HUD initReady={ready} />
         </motion.div>
       )}

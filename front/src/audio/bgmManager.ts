@@ -70,6 +70,22 @@ export const bgm = {
   isMuted() {
     return muted
   },
+
+  // ── seek 바용 ──
+  // 현재 트랙 총 길이(초). 메타데이터 로드 전이면 0
+  duration() {
+    return current ? current.duration() : 0
+  },
+  // 현재 재생 위치(초)
+  getSeek() {
+    if (!current) return 0
+    const s = current.seek()
+    return typeof s === 'number' ? s : 0
+  },
+  // 위치 이동
+  setSeek(sec: number) {
+    if (current) current.seek(sec)
+  },
 }
 
 // 첫 사용자 상호작용 시 오디오 언락 (자동재생 정책)

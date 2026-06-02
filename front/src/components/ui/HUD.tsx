@@ -7,7 +7,8 @@ import EndingSequence from '../EndingSequence'
 import { bgm } from '../../audio/bgmManager'
 import { getDiscoveredTraces, type DiscoveredTrace } from '../../api/trace'
 
-type LogEntry = { id: number; date: string; from: string; to: string; note: string; autoText: string }
+type EventInfo = { name: string; text: string; imageUrl: string | null }
+type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
 
 // ─── 도시 메타 (이름/이미지/설명 — city 테이블 기준 고정값) ──────────────────
 const CITY_META: Record<number, { name: string; img: string; desc: string }> = {
@@ -22,6 +23,28 @@ const CITY_META: Record<number, { name: string; img: string; desc: string }> = {
   9:  { name: '포항', img: '/city/pohang.png',    desc: '가족과 함께 보았던 상생의 손이 보인다. 이젠 상생의 손마디인가.' },
   10: { name: '제주', img: '/city/jeju.png',      desc: '한라산 중턱까지 물이 찼다. 백록담이 섬이 되었다.' },
 }
+
+// ─── 도시 BGM (city.bgm_url 규칙과 동일) ──────────────────
+const CITY_BGM: Record<number, string> = {
+  1: '/city/seoul_bgm.mp3',
+  2: '/city/incheon_bgm.mp3',
+  3: '/city/daejeon_bgm.mp3',
+  4: '/city/gangneung_bgm.mp3',
+  5: '/city/busan_bgm.mp3',
+  6: '/city/suwon_bgm.mp3',
+  7: '/city/gwangju_bgm.mp3',
+  8: '/city/daegu_bgm.mp3',
+  9: '/city/pohang_bgm.mp3',
+  10: '/city/jeju_bgm.mp3',
+}
+
+const fmtTime = (sec: number) => {
+  if (!sec || !isFinite(sec)) return '0:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 
 // ─── 나침반 (framer-motion 흔들림 애니메이션) ─────────────────────────────────
 function Compass({ deg }: { deg: number }) {
@@ -136,8 +159,6 @@ function ProgressBar({ from, to, progress, remainingSeconds, voyageState }: {
   const isPaused = voyageState === 'PAUSED'
   const countdown = useCountdown(remainingSeconds, voyageState === 'SAILING')
   const safeProgress = Math.max(0, Math.min(1, progress))
-  const [muted, setMuted] = useState(bgm.isMuted())
-  
 
   return (
     <div className="flex flex-col gap-3" style={{ width: 'clamp(200px, 35vw, 480px)' }}>
@@ -191,14 +212,8 @@ const CITY_COORDS: Record<number, { x: number; y: number; name: string }> = {
 
 function MapPanel() {
   const { voyageState, currentCity, destinationCityId, progress } = useVoyageStore()
-  const [mapData, setMapData] = useState<any>(null)
   const [mapOpen, setMapOpen] = useState(false)
 
-  useEffect(() => {
-    apiClient.get('/map').then(res => setMapData(res.data)).catch(() => {})
-  }, [])
-
-  const visitedCityIds: number[] = mapData?.maps?.map((c: any) => c.cityId) ?? []
   const fromCity = currentCity ? CITY_COORDS[currentCity.cityId] : null
   const toCity = destinationCityId ? CITY_COORDS[destinationCityId] : null
   const safeProgress = Math.max(0, Math.min(1, progress))
@@ -259,7 +274,6 @@ function MapPanel() {
         {Object.entries(CITY_COORDS).map(([idStr, city]) => {
           const id = Number(idStr)
           const isCurrent = id === currentCity?.cityId
-          const isVisited = visitedCityIds.includes(id)
           return (
             <g key={id}>
               {isCurrent && (
@@ -268,11 +282,11 @@ function MapPanel() {
                   <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
                 </circle>
               )}
-              <circle cx={city.x} cy={city.y} r={isCurrent ? 1.4 : isVisited ? 1.1 : 0.9}
-                fill={isCurrent ? '#7eb8d4' : isVisited ? '#2a5a74' : '#0d2233'}
-                stroke={isCurrent ? '#a8d4e8' : isVisited ? '#1a4a64' : '#1a3a50'} strokeWidth="0.4" />
+              <circle cx={city.x} cy={city.y} r={isCurrent ? 1.4 : 1.0}
+                fill={isCurrent ? '#7eb8d4' : '#2a5a74'}
+                stroke={isCurrent ? '#a8d4e8' : '#1a4a64'} strokeWidth="0.4" />
               <text x={city.x + 2} y={city.y + 0.8} fontSize="2.4"
-                fill={isCurrent ? '#a8d4e8' : isVisited ? '#3a6880' : '#1a3a50'} fontFamily="monospace">{city.name}</text>
+                fill={isCurrent ? '#a8d4e8' : '#3a6880'} fontFamily="monospace">{city.name}</text>
             </g>
           )
         })}
@@ -282,7 +296,7 @@ function MapPanel() {
 
   const legend = (
     <div className="flex gap-3 flex-wrap">
-      {[{ color: '#7eb8d4', label: '현재 위치' }, { color: '#2a5a74', label: '방문' }, { color: '#0d2233', label: '미방문' }].map(l => (
+      {[{ color: '#7eb8d4', label: '현재 위치' }, { color: '#2a5a74', label: '도시' }].map(l => (
         <div key={l.label} className="flex items-center gap-1">
           <div className="w-1.5 h-1.5 rounded-full border border-[#1a3a50]" style={{ background: l.color }} />
           <span className="text-[8px] font-mono text-[#2a5a74]">{l.label}</span>
@@ -477,6 +491,12 @@ function LogPanel() {
   const [visitedCityIds, setVisitedCityIds] = useState<number[]>([])
   const [gridOpen, setGridOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState<number | null>(null)
+  const [musicOpen, setMusicOpen] = useState(false)
+  const [playingId, setPlayingId] = useState<number | null>(null)
+  const [seekPos, setSeekPos] = useState(0)
+  const [seekDur, setSeekDur] = useState(0)
+  const [selectedEvent, setSelectedEvent] = useState<EventInfo | null>(null)
+  const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     apiClient.get('/voyage-log').then(res => {
@@ -487,10 +507,14 @@ function LogPanel() {
         const day = String(d.getDate()).padStart(2, '0')
         return {
           id: l.logId,
+          ts: d.getTime(),
           date: `${y}.${m}.${day}.`,
           from: l.fromCity, to: l.toCity, note: l.userText ?? '', autoText: l.autoText,
+          events: (l.events ?? []).filter((e: EventInfo) => e.imageUrl),  // 이미지 있는 것만
         }
       })
+      // 최신순 정렬
+      mapped.sort((a: LogEntry, b: LogEntry) => b.ts - a.ts)
       setLogs(mapped)
     }).catch(() => {})
 
@@ -506,7 +530,77 @@ function LogPanel() {
     setEditingId(null)
   }
 
+  // ── 음악 미리듣기 ──
+  // 원래 BGM으로 복귀 (항해 중이면 voyage, 정박 중이면 현재 도시 곡)
+  const restoreBgm = () => {
+    const { voyageState, currentCity } = useVoyageStore.getState()
+    if (voyageState === 'SAILING' || voyageState === 'PAUSED') {
+      bgm.playVoyage()
+    } else if (currentCity?.bgmUrl) {
+      bgm.playCity(currentCity.bgmUrl)
+    } else {
+      bgm.stop()
+    }
+  }
+
+  const togglePreview = (id: number) => {
+    if (playingId === id) {
+      setPlayingId(null)
+      restoreBgm()
+    } else {
+      const url = CITY_BGM[id]
+      if (!url) return
+      setPlayingId(id)
+      bgm.playCity(url)
+    }
+  }
+
+  const closeMusic = () => {
+    setMusicOpen(false)
+    if (playingId !== null) {
+      setPlayingId(null)
+      restoreBgm()
+    }
+  }
+
+  useEffect(() => {
+    if (playingId === null) { setSeekPos(0); setSeekDur(0); return }
+    const tick = () => {
+      setSeekPos(bgm.getSeek())
+      setSeekDur(bgm.duration())
+    }
+    tick()
+    const id = setInterval(tick, 250)
+    return () => clearInterval(id)
+  }, [playingId])
+
   const visited = visitedCityIds.filter(id => CITY_META[id])
+
+  // ── 월별 그룹핑 (logs는 이미 최신순) ──
+  const monthGroups = (() => {
+    const groups: { key: string; label: string; logs: LogEntry[] }[] = []
+    const map = new Map<string, LogEntry[]>()
+    for (const log of logs) {
+      const d = new Date(log.ts)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(log)
+    }
+    // logs가 최신순이라 Map 삽입 순서도 최신 달 우선
+    for (const [key, list] of map) {
+      const [y, m] = key.split('-')
+      groups.push({ key, label: `${y}년 ${Number(m)}월`, logs: list })
+    }
+    return groups
+  })()
+
+  // 최신 달(첫 그룹)만 펼치고 나머진 접힘 — collapsedMonths에 없으면 기본값 적용
+  const isCollapsed = (key: string, idx: number) =>
+    collapsedMonths[key] ?? idx !== 0
+
+  const toggleMonth = (key: string, idx: number) =>
+    setCollapsedMonths(prev => ({ ...prev, [key]: !(prev[key] ?? idx !== 0) }))
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -522,42 +616,214 @@ function LogPanel() {
         </button>
       )}
 
-      {/* 기록 목록 */}
+      {/* 음악 듣기 버튼 */}
+      {visited.length > 0 && (
+        <button
+          onClick={() => setMusicOpen(true)}
+          className="w-full py-2.5 border border-[#1a4a64]/50 rounded text-[10px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#4a9abb]/70 tracking-widest uppercase transition-colors bg-[#071826]/40"
+        >
+          ♫ 지나온 도시 음악 듣기 ({visited.length})
+        </button>
+      )}
+
+      {/* 기록 목록 — 월별 그룹 */}
       {logs.length === 0 && <p className="text-[10px] text-[#1a3a50] italic">— 아직 항해 기록이 없습니다</p>}
-      <div className="flex flex-col gap-3">
-        {logs.map((log, i) => (
-          <motion.div key={log.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="border-l border-[#0d2233] pl-3 py-1.5">
-            <div className="flex justify-between items-center mb-1">
-              <div className="flex gap-2 items-baseline">
-                <span className="text-[9px] font-mono text-[#2a5a74]">{log.date}</span>
-                <span className="text-[9px] font-mono text-[#1a3a50]">{log.from} → {log.to}</span>
-              </div>
-              {editingId !== log.id && (
-                <button onClick={() => startEdit(log)} className="text-[8px] font-mono text-[#1a3a50] hover:text-[#4a9abb] px-1">수정</button>
-              )}
+      <div className="flex flex-col gap-2">
+        {monthGroups.map((group, gIdx) => {
+          const collapsed = isCollapsed(group.key, gIdx)
+          return (
+            <div key={group.key} className="flex flex-col">
+              {/* 월 헤더 — 누르면 토글 */}
+              <button
+                onClick={() => toggleMonth(group.key, gIdx)}
+                className="flex items-center justify-between py-2 px-1 border-b border-[#0d2233] hover:border-[#1a4a64] transition-colors group"
+              >
+                <span className="text-[10px] font-mono text-[#4a7a94] group-hover:text-[#7eb8d4] tracking-widest">
+                  {group.label}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="text-[9px] font-mono text-[#2a5a74]">{group.logs.length}건</span>
+                  <motion.span
+                    animate={{ rotate: collapsed ? 0 : 90 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-[9px] font-mono text-[#2a5a74] group-hover:text-[#7eb8d4]"
+                  >
+                    ›
+                  </motion.span>
+                </span>
+              </button>
+
+              {/* 해당 월 기록들 */}
+              <AnimatePresence initial={false}>
+                {!collapsed && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col gap-3 pt-3">
+                      {group.logs.map((log, i) => (
+                        <motion.div key={log.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="border-l border-[#0d2233] pl-3 py-1.5">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex gap-2 items-baseline">
+                              <span className="text-[9px] font-mono text-[#2a5a74]">{log.date}</span>
+                              <span className="text-[9px] font-mono text-[#1a3a50]">{log.from} → {log.to}</span>
+                            </div>
+                            {editingId !== log.id && (
+                              <button onClick={() => startEdit(log)} className="text-[8px] font-mono text-[#1a3a50] hover:text-[#4a9abb] px-1">수정</button>
+                            )}
+                          </div>
+                          <p className="text-[9px] text-[#2a5a74] mb-1">{log.autoText}</p>
+
+                          {/* 이벤트 썸네일 — 이 항해에서 본 랜덤 이벤트 */}
+                          {log.events.length > 0 && (
+                            <div className="flex gap-1.5 flex-wrap mb-1.5">
+                              {log.events.map((ev, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => setSelectedEvent(ev)}
+                                  className="w-9 h-9 rounded overflow-hidden border border-[#1a4a64]/50 hover:border-[#4a9abb] transition-colors shrink-0"
+                                  title={ev.name}
+                                >
+                                  <img src={ev.imageUrl!} alt={ev.name} className="w-full h-full object-cover" draggable={false} />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {editingId === log.id ? (
+                            <div className="flex flex-col gap-1.5 mt-1">
+                              <textarea value={editNote} onChange={e => setEditNote(e.target.value)} maxLength={100} rows={2} placeholder="오늘의 항해를 기록하세요..." className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-2 py-1.5 text-[11px] text-[#7eb8d4] resize-none outline-none focus:border-[#2a5a74] placeholder-[#1a3a50]" />
+                              <div className="flex justify-between">
+                                <span className="text-[8px] font-mono text-[#1a3a50]">{editNote.length}/100</span>
+                                <div className="flex gap-2">
+                                  <button onClick={() => setEditingId(null)} className="text-[8px] font-mono text-[#1a3a50]">취소</button>
+                                  <button onClick={() => saveEdit(log.id)} className="text-[8px] font-mono text-[#4a9abb]">저장</button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : log.note ? (
+                            <p className="text-[11px] text-[#4a7a94] font-light leading-relaxed">{log.note}</p>
+                          ) : (
+                            <p className="text-[10px] text-[#1a3a50] italic">— 기록 없음 · 수정으로 추가</p>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <p className="text-[9px] text-[#2a5a74] mb-1">{log.autoText}</p>
-            {editingId === log.id ? (
-              <div className="flex flex-col gap-1.5 mt-1">
-                <textarea value={editNote} onChange={e => setEditNote(e.target.value)} maxLength={100} rows={2} placeholder="오늘의 항해를 기록하세요..." className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-2 py-1.5 text-[11px] text-[#7eb8d4] resize-none outline-none focus:border-[#2a5a74] placeholder-[#1a3a50]" />
-                <div className="flex justify-between">
-                  <span className="text-[8px] font-mono text-[#1a3a50]">{editNote.length}/100</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditingId(null)} className="text-[8px] font-mono text-[#1a3a50]">취소</button>
-                    <button onClick={() => saveEdit(log.id)} className="text-[8px] font-mono text-[#4a9abb]">저장</button>
-                  </div>
-                </div>
-              </div>
-            ) : log.note ? (
-              <p className="text-[11px] text-[#4a7a94] font-light leading-relaxed">{log.note}</p>
-            ) : (
-              <p className="text-[10px] text-[#1a3a50] italic">— 기록 없음 · 수정으로 추가</p>
-            )}
-          </motion.div>
-        ))}
+          )
+        })}
       </div>
 
-{/* 그리드 모달 */}
+      {/* 음악 미리듣기 모달 */}
+      {createPortal(
+        <AnimatePresence>
+          {musicOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={closeMusic}
+              className="fixed inset-0 z-[9998] flex flex-col items-center justify-center cursor-pointer py-10 px-6"
+              style={{ background: 'rgba(2,6,14,0.92)', backdropFilter: 'blur(6px)' }}
+            >
+              <p className="text-[12px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase mb-6 pointer-events-none shrink-0">
+                지나온 도시의 음악
+              </p>
+
+              {/* 곡 리스트 */}
+              <div
+                onClick={e => e.stopPropagation()}
+                className="cursor-default flex flex-col gap-2 overflow-y-auto min-h-0 w-full pb-28"
+                style={{ maxWidth: 'min(92vw, 420px)', scrollbarWidth: 'none' }}
+              >
+                {visited.map(id => {
+                  const c = CITY_META[id]
+                  const isPlaying = playingId === id
+                  const hasBgm = !!CITY_BGM[id]
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => togglePreview(id)}
+                      disabled={!hasBgm}
+                      className={`flex items-center gap-4 p-3 rounded-lg border transition-colors text-left disabled:opacity-30 ${
+                        isPlaying
+                          ? 'bg-[#0a2233]/80 border-[#4a9abb]/70'
+                          : 'bg-[#071826]/50 border-[#1a4a64]/40 hover:border-[#4a9abb]/60'
+                      }`}
+                    >
+                      <div className="w-14 h-14 rounded overflow-hidden border border-[#0d2233] shrink-0">
+                        <img src={c.img} alt={c.name} className="w-full h-full object-cover" draggable={false} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-serif text-[#cce8f5] tracking-[0.2em]">{c.name}</p>
+                        <p className="text-[9px] font-mono text-[#3a6880] mt-0.5">
+                          {!hasBgm ? '음악 없음' : isPlaying ? '재생 중...' : '미리듣기'}
+                        </p>
+                      </div>
+                      <div className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 font-mono text-[12px] ${
+                        isPlaying ? 'border-[#7eb8d4]/70 text-[#cce8f5]' : 'border-[#1a4a64]/60 text-[#7eb8d4]/70'
+                      }`}>
+                        {isPlaying ? 'Ⅱ' : '▶'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* 하단 고정 플레이어 — fixed로 화면 하단에 띄움 (리스트 안 밀어냄/안 가림) */}
+              {playingId !== null && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[9999] w-[min(92vw,420px)] rounded-lg border border-[#4a9abb]/40 bg-[#071826]/95 p-4 flex flex-col gap-2 cursor-default"
+                  style={{ backdropFilter: 'blur(8px)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-[#cce8f5] tracking-widest">
+                      ♫ {CITY_META[playingId]?.name}
+                    </span>
+                    <span className="text-[9px] font-mono text-[#4a7a94]">
+                      {fmtTime(seekPos)} / {fmtTime(seekDur)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={seekDur || 0}
+                    step={0.1}
+                    value={seekPos}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      setSeekPos(v)
+                      bgm.setSeek(v)
+                    }}
+                    className="w-full h-1 appearance-none rounded-full cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #4a9abb ${
+                        seekDur > 0 ? (seekPos / seekDur) * 100 : 0
+                      }%, #0d2233 0%)`,
+                    }}
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={closeMusic}
+                className="mt-6 px-8 py-2 border border-[#1a4a64]/60 rounded text-[11px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-widest uppercase transition-colors cursor-pointer shrink-0"
+              >
+                닫기
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* 그리드 모달 */}
       {createPortal(
         <AnimatePresence>
           {gridOpen && (
@@ -569,7 +835,7 @@ function LogPanel() {
               style={{ background: 'rgba(2,6,14,0.9)', backdropFilter: 'blur(6px)' }}
             >
               <p className="text-[12px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase mb-6 pointer-events-none shrink-0">지나온 도시</p>
-                <div
+              <div
                 onClick={e => e.stopPropagation()}
                 className="grid gap-3 cursor-default overflow-y-auto min-h-0"
                 style={{
@@ -631,6 +897,39 @@ function LogPanel() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* 이벤트 상세 — 항해 중 본 랜덤 이벤트 이미지 + 설명 */}
+      {createPortal(
+        <AnimatePresence>
+          {selectedEvent && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={() => setSelectedEvent(null)}
+              className="fixed inset-0 z-[9999] flex items-center justify-center cursor-pointer px-6"
+              style={{ background: 'rgba(2,6,14,0.9)', backdropFilter: 'blur(8px)' }}
+            >
+              <motion.div
+                onClick={e => e.stopPropagation()}
+                initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+                className="w-full max-w-md bg-[#050e18] border border-[#1a4a64]/50 rounded-lg overflow-hidden flex flex-col cursor-default"
+              >
+                {selectedEvent.imageUrl && (
+                  <img src={selectedEvent.imageUrl} alt={selectedEvent.name}
+                    className="w-full aspect-video object-cover" draggable={false} />
+                )}
+                <div className="p-6 flex flex-col gap-3">
+                  <p className="text-[9px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase">항해 중 마주친 것</p>
+                  <h3 className="text-[16px] font-serif text-[#a8d4e8] tracking-wide">{selectedEvent.name}</h3>
+                  <p className="text-[12px] text-[#7eb8d4] font-light leading-relaxed whitespace-pre-line">{selectedEvent.text}</p>
+                  <button onClick={() => setSelectedEvent(null)} className="mt-1 py-2 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/50 tracking-widest uppercase transition-colors">닫기</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }
@@ -655,6 +954,10 @@ const MINI_CITY_COORDS: Record<number, { x: number; y: number; name: string }> =
 }
 
 function VisitedMiniMap({ visitedIds }: { visitedIds: number[] }) {
+  const visitedNames = visitedIds
+    .map(id => MINI_CITY_COORDS[id]?.name)
+    .filter(Boolean) as string[]
+
   return (
     <div className="w-full bg-[#040d16] rounded border border-[#1a4a64]/50 p-4">
       <div className="relative w-full" style={{ paddingBottom: '115%' }}>
@@ -679,7 +982,20 @@ function VisitedMiniMap({ visitedIds }: { visitedIds: number[] }) {
           </g>
         </svg>
       </div>
-      <p className="text-center text-[10px] font-mono text-[#2a5a74] mt-2">다녀온 도시</p>
+      <p className="text-center text-[10px] font-mono text-[#2a5a74] mt-2">
+        다녀온 도시 {visitedNames.length}곳
+      </p>
+      {visitedNames.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 justify-center mt-2">
+          {visitedNames.map(name => (
+            <span key={name} className="px-2 py-0.5 rounded-full border border-[#1a4a64]/50 bg-[#071826]/60 text-[9px] font-mono text-[#7eb8d4] tracking-widest">
+              {name}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-[9px] font-mono text-[#1a3a50] italic mt-2">아직 다녀온 도시가 없습니다</p>
+      )}
     </div>
   )
 }

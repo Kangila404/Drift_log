@@ -11,9 +11,25 @@ public record VoyageLogResponse(
     String autoText,
     String userText,
     String weatherTheme,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    List<EventInfo> events
 ) {
+    public record EventInfo(
+        String name,
+        String text,
+        String imageUrl
+    ) {}
+
     public static VoyageLogResponse from(VoyageLog log) {
+
+        List<EventInfo> events = log.getVoyageEvents().stream()
+            .map(ve -> new EventInfo(
+                ve.getRandomEvent().getName(),
+                ve.getRandomEvent().getText(),
+                ve.getRandomEvent().getImageUrl()
+            ))
+            .toList();
+
         return new VoyageLogResponse(
             log.getId(),
             log.getFromCity().getName(),
@@ -21,7 +37,8 @@ public record VoyageLogResponse(
             log.getAutoText(),
             log.getUserText(),
             log.getWeatherTheme(),
-            log.getCreatedAt()
+            log.getCreatedAt(),
+            events
         );
     }
 }

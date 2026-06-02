@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.example.drift_log.weather.application.WeatherThemeServiceImpl;
+import org.example.drift_log.weather.domain.model.Weather;
 import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
 import org.example.drift_log.weather.exception.WeatherErrorCode;
@@ -37,7 +38,14 @@ public class WeatherThemeServiceImplTest {
         ReflectionTestUtils.setField(theme, "date", LocalDate.now());
         ReflectionTestUtils.setField(theme, "realWeather", "맑음");
         ReflectionTestUtils.setField(theme, "isAbnormal", false);
+        ReflectionTestUtils.setField(theme, "weather", weather(1L));
         return theme;
+    }
+
+    private Weather weather(Long id) {
+        Weather weather = new Weather();
+        ReflectionTestUtils.setField(weather, "id", id);
+        return weather;
     }
 
     // ================================================================

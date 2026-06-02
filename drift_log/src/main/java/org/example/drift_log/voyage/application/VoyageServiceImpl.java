@@ -3,6 +3,8 @@ package org.example.drift_log.voyage.application;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
 import org.example.drift_log.city.domain.model.CityRoute;
@@ -186,8 +188,9 @@ public class VoyageServiceImpl implements VoyageService {
         voyageLogRepository.save(voyageLog);
 
         // 2. voyageEvent 저장
-        if(request.eventIds() != null && !request.eventIds().isEmpty()){
-            for(Long eventId : request.eventIds()){
+        if (request.eventIds() != null && !request.eventIds().isEmpty()) {
+            List<String> eventNames = new ArrayList<>();
+            for (Long eventId : request.eventIds()) {
                 RandomEvent randomEvent = randomEventRepository.findById(eventId)
                     .orElseThrow(() -> new VoyageException(VoyageErrorCode.EVENT_NOT_FOUND));
                 VoyageEvent voyageEvent = VoyageEvent.builder()
@@ -196,8 +199,13 @@ public class VoyageServiceImpl implements VoyageService {
                     .occurredAt(LocalDateTime.now())
                     .build();
                 voyageEventRepository.save(voyageEvent);
+
+                eventNames.add(randomEvent.getName());
             }
+            autoText += " 항해 중 " + String.join(", ", eventNames) + "을(를) 보았다.";
+            voyageLog.updateAutoText(autoText);
         }
+
 
         // 3. 도착 시 -> Trace 조회 (첫 발견일 때만 저장 + 응답)
         Trace trace = findByCityIdOrNull(arrivedCityId);
@@ -280,6 +288,7 @@ public class VoyageServiceImpl implements VoyageService {
         return cityRepository.findById(cityId)
             .orElseThrow(()-> new VoyageException(VoyageErrorCode.CITY_NOT_FOUND));
     }
+
 
     // ====== 검증 메서드 ======= //
     // 1. 도시 아이디가 있는지를 검증
