@@ -91,7 +91,7 @@ public class AuthServiceImplTest {
             SignUpRequest request = new SignUpRequest("test@test.com", "테스터", "password1!", "password1!");
             given(userRepository.existsByEmail("test@test.com")).willReturn(false);
             given(passwordEncoder.encode("password1!")).willReturn("encoded");
-            given(jwtTokenProvider.createAccessToken(any())).willReturn("access-token");
+            given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
             given(jwtTokenProvider.createRefreshToken(any())).willReturn("refresh-token");
             given(refreshTokenRepository.findByUserId(any())).willReturn(Optional.empty());
 
@@ -147,7 +147,7 @@ public class AuthServiceImplTest {
 
             given(userRepository.findByEmail("test@test.com")).willReturn(Optional.of(mockUser));
             given(passwordEncoder.matches("password1!", "encoded")).willReturn(true);
-            given(jwtTokenProvider.createAccessToken(any())).willReturn("access-token");
+            given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
             given(jwtTokenProvider.createRefreshToken(anyLong())).willReturn("refresh-token");
             given(refreshTokenRepository.findByUserId(anyLong())).willReturn(Optional.empty());
 
@@ -255,7 +255,7 @@ public class AuthServiceImplTest {
             given(refreshTokenRepository.findByToken("valid-token"))
                 .willReturn(Optional.of(유효한토큰()));
             given(userRepository.findById(1L)).willReturn(Optional.of(mockUser));
-            given(jwtTokenProvider.createAccessToken(any())).willReturn("new-access");
+            given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("new-access");
             given(jwtTokenProvider.createRefreshToken(anyLong())).willReturn("new-refresh");
             given(refreshTokenRepository.findByUserId(anyLong()))
                 .willReturn(Optional.of(유효한토큰()));

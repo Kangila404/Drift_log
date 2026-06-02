@@ -33,5 +33,20 @@ public class VoyageLogRepositoryImpl implements VoyageLogRepository {
         return voyageLogJpaRepository.countDistinctToCityByUserId(userId);
     }
 
+    @Override
+    public long countByUserId(Long userId) {
+        return voyageLogJpaRepository.countByUserId(userId);
+    }
+
+    @Override
+    public List<Long> findDistinctToCityIdsByUserId(Long userId) {
+        return voyageLogJpaRepository.findDistinctToCityIdsByUserId(userId);
+    }
+
+    @Override
+    public Long countByUserIdAndToCityId(Long userId, Long cityId) {
+        return voyageLogJpaRepository.countByUserIdAndToCityId(userId, cityId);
+    }
+
 
 }

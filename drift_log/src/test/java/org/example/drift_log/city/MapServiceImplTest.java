@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Optional;
 import org.example.drift_log.city.application.MapServiceImpl;
 import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.model.CityRoute;
 import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.city.domain.repository.CityRouteRepository;
 import org.example.drift_log.city.exception.CityErrorCode;
 import org.example.drift_log.city.exception.CityException;
 import org.example.drift_log.city.presentation.dto.res.MapResponse;
@@ -35,6 +37,7 @@ public class MapServiceImplTest {
     @Mock private CityRepository cityRepository;
     @Mock private UserRepository userRepository;
     @Mock private VoyageStatusRepository voyageStatusRepository;
+    @Mock private CityRouteRepository cityRouteRepository;
 
     // ── 공통 픽스처 ──────────────────────────────────────────────
     private User 활성유저() {
@@ -59,6 +62,14 @@ public class MapServiceImplTest {
             .currentCityId(currentCityId)
             .isFamilyReunited(false)
             .progress(0f)
+            .build();
+    }
+
+    private CityRoute 도시경로(Long fromCityId, Long toCityId) {
+        return CityRoute.builder()
+            .fromCityId(fromCityId)
+            .toCityId(toCityId)
+            .durationMinutes(60)
             .build();
     }
 
@@ -108,6 +119,8 @@ public class MapServiceImplTest {
             given(cityRepository.findAll()).willReturn(전체도시목록());
             given(cityRepository.findById(1L)).willReturn(Optional.of(도시(1L, "서울")));
             given(cityRepository.findById(2L)).willReturn(Optional.of(도시(2L, "인천")));
+            given(cityRouteRepository.findByFromCityIdAndToCityId(anyLong(), anyLong()))
+                .willReturn(Optional.of(도시경로(1L, 2L)));
 
             // when
             MapResponse response = mapService.getMap("uuid");

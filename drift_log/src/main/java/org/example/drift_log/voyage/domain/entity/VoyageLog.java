@@ -64,5 +64,10 @@ public class VoyageLog extends BaseEntity {
         this.userText = text;
     }
 
+    // 2. autoText 업데이트
+    public void updateAutoText(String autoText) {
+        this.autoText = autoText;
+    }
+
 
 }

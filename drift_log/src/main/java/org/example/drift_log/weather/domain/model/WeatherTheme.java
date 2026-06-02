@@ -37,8 +37,8 @@ public class WeatherTheme extends BaseEntity {
 
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "theme_id")
-    private Weather theme; // drift_log 날씨
+    @JoinColumn(name = "weather_id")
+    private Weather weather; // drift_log 날씨
 
     @Column(nullable = false)
     private boolean isAbnormal; // 보통 날씨 / 이상 날씨
@@ -46,11 +46,11 @@ public class WeatherTheme extends BaseEntity {
 
     // 비즈니스 로직
     // 1. 날씨 바꾸기
-    public static WeatherTheme changeWeather(String realWeather, Weather theme, boolean isAbnormal) {
+    public static WeatherTheme changeWeather(String realWeather, Weather weather, boolean isAbnormal) {
         return WeatherTheme.builder()
             .date(LocalDate.now(ZoneId.of("Asia/Seoul")))
             .realWeather(realWeather)
-            .theme(theme)
+            .weather(weather)
             .isAbnormal(isAbnormal)
             .build();
     }

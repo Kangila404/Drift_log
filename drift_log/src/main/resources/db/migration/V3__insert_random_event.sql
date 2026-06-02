@@ -1,9 +1,7 @@
 -- =============================================
 -- V3 : 랜덤 이벤트 초기 데이터 (5개)
--- 현재 로컬 static 경로 사용 중
--- S3 세팅 완료 후 URL 교체 필요
+-- image_url : /event/ 하위 이미지 사용
 -- trigger_weather NULL = 날씨 무관 발생
--- image_url NULL = 텍스트만 표시
 -- =============================================
 
 INSERT INTO random_event (id, name, trigger_weather, cooldown_minutes, text, image_url, created_at, updated_at)
@@ -14,27 +12,27 @@ VALUES
         NULL,
         20,
         '수면 아래로 거대한 그림자가 천천히 지나간다. 오래 바라보았지만 다시 나타나지 않았다.',
-        NULL,
+        '/event/whale_shadow.png',
         NOW(),
         NOW()
     ),
     (
         2,
-        '붉은 달',
+        '무지개',
         NULL,
         30,
-        '구름 사이로 붉게 물든 달이 모습을 드러냈다. 바다도 같은 빛으로 물들었다.',
-        '/event/red_moon.png',
+        '비 그친 자리, 수평선 위로 옅은 무지개가 걸렸다.',
+        '/event/rainbow.png',
         NOW(),
         NOW()
     ),
     (
         3,
-        '안개',
-        '흐림',
-        15,
-        '짙은 안개가 수평선을 지웠다. 배가 어디쯤 있는지 알 수 없었다. 그래도 앞으로 나아갔다.',
+        '돌고래 떼',
         NULL,
+        15,
+        '배 옆으로 돌고래 떼가 나타나 한참을 따라왔다.',
+        '/event/dolphins.png',
         NOW(),
         NOW()
     ),
@@ -54,7 +52,7 @@ VALUES
         NULL,
         20,
         '수평선 너머로 아주 희미한 불빛이 깜빡였다. 누군가 아직 거기 있는 것일까.',
-        NULL,
+        '/event/city_lights.png',
         NOW(),
         NOW()
     );

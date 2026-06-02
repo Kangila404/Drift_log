@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import org.example.drift_log.city.domain.model.City;
 import org.example.drift_log.trace.application.DiscoveredTraceServiceImpl;
+import org.example.drift_log.trace.domain.enums.FamilyMember;
 import org.example.drift_log.trace.domain.model.DiscoveredTrace;
 import org.example.drift_log.trace.domain.model.Trace;
 import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
@@ -27,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+
 
 @ExtendWith(MockitoExtension.class)
 public class DiscoveredTraceServiceImplTest {
@@ -57,6 +59,8 @@ public class DiscoveredTraceServiceImplTest {
             ReflectionTestUtils.setField(trace, "cityId", 1L);
             ReflectionTestUtils.setField(trace, "name", "낡은 편지");
             ReflectionTestUtils.setField(trace, "content", "아빠가 남긴 편지");
+            ReflectionTestUtils.setField(trace, "familyMember", FamilyMember.DAD); // ← 추가
+            ReflectionTestUtils.setField(trace, "imageUrl", "/trace/seoul_dad.png"); // ← 추가
             return trace;
         } catch (Exception e) {
             throw new RuntimeException("Trace 생성 실패", e);

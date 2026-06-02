@@ -11,7 +11,7 @@ import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
 import org.example.drift_log.feedback.domain.model.EndingFeedback;
 import org.example.drift_log.feedback.domain.repository.EndingFeedBackRepository;
-import org.example.drift_log.feedback.presentation.dto.res.AdminUserResponse;
+import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;

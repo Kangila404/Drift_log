@@ -65,7 +65,7 @@ public class AuthServiceImpl implements AuthService{
         voyageStatusRepository.save(voyageStatus);
 
         // Jwt 토큰 발급
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
         String refreshToken = saveRefreshToken(user.getId());
 
         return SignUpResponse.from(user, accessToken, refreshToken);
@@ -82,7 +82,7 @@ public class AuthServiceImpl implements AuthService{
         }
 
         // Jwt 토큰 발급
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
         String refreshToken = saveRefreshToken(user.getId());
 
         user.updateLastLoginAt();
@@ -118,7 +118,7 @@ public class AuthServiceImpl implements AuthService{
         validateUserStatus(user.getUserStatus());
 
         String issuedRefreshToken = saveRefreshToken(user.getId());
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
 
         return TokenRefreshResponse.from(issuedRefreshToken, accessToken);
     }

@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.drift_log.admin.application.AdminService;
 import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
-import org.example.drift_log.feedback.presentation.dto.res.AdminUserResponse;
+import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
