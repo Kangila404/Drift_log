@@ -9,20 +9,22 @@ import org.example.drift_log.voyage.domain.entity.VoyageLog;
 
 public record VoyageCompleteResponse(
     CityInfo arrivedCity,
-    TraceInfo discoverdTrace,
+    TraceInfo discoveredTrace,
     LogInfo voyageLog,
-    boolean isEnding
+    boolean isEnding,
+    boolean isFirstVisit
 ) {
 
     // 1. CityInfo
     public record CityInfo(
         Long cityId,
         String cityName,
-        String desription,
+        String description,
         String imgUrl,
         String bgmUrl
-    ){
-        public static CityInfo from(City city){
+    ) {
+
+        public static CityInfo from(City city) {
             return new CityInfo(
                 city.getId(),
                 city.getName(),
@@ -38,7 +40,8 @@ public record VoyageCompleteResponse(
         String familyMember,
         String content,
         String imgUrl
-    ){
+    ) {
+
         public static TraceInfo from(Trace trace) {
             return new TraceInfo(
                 trace.getFamilyMember().name(),
@@ -53,7 +56,8 @@ public record VoyageCompleteResponse(
         String autoText,
         String weatherTheme,
         List<EventInfo> events
-    ){
+    ) {
+
         public static LogInfo from(VoyageLog log) {
             return new LogInfo(
                 log.getAutoText(),
@@ -69,7 +73,8 @@ public record VoyageCompleteResponse(
     public record EventInfo(
         Long eventId,
         String eventName
-    ){
+    ) {
+
         public static EventInfo from(VoyageEvent voyageEvent) {
             return new EventInfo(
                 voyageEvent.getRandomEvent().getId(),
@@ -79,14 +84,15 @@ public record VoyageCompleteResponse(
     }
 
 
-
     // 전체 정적 팩토리 메서드
-    public static VoyageCompleteResponse of(City city, Trace trace, VoyageLog log, boolean isEnding){
+    public static VoyageCompleteResponse of(City city, Trace trace, VoyageLog log, boolean isEnding, boolean isFirstVisit) {
         return new VoyageCompleteResponse(
             CityInfo.from(city),
             trace != null ? TraceInfo.from(trace) : null,
-            LogInfo.from(log),
-            isEnding
+            log != null ? LogInfo.from(log) : null,   // log null 허용
+            isEnding,
+            isFirstVisit
         );
     }
+
 }

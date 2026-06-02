@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.model.CityRoute;
 import org.example.drift_log.city.domain.repository.CityRepository;
 import org.example.drift_log.randomEvent.domain.model.RandomEvent;
 import org.example.drift_log.randomEvent.domain.model.VoyageEvent;
@@ -25,7 +26,7 @@ import org.example.drift_log.voyage.presentation.dto.res.VoyageStopResponse;
 import org.example.drift_log.weather.domain.model.WeatherTheme;
 import org.example.drift_log.weather.domain.repository.WeatherThemeRepository;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.drift_log.city.domain.model.CityRoute;
+
 import org.example.drift_log.city.domain.repository.CityRouteRepository;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
@@ -57,27 +58,30 @@ public class VoyageServiceImpl implements VoyageService {
     @Override
     public VoyageStatusResponse getVoyageStatus(String userId) {
 
-        // 1) 클라이언트로부터 온 String userId -> 내부 통신에선, Long으로 voyageStatus 가져올 것
         User user = findUserByUserIdOrThrow(userId);
-
         VoyageStatus voyageStatus = findVoyageStatusByUserId(user.getId());
 
-        if(!voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
-            throw new VoyageException(VoyageErrorCode.NOT_SAILING);
+        // SAILING일 때만 진척률 갱신
+        if (voyageStatus.getVoyageState().equals(VoyageState.SAILING)) {
+            CityRoute cityRoute = findCityRouteByCityIdsOrThrow(
+                voyageStatus.getDepartedCityId(),
+                voyageStatus.getDestinationCityId()
+            );
+
+            long totalSeconds = cityRoute.getDurationMinutes() * 60L;
+            voyageStatus.tickProgress(totalSeconds);
+
+            if (voyageStatus.getProgress() >= 1.0f) {
+                voyageStatus.arrive();
+                voyageStatusRepository.save(voyageStatus);
+                return VoyageStatusResponse.from(voyageStatus);
+            }
+
+            voyageStatusRepository.save(voyageStatus);
+            return VoyageStatusResponse.fromSailing(voyageStatus, cityRoute);
         }
 
-        // 2) 조회(10 초 폴링)마다 -> 진척률 갱신
-        CityRoute cityRoute = findCityRouteByCityIdsOrThrow(voyageStatus.getDepartedCityId(), voyageStatus.getDestinationCityId());
-        float delta = 10f / (cityRoute.getDurationMinutes() * 60f);
-        voyageStatus.updateProgress(delta);
-
-        // 진척률 >= 1.0 -> 도착
-        if(voyageStatus.getProgress() >= 1.0f){
-            voyageStatus.arrive();
-        }
-
-        voyageStatusRepository.save(voyageStatus);
-
+        // PAUSED / ANCHORED — 그냥 현재 상태 반환
         return VoyageStatusResponse.from(voyageStatus);
     }
 
@@ -146,21 +150,28 @@ public class VoyageServiceImpl implements VoyageService {
             throw new VoyageException(VoyageErrorCode.NOT_ARRIVED);
         }
 
+        // 멱등 가드 : 이미 complete -> 현재 도시 정보만 반환
+        if(voyageStatus.getDepartedCityId() == null){
+            City current = findCityByIdORThrow(voyageStatus.getCurrentCityId());
+            return VoyageCompleteResponse.of(current, null, null, voyageStatus.isFamilyReunited(), false);
+        }
+
         Long departedCityId = voyageStatus.getDepartedCityId();
         Long arrivedCityId = voyageStatus.getCurrentCityId();
 
         City arrivedCity = findCityByIdORThrow(arrivedCityId);
         City departedCity = findCityByIdORThrow(departedCityId);
 
+        boolean isFirstVisit = voyageLogRepository.countByUserIdAndToCityId(user.getId(), arrivedCityId) == 0;
+
         String autoText = departedCity.getName() + "을(를) 떠나 " + arrivedCity.getName() + "에 도착했다.";
 
         WeatherTheme todayWeatherTheme = weatherThemeRepository.findByDate(LocalDate.now(ZoneId.of("Asia/Seoul")))
             .orElse(null);
 
-
         // 날씨 없을 때 기본 값
         String weatherThemeName = todayWeatherTheme != null
-            ? todayWeatherTheme.getTheme().getTheme()
+            ? todayWeatherTheme.getWeather().getTheme()
             : "잔잔한 수면";
 
         // 1. Voyage 로그 생성
@@ -188,14 +199,14 @@ public class VoyageServiceImpl implements VoyageService {
             }
         }
 
-
-// 3. 도착 시 -> Trace 조회
+        // 3. 도착 시 -> Trace 조회 (첫 발견일 때만 저장 + 응답)
         Trace trace = findByCityIdOrNull(arrivedCityId);
+        boolean isFirstDiscovery = false;
 
-// 흔적 있을 때만 처리
         if(trace != null){
             DiscoveredTrace discoveredTrace = findByUserIdAndTraceIdOrNull(user.getId(), trace.getId());
             if(discoveredTrace == null){
+                // 이미 발견한 적 없음 -> 첫 발견, 저장
                 discoveredTrace = DiscoveredTrace.builder()
                     .userId(user.getId())
                     .trace(trace)
@@ -203,21 +214,22 @@ public class VoyageServiceImpl implements VoyageService {
                     .discoveredAt(LocalDateTime.now())
                     .build();
                 discoveredTraceRepository.save(discoveredTrace);
+                isFirstDiscovery = true;
             }
         }
 
-        // 2. 엔딩 체크
+        // 4. 엔딩 체크
         boolean isEnding = checkEndingCondition(user.getId(), arrivedCityId, voyageStatus);
         if(isEnding){
             voyageStatus.familyReunited();
         }
 
-
-        // 3. complete 호출
+        // 5. complete 호출
         voyageStatus.complete();
         voyageStatusRepository.save(voyageStatus);
 
-        return VoyageCompleteResponse.of(arrivedCity, trace, voyageLog, isEnding);
+        // 첫 발견일 때만 trace 내려줌 (재방문이면 null -> 흔적 안 띄움)
+        return VoyageCompleteResponse.of(arrivedCity, isFirstDiscovery ? trace : null, voyageLog, isEnding, isFirstVisit);
     }
 
 

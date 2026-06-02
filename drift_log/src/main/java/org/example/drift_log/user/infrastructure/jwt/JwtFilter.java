@@ -5,8 +5,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,9 +26,12 @@ public class JwtFilter extends OncePerRequestFilter {
         // 유저가 올바른 토큰을 지니고 있을 때
         if(token != null && jwtTokenProvider.validateToken(token)) {
             String userId = jwtTokenProvider.getUserId(token);
+            String role = jwtTokenProvider.getRole(token);
+
+            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
             UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userId, null, null);
+                new UsernamePasswordAuthenticationToken(userId, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 

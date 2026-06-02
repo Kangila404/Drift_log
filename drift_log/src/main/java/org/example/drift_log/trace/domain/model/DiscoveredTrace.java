@@ -22,7 +22,7 @@ import org.example.drift_log.common.entity.BaseEntity;
 @NoArgsConstructor
 @Getter
 @Entity
-@Table(name = "discoverd_trace")
+@Table(name = "discovered_trace")
 public class DiscoveredTrace extends BaseEntity {
 
     @Id

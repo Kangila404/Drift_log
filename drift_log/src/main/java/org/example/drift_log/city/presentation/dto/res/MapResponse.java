@@ -2,6 +2,7 @@ package org.example.drift_log.city.presentation.dto.res;
 
 import java.util.List;
 import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.model.CityRoute;
 
 public record MapResponse(
     String voyageState,
@@ -9,7 +10,8 @@ public record MapResponse(
     MapDetail currentCity,
     MapDetail departedCity,
     MapDetail destinationCity,
-    Float progress
+    Float progress,
+    Integer remainingSeconds
 ) {
 
     public record MapDetail(
@@ -32,19 +34,24 @@ public record MapResponse(
             MapDetail.from(currentCity),
             null,
             null,
+            null,
             null
         );
     }
 
     // SAILING용
-    public static MapResponse ofSailing(List<City> cities, City departedCity, City destinationCity, Float progress) {
+    public static MapResponse ofSailing(String voyageState,List<City> cities, City departedCity, City destinationCity, Float progress, CityRoute cityRoute) {
+        int totalSeconds = cityRoute.getDurationMinutes() * 60;
+        int remaining = (int)(totalSeconds * (1 - progress));
+
         return new MapResponse(
-            "SAILING",
+            voyageState,
             cities.stream().map(MapDetail::from).toList(),
             null,
             MapDetail.from(departedCity),
             MapDetail.from(destinationCity),
-            progress
+            progress,
+            Math.max(0, remaining)
         );
     }
 }

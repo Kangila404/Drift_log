@@ -91,4 +91,14 @@ public class User extends BaseEntity {
     public void activateUser(){
         this.userStatus = UserStatus.ACTIVE;
     }
+
+    // 5. 닉네임 변경
+    public void updateName(String name){
+        this.name = name;
+    }
+
+    // 6. 비밀번호 변경
+    public void updatePassword(String encodedPassword){
+        this.password = encodedPassword;
+    }
 }

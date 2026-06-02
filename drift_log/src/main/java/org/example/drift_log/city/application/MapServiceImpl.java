@@ -3,7 +3,9 @@ package org.example.drift_log.city.application;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.model.CityRoute;
 import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.city.domain.repository.CityRouteRepository;
 import org.example.drift_log.city.exception.CityErrorCode;
 import org.example.drift_log.city.exception.CityException;
 import org.example.drift_log.city.presentation.dto.res.MapResponse;
@@ -21,6 +23,7 @@ public class MapServiceImpl implements MapService{
     private final CityRepository cityRepository;
     private final UserRepository userRepository;
     private final VoyageStatusRepository voyageStatusRepository;
+    private final CityRouteRepository cityRouteRepository;
 
     @Override
     public MapResponse getMap(String userId) {
@@ -37,10 +40,16 @@ public class MapServiceImpl implements MapService{
             return MapResponse.ofAnchored(cities, currentCity);
         }
         // 1-2) 만약 유저가 현재 항해 상태라면 -> 모든 도시 정보, 출발 도시, 목적 도시 반환
-        if(voyageStatus.getVoyageState().equals(VoyageState.SAILING)){
+        if(voyageStatus.getVoyageState().equals(VoyageState.SAILING) ||
+            voyageStatus.getVoyageState().equals(VoyageState.PAUSED)){
             City departedCity = getCityByCityId(voyageStatus.getDepartedCityId());
             City destinationCity = getCityByCityId(voyageStatus.getDestinationCityId());
-            return MapResponse.ofSailing(cities, departedCity, destinationCity, voyageStatus.getProgress());  }
+            CityRoute cityRoute = cityRouteRepository.findByFromCityIdAndToCityId(
+                voyageStatus.getDepartedCityId(),
+                voyageStatus.getDestinationCityId()
+            ).orElseThrow(()-> new CityException(CityErrorCode.CITY_NOT_FOUND));
+            return MapResponse.ofSailing(voyageStatus.getVoyageState().name(), cities, departedCity, destinationCity, voyageStatus.getProgress(), cityRoute);
+        }
         throw new CityException(CityErrorCode.UNKNOWN_VOYAGE_STATE);
     }
 

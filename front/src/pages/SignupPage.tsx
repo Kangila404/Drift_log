@@ -1,8 +1,35 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { signup } from "../api/auth";
+import OceanBackground from "../components/OceanBackground";
+import { getTodayWeather } from "../api/weather";
+import { WEATHER_MAP } from "../constants/weather";
 
 export default function SignupPage() {
+  const navigate = useNavigate()
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [weatherLabel, setWeatherLabel] = useState('잔잔한 수면')
 
-  // 타이핑 애니메이션 상태
+  const handleSignup = async () => {
+    if (password !== passwordConfirm) {
+      alert("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    try {
+      const result = await signup({ email, name, password, passwordConfirm });
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      localStorage.setItem("justLoggedIn", "1");
+      navigate("/");
+    } catch (e) {
+      console.error("회원가입 실패:", e);
+      alert("회원가입에 실패했습니다. 다시 시도해주세요.");
+    }
+  }
+
   const [displayText, setDisplayText] = useState('')
   const fullText = '새로운 항해자 등록'
 
@@ -19,24 +46,18 @@ export default function SignupPage() {
     return () => clearInterval(timer)
   }, [])
 
+useEffect(() => {
+    getTodayWeather()
+      .then(w => setWeatherLabel(WEATHER_MAP[w.weatherId]))
+      .catch(() => {})
+  }, [])
+
   return (
-    // 전체 화면 컨테이너 - 배경 이미지
-    <div
-      className="w-full h-screen flex flex-col items-center justify-center relative"
-      style={{
-        backgroundImage: 'url(/img/ocean-bg.jpg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
+    <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#07111d]">
+      <OceanBackground />
+      <div className="absolute inset-0 bg-[rgba(5,12,20,0.55)]" />
 
-      {/* 어두운 오버레이 */}
-      <div className="absolute inset-0 bg-[rgba(5,12,20,0.65)]" />
-
-      {/* 콘텐츠 */}
       <div className="z-10 flex flex-col items-center">
-
-        {/* 타이틀 */}
         <div className="text-center mb-12">
           <p className="text-[rgba(122,184,200,0.4)] text-xs tracking-widest uppercase mb-3">
             {displayText}
@@ -49,73 +70,35 @@ export default function SignupPage() {
           </p>
         </div>
 
-        {/* 회원가입 폼 - 로그인이랑 다른 점: 입력 필드 4개 */}
         <div className="border border-[rgba(122,184,200,0.2)] bg-[rgba(6,14,22,0.85)] p-10 w-80 flex flex-col gap-5 backdrop-blur-sm">
-
-          {/* 이름 입력 */}
           <div className="flex flex-col gap-1">
-            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">
-              이름
-            </label>
-            <input
-              type="text"
-              className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none"
-            />
+            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">이름</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
           </div>
-
-          {/* 이메일 입력 */}
           <div className="flex flex-col gap-1">
-            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">
-              이메일
-            </label>
-            <input
-              type="email"
-              className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none"
-            />
+            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">이메일</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
           </div>
-
-          {/* 비밀번호 입력 */}
           <div className="flex flex-col gap-1">
-            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">
-              비밀번호
-            </label>
-            <input
-              type="password"
-              className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none"
-            />
+            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">비밀번호</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
           </div>
-
-          {/* 비밀번호 확인 입력 */}
           <div className="flex flex-col gap-1">
-            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">
-              비밀번호 확인
-            </label>
-            <input
-              type="password"
-              className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none"
-            />
+            <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">비밀번호 확인</label>
+            <input type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
           </div>
-
-          {/* 등록 버튼 */}
-          <button className="border border-[rgba(122,184,200,0.4)] text-[rgba(180,210,218,0.8)] py-2 text-xs tracking-widest uppercase hover:bg-[rgba(122,184,200,0.1)] transition-all">
+          <button onClick={handleSignup} className="border border-[rgba(122,184,200,0.4)] text-[rgba(180,210,218,0.8)] py-2 text-xs tracking-widest uppercase hover:bg-[rgba(122,184,200,0.1)] transition-all">
             등록하기
           </button>
-
-          {/* 로그인 페이지로 이동 링크 */}
           <p className="text-center text-[rgba(122,184,200,0.3)] text-xs">
             이미 항해자이신가요?{" "}
-            <a href="/login" className="text-[rgba(122,184,200,0.6)] underline">
-              로그인
-            </a>
+            <a href="/login" className="text-[rgba(122,184,200,0.6)] underline">로그인</a>
           </p>
-
         </div>
 
-        {/* 하단 날씨 */}
         <p className="mt-8 text-[rgba(122,184,200,0.2)] text-xs tracking-widest uppercase">
-          오늘의 바다 · 잔잔한 수면
+          오늘의 바다 · {weatherLabel}
         </p>
-
       </div>
     </div>
   )

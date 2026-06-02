@@ -28,9 +28,10 @@ public final class JwtTokenProvider {
     }
 
     // 1. AccessToken 생성
-    public String createAccessToken(String userId){
+    public String createAccessToken(String userId, String role){
         return Jwts.builder()
             .setSubject(String.valueOf(userId))
+            .claim("role", role)
             .setIssuedAt(new Date())
             .setExpiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
             .signWith(key, SignatureAlgorithm.HS256)
@@ -47,7 +48,11 @@ public final class JwtTokenProvider {
             .compact();
     }
 
-    // 3. 토큰 -> user의 Id 추출
+    // 3-1. 토큰 -> role 추출
+    public String getRole(String token){
+        return getClaims(token).get("role", String.class);
+    }
+    // 3-2. 토큰 -> user의 Id 추출
     public String getUserId(String token){
         return getClaims(token).getSubject();
     }

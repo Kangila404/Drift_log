@@ -13,6 +13,11 @@ public interface VoyageLogRepository {
 
     List<VoyageLog> findAllByUserId(Long userId);
 
-    @Query("SELECT COUNT(DISTINCT v.toCity.id) FROM VoyageLog v WHERE v.userId = :userId")
-    Long countDistinctToCityByUserId(@Param("userId") Long userId);
+    Long countDistinctToCityByUserId(Long userId);
+
+    long countByUserId(Long userId);
+
+    List<Long> findDistinctToCityIdsByUserId(Long userId);
+
+    Long countByUserIdAndToCityId(Long userId, Long cityId);
 }

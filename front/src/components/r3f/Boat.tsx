@@ -1,10 +1,8 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Line
-// ─────────────────────────────────────────────────────────────────────────────
+import { useVoyageStore } from '../../stores/voyageStore'
+import type { ScenePreset } from '../../constants/scenePreset'
 
 function Line({ points, opacity = 0.55 }: { points: [number, number, number][]; opacity?: number }) {
   const obj = useMemo(() => {
@@ -15,10 +13,6 @@ function Line({ points, opacity = 0.55 }: { points: [number, number, number][]; 
   }, [points, opacity])
   return <primitive object={obj} />
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sail
-// ─────────────────────────────────────────────────────────────────────────────
 
 function Sail({ side }: { side: -1 | 1 }) {
   const geometry = useMemo(() => {
@@ -54,10 +48,6 @@ function Sail({ side }: { side: -1 | 1 }) {
     </group>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Hull
-// ─────────────────────────────────────────────────────────────────────────────
 
 function Hull() {
   const hullShape = useMemo(() => {
@@ -117,20 +107,9 @@ function Hull() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WakeLine
-//
-// 항법등 로컬 좌표: [±1.08, 0.38, -0.56]
-// 배 group: position=[0,-0.55,-4], scale=1.12
-// 항법등 world 좌표:
-//   x = ±1.08 * 1.12 = ±1.21
-//   y = -0.55 + 0.38 * 1.12 = -0.124  → 수면 y=-1.0으로 내림
-//   z = -4 + (-0.56) * 1.12 = -4.627
-// ─────────────────────────────────────────────────────────────────────────────
-
 function WakeLine({ side, phase = 0 }: { side: 1 | -1; phase?: number }) {
-  const X       = side * 1.21   // 항법등 world x
-  const START_Z = -4.63          // 항법등 world z
+  const X       = side * 1.21
+  const START_Z = -4.63
   const END_Z   = 8.0
   const SEGS    = 80
 
@@ -180,38 +159,95 @@ function WakeLine({ side, phase = 0 }: { side: 1 | -1; phase?: number }) {
   }, [])
 
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime
+    const isPaused = useVoyageStore.getState().voyageState === 'PAUSED'
 
-    // 등장: 0.8초 만에 연한 줄 → 점점 진해짐
+    if (isPaused) {
+      material.uniforms.uAppear.value = Math.max(0, material.uniforms.uAppear.value - 0.02)
+      return
+    }
+
+    const t = clock.elapsedTime
     const elapsed = t - startTime.current
     material.uniforms.uAppear.value = Math.min(1.0, elapsed / 0.8) ** 2
 
-    // 강도 변화
-    const w1 = Math.sin(t * 1.4 + phase)
-    const w2 = Math.sin(t * 2.6 + phase + 1.3)
-    const w3 = Math.sin(t * 4.8 + phase + 2.7)
+    const w1 = Math.sin(t * 0.25 + phase)
+    const w2 = Math.sin(t * 0.45 + phase + 1.3)
+    const w3 = Math.sin(t * 0.8 + phase + 2.7)
     material.uniforms.uPulse.value = Math.max(0.55, Math.min(1.0, 0.72 + 0.15*w1 + 0.08*w2 + 0.05*w3))
   })
 
   return <primitive object={lineObj} />
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Wake
-// ─────────────────────────────────────────────────────────────────────────────
+function RippleWave() {
+  const lastSpawnRef = useRef(0)
+  const NUM_RINGS = 4
+  const INTERVAL = 0.8
+
+  const rings = useMemo(() => {
+    return Array.from({ length: NUM_RINGS }, () => {
+      const geo = new THREE.RingGeometry(1, 1.05, 64)
+      const mat = new THREE.MeshBasicMaterial({
+        color: '#7eb8d4',
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.y = -1.0
+      return { mesh, material: mat, startTime: -999 }
+    })
+  }, [])
+
+  useFrame(({ clock }) => {
+    const isPaused = useVoyageStore.getState().voyageState === 'PAUSED'
+    const t = clock.elapsedTime
+
+    if (isPaused && t - lastSpawnRef.current > INTERVAL) {
+      const oldest = rings.reduce((a, b) => a.startTime < b.startTime ? a : b)
+      oldest.startTime = t
+      lastSpawnRef.current = t
+    }
+
+    rings.forEach((ring) => {
+      const { mesh, material, startTime } = ring
+      const age = t - startTime
+      const duration = 3.0
+      const maxRadius = 4.5
+
+      if (age < 0 || age > duration) {
+        material.opacity = 0
+        mesh.scale.setScalar(0)
+        return
+      }
+
+      const progress = age / duration
+      const radius = 0.3 + progress * maxRadius
+      mesh.scale.setScalar(radius)
+      material.opacity = isPaused ? (1 - progress) * 0.5 : 0
+    })
+  })
+
+  return (
+    <group position={[0, 0, -4]}>
+      {rings.map(({ mesh }, i) => (
+        <primitive key={i} object={mesh} />
+      ))}
+    </group>
+  )
+}
 
 export function Wake() {
   return (
     <>
       <WakeLine side={-1} phase={0.0} />
       <WakeLine side={ 1} phase={0.5} />
+      <RippleWave />
     </>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BoatModel
-// ─────────────────────────────────────────────────────────────────────────────
 
 function BoatModel() {
   return (
@@ -248,25 +284,54 @@ function BoatModel() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Boat
-// ─────────────────────────────────────────────────────────────────────────────
-
-export default function Boat() {
+export default function Boat({ preset }: { preset?: ScenePreset }) {
   const boatRef = useRef<THREE.Group>(null)
 
+  // 새벽/밤(달) 또는 폭풍우(wind)면 갑판등 켜기
+  const isDark = preset?.celestialBody === 'moon'
+  const isStorm = preset?.effects?.includes('wind') ?? false
+  const lampOn = isDark || isStorm
+
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime
+    const isPaused = useVoyageStore.getState().voyageState === 'PAUSED'
     if (!boatRef.current) return
-    boatRef.current.position.y = Math.sin(t * 1.0) * 0.05
-    boatRef.current.rotation.z = Math.sin(t * 0.72) * 0.009
-    boatRef.current.rotation.x = Math.sin(t * 0.55) * 0.006
+
+    if (isPaused) {
+      boatRef.current.position.y = 0
+      boatRef.current.rotation.z = 0
+      boatRef.current.rotation.x = 0
+      return
+    }
+
+    // 날씨 거칠수록 흔들림 강하게 (waveScale 1.0 = 잔잔 기준)
+    const intensity = preset?.waveScale ?? 1.0
+    const speed = preset?.waveSpeed ?? 1.0
+    const t = clock.elapsedTime * speed
+
+    boatRef.current.position.y = Math.sin(t * 1.0) * 0.05 * intensity
+    boatRef.current.rotation.z = Math.sin(t * 0.72) * 0.012 * intensity
+    boatRef.current.rotation.x = Math.sin(t * 0.55) * 0.008 * intensity
   })
 
   return (
     <group position={[0, -0.55, -4]} scale={1.12}>
       <group ref={boatRef}>
         <BoatModel />
+
+        {/* 갑판등 — 새벽/밤/폭풍우일 때 주변 비춤 */}
+        {lampOn && (
+          <>
+            {/* 주변 수면·배를 비추는 따뜻한 등불 */}
+            <pointLight position={[0, 1.5, -0.2]} color="#ffce8a" intensity={2.4} distance={10} decay={1.4} />
+            {/* 아래쪽(수면) 비추는 보조광 */}
+            <pointLight position={[0, 0.6, 0.4]} color="#ffd89a" intensity={1.2} distance={6} decay={1.6} />
+            {/* 등불 발광체 (광원 자체가 보이게) */}
+            <mesh position={[0, 1.5, -0.2]}>
+              <sphereGeometry args={[0.07, 16, 16]} />
+              <meshBasicMaterial color="#ffe6b0" />
+            </mesh>
+          </>
+        )}
       </group>
     </group>
   )
