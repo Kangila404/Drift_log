@@ -48,8 +48,12 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
-    // google api
+    // loki
+    implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
 
+    // prometheus
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
@@ -89,11 +93,5 @@ spotbugsMain {
 // 테스트 설정
 tasks.named('test') {
     useJUnitPlatform()
-    testLogging {
-        exceptionFormat = 'full'
-        showExceptions = true
-        showCauses = true
-        showStackTraces = true
-    }
 }
 

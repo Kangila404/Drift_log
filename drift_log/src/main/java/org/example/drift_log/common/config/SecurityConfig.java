@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // 스웨거 통과
                 .requestMatchers("/api/weather/today").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()                // 나머지 토큰
             )
             .addFilterBefore(new JwtFilter(jwtTokenProvider),  // JwtFilter 등록
