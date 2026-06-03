@@ -17,3 +17,13 @@ spring:
   weather:
     api:
       key: ${WEATHER_API_KEY}
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: drift_log
