@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import AdminPage from './pages/AdminPage'
 
-import { WeatherProvider, useWeather } from "./contexts/WeatherContext";
+import { WeatherProvider} from "./contexts/WeatherContext";
 import ProtectedRoute from './routes/ProtectedRoute'
 import AdminRoute from './routes/AdminRoute'
 import ScenePreview from './pages/ScenePreview'

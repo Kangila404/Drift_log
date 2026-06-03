@@ -25,7 +25,6 @@ export default function Incheon() {
   const breakStart = 760, breakEnd = 880
 
   // 뒤편 도시 건물 한 그룹 [x, y, w, h, brokenTop, crackSide]
-  type Bldg = [number, number, number, number, number, 'L' | 'R' | null]
   const bldgL: { x: number; bt: number }[] = [
     { x: 60, bt: 0.4 }, { x: 108, bt: 0 }, { x: 152, bt: 0.5 },
     { x: 200, bt: 0 }, { x: 244, bt: 0.35 }, { x: 290, bt: 0.2 },
