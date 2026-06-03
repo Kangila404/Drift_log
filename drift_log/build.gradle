@@ -87,10 +87,6 @@ spotbugsMain {
 }
 
 // 테스트 설정
-test {
-    useJUnitPlatform()
-}
-
 tasks.named('test') {
     useJUnitPlatform()
     testLogging {
@@ -100,3 +96,4 @@ tasks.named('test') {
         showStackTraces = true
     }
 }
+
