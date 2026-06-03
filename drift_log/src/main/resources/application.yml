@@ -15,4 +15,4 @@ springdoc:
 
 google:
   client-id:
-    ${GOOGLE_CLIENT_ID}
+    ${GOOGLE_CLIENT_ID:dummy-client-id}
