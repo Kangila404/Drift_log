@@ -12,6 +12,7 @@ import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.user.exception.UserErrorCode;
 import org.example.drift_log.user.exception.UserException;
 import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
+import org.example.drift_log.user.infrastructure.oauth.GoogleTokenVerifier;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -35,6 +36,7 @@ public class AuthServiceImpl implements AuthService{
 
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     private final VoyageStatusRepository voyageStatusRepository;
     private final UserRepository userRepository;
@@ -76,10 +78,8 @@ public class AuthServiceImpl implements AuthService{
         User user = findUserOrThrowByEmail(request.email());
         validateUserStatus(user.getUserStatus());
 
-        // 로컬 회원만 비밀번호 검사
-        if(user.getAuthType().equals(AuthType.LOCAL)){
-            validatePassword(request.password(), user.getPassword());
-        }
+        validateLocalUser(user);
+        validatePassword(request.password(), user.getPassword());
 
         // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
@@ -94,7 +94,41 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public SocialLoginResponse socialLogin(SocialLoginRequest request) {
-        return null;
+        // 1. 구글 idToken 검증
+        GoogleTokenVerifier.GoogleUserInfo googleUser =googleTokenVerifier.verify(request.idToken());
+
+        // 2. 기존 유저 조회
+        User user = userRepository.findByEmail(googleUser.email())
+            .orElseGet(()->{
+                User newUser = User.createSocialUser(googleUser.email(), googleUser.name(), request.authType());
+                userRepository.save(newUser);
+
+                voyageStatusRepository.save(VoyageStatus.builder()
+                    .userId(newUser.getId())     // save 후 id 채워짐
+                    .voyageState(VoyageState.ANCHORED)
+                    .currentCityId(1L)
+                    .progress(0.0f)
+                    .isFamilyReunited(false)
+                    .build());
+
+                return newUser;
+            });
+
+
+        // 3. 상태 검증
+        validateUserStatus(user.getUserStatus());
+
+        // 4. 소셜 유저 검증
+        validateSocialUser(user);
+
+        // 4. jwt 발급
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
+        String refreshToken = saveRefreshToken(user.getId());
+
+        user.updateLastLoginAt();
+        userRepository.save(user);
+
+        return SocialLoginResponse.from(user, accessToken, refreshToken);
     }
 
     @Override
@@ -205,6 +239,21 @@ public class AuthServiceImpl implements AuthService{
     private void validatePassword(String rawPassword, String encodedPassword){
         if(!passwordEncoder.matches(rawPassword, encodedPassword)){
             throw new UserException(UserErrorCode.INVALID_PASSWORD);
+        }
+    }
+
+    // 5. 소셜(구글) 유저 검증
+    private void validateSocialUser(User user){
+
+        if(!user.getAuthType().equals(AuthType.GOOGLE)){
+            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
+        }
+    }
+
+    // 6. 로컬 유저 검증
+    private void validateLocalUser(User user){
+        if(!user.getAuthType().equals(AuthType.LOCAL)){
+            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
         }
     }
 }

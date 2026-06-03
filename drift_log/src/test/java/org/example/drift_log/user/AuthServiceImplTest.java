@@ -17,12 +17,16 @@ import org.example.drift_log.user.domain.repository.RefreshTokenRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.user.exception.UserErrorCode;
 import org.example.drift_log.user.exception.UserException;
+import org.example.drift_log.user.domain.enums.AuthType;
 import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
+import org.example.drift_log.user.infrastructure.oauth.GoogleTokenVerifier;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
+import org.example.drift_log.user.presentation.dto.req.SocialLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.TokenRefreshRequest;
 import org.example.drift_log.user.presentation.dto.res.LoginResponse;
+import org.example.drift_log.user.presentation.dto.res.SocialLoginResponse;
 import org.example.drift_log.user.presentation.dto.res.TokenRefreshResponse;
 import org.example.drift_log.voyage.domain.repository.VoyageStatusRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +47,7 @@ public class AuthServiceImplTest {
 
     @Mock private JwtTokenProvider jwtTokenProvider;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private GoogleTokenVerifier googleTokenVerifier;
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private VoyageStatusRepository voyageStatusRepository;
@@ -106,7 +111,7 @@ public class AuthServiceImplTest {
         @DisplayName("회원가입_이메일_중복_예외")
         void 회원가입_이메일_중복_예외() {
             // given
-            SignUpRequest request = new SignUpRequest("dup@test.com", "password1!", "password1!", "테스터");
+            SignUpRequest request = new SignUpRequest("dup@test.com", "테스터", "password1!", "password1!");
             given(userRepository.existsByEmail("dup@test.com")).willReturn(true);
 
             // when & then
@@ -128,6 +133,94 @@ public class AuthServiceImplTest {
                 .isInstanceOf(UserException.class)
                 .satisfies(e -> assertThat(((UserException) e).getErrorCode())
                     .isEqualTo(UserErrorCode.PASSWORD_NOT_MATCHED));
+        }
+    }
+
+    // ================================================================
+    // 소셜 로그인
+    // ================================================================
+    @Nested
+    @DisplayName("소셜로그인")
+    class 소셜로그인 {
+
+        private final GoogleTokenVerifier.GoogleUserInfo googleUserInfo =
+            new GoogleTokenVerifier.GoogleUserInfo("google@test.com", "구글유저");
+
+        @Test
+        @DisplayName("소셜로그인_신규유저_정상_성공")
+        void 소셜로그인_신규유저_정상_성공() {
+            // given
+            SocialLoginRequest request = new SocialLoginRequest("id-token", AuthType.GOOGLE);
+            given(googleTokenVerifier.verify("id-token")).willReturn(googleUserInfo);
+            given(userRepository.findByEmail("google@test.com")).willReturn(Optional.empty());
+            given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
+            given(jwtTokenProvider.createRefreshToken(any())).willReturn("refresh-token");
+            given(refreshTokenRepository.findByUserId(any())).willReturn(Optional.empty());
+
+            // when
+            SocialLoginResponse response = authService.socialLogin(request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.accessToken()).isEqualTo("access-token");
+            assertThat(response.refreshToken()).isEqualTo("refresh-token");
+            verify(voyageStatusRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("소셜로그인_기존유저_정상_성공")
+        void 소셜로그인_기존유저_정상_성공() {
+            // given
+            SocialLoginRequest request = new SocialLoginRequest("id-token", AuthType.GOOGLE);
+            User existingUser = User.createSocialUser("google@test.com", "구글유저", AuthType.GOOGLE);
+            ReflectionTestUtils.setField(existingUser, "id", 2L);
+
+            given(googleTokenVerifier.verify("id-token")).willReturn(googleUserInfo);
+            given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(existingUser));
+            given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
+            given(jwtTokenProvider.createRefreshToken(any())).willReturn("refresh-token");
+            given(refreshTokenRepository.findByUserId(any())).willReturn(Optional.empty());
+
+            // when
+            SocialLoginResponse response = authService.socialLogin(request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.accessToken()).isEqualTo("access-token");
+        }
+
+        @Test
+        @DisplayName("소셜로그인_유효하지않은_토큰_예외")
+        void 소셜로그인_유효하지않은_토큰_예외() {
+            // given
+            SocialLoginRequest request = new SocialLoginRequest("bad-token", AuthType.GOOGLE);
+            given(googleTokenVerifier.verify("bad-token"))
+                .willThrow(new UserException(UserErrorCode.INVALID_SOCIAL_TOKEN));
+
+            // when & then
+            assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(UserException.class)
+                .satisfies(e -> assertThat(((UserException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.INVALID_SOCIAL_TOKEN));
+        }
+
+        @Test
+        @DisplayName("소셜로그인_정지된_유저_예외")
+        void 소셜로그인_정지된_유저_예외() {
+            // given
+            SocialLoginRequest request = new SocialLoginRequest("id-token", AuthType.GOOGLE);
+            User suspended = User.createSocialUser("google@test.com", "구글유저", AuthType.GOOGLE);
+            ReflectionTestUtils.setField(suspended, "id", 2L);
+            suspended.banUser();
+
+            given(googleTokenVerifier.verify("id-token")).willReturn(googleUserInfo);
+            given(userRepository.findByEmail("google@test.com")).willReturn(Optional.of(suspended));
+
+            // when & then
+            assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(UserException.class)
+                .satisfies(e -> assertThat(((UserException) e).getErrorCode())
+                    .isEqualTo(UserErrorCode.USER_SUSPENDED));
         }
     }
 

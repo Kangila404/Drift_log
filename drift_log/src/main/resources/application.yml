@@ -12,3 +12,7 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+google:
+  client-id:
+    ${GOOGLE_CLIENT_ID:dummy-client-id}

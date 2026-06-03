@@ -31,6 +31,14 @@ export const login = async (data: LoginRequest) => {
     return response.data;
 }
 
+export async function socialLogin(idToken:string) {
+    const {data} = await apiClient.post("/auth/social-login", {
+        idToken,
+        authType: "GOOGLE",
+    });
+    return data;
+}
+
 export const logout = async (data: LogoutRequest) => {
     const response = await apiClient.post("/auth/logout", data);
     return response.data;
