@@ -77,27 +77,41 @@ public class User extends BaseEntity {
             .build();
     }
 
-    // 2. 마지막 로그인 업데이트
+    // 2.소셜 로그인
+    public static User createSocialUser(String email, String name, AuthType authType){
+        return User.builder()
+            .userId(UUID.randomUUID().toString())
+            .email(email)
+            .password(null)
+            .name(name)
+            .authType(authType)
+            .userRole(UserRole.USER)
+            .userStatus(UserStatus.ACTIVE)
+            .lastLoginAt(LocalDateTime.now())
+            .build();
+    }
+
+    // 3. 마지막 로그인 업데이트
     public void updateLastLoginAt(){
         this.lastLoginAt = LocalDateTime.now();
     }
 
-    // 3. 유저 밴
+    // 4. 유저 밴
     public void banUser(){
         this.userStatus = UserStatus.SUSPENDED;
     }
 
-    // 4. 유저 활성화
+    // 5. 유저 활성화
     public void activateUser(){
         this.userStatus = UserStatus.ACTIVE;
     }
 
-    // 5. 닉네임 변경
+    // 6. 닉네임 변경
     public void updateName(String name){
         this.name = name;
     }
 
-    // 6. 비밀번호 변경
+    // 7. 비밀번호 변경
     public void updatePassword(String encodedPassword){
         this.password = encodedPassword;
     }

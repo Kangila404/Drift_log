@@ -1,28 +1,70 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../api/auth";
+import { login, socialLogin } from "../api/auth";
 import OceanBackground from "../components/OceanBackground";
 import { getTodayWeather } from "../api/weather";
 import { WEATHER_MAP } from "../constants/weather";
+
+// 구글 전역 객체 타입
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [weatherLabel, setWeatherLabel] = useState('잔잔한 수면')
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = async () => {
     try {
       const result = await login({ email, password });
       localStorage.setItem("accessToken", result.accessToken);
       localStorage.setItem("refreshToken", result.refreshToken);
-      localStorage.setItem("justLoggedIn", "1"); 
+      localStorage.setItem("justLoggedIn", "1");
       navigate("/");
     } catch (e) {
       console.error("로그인 실패:", e);
       alert("이메일 또는 비밀번호를 확인해주세요.");
     }
   }
+
+  // 구글 로그인 콜백 — idToken 받아서 백엔드로
+  const handleGoogleLogin = async (response: any) => {
+    try {
+      const idToken = response.credential;  // 구글이 준 idToken
+      const result = await socialLogin(idToken);
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      localStorage.setItem("justLoggedIn", "1");
+      navigate("/");
+    } catch (e) {
+      console.error("구글 로그인 실패:", e);
+      alert("구글 로그인에 실패했습니다.");
+    }
+  };
+
+  // 구글 버튼 초기화
+  useEffect(() => {
+    console.log("CLIENT_ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
+    if (!window.google) return;
+    window.google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleLogin,
+    });
+    if (googleBtnRef.current) {
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: "outline",
+        size: "large",
+        width: 256,
+        text: "signin_with",
+        shape: "rectangular",
+      });
+    }
+  }, []);
 
   const [displayText, setDisplayText] = useState('')
   const fullText = '물에 잠긴 한국을 항해하다'
@@ -76,6 +118,17 @@ export default function LoginPage() {
           <button onClick={handleLogin} className="border border-[rgba(122,184,200,0.4)] text-[rgba(180,210,218,0.8)] py-2 text-xs tracking-widest uppercase hover:bg-[rgba(122,184,200,0.1)] transition-all">
             출항
           </button>
+
+          {/* 구분선 */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-[rgba(122,184,200,0.15)]" />
+            <span className="text-[rgba(122,184,200,0.3)] text-[10px] tracking-widest uppercase">또는</span>
+            <div className="flex-1 h-px bg-[rgba(122,184,200,0.15)]" />
+          </div>
+
+          {/* 구글 로그인 버튼 (GIS가 여기에 렌더) */}
+          <div ref={googleBtnRef} className="flex justify-center" />
+
           <p className="text-center text-[rgba(122,184,200,0.3)] text-xs">
             처음이신가요?{" "}
             <a href="/signup" className="text-[rgba(122,184,200,0.6)] underline">등록하기</a>

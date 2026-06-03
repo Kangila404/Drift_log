@@ -13,5 +13,15 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
 
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "30001:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   mysql-data:
