@@ -78,10 +78,8 @@ public class AuthServiceImpl implements AuthService{
         User user = findUserOrThrowByEmail(request.email());
         validateUserStatus(user.getUserStatus());
 
-        // 로컬 회원만 비밀번호 검사
-        if(user.getAuthType().equals(AuthType.LOCAL)){
-            validatePassword(request.password(), user.getPassword());
-        }
+        validateLocalUser(user);
+        validatePassword(request.password(), user.getPassword());
 
         // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
@@ -116,8 +114,12 @@ public class AuthServiceImpl implements AuthService{
                 return newUser;
             });
 
+
         // 3. 상태 검증
         validateUserStatus(user.getUserStatus());
+
+        // 4. 소셜 유저 검증
+        validateSocialUser(user);
 
         // 4. jwt 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
@@ -237,6 +239,21 @@ public class AuthServiceImpl implements AuthService{
     private void validatePassword(String rawPassword, String encodedPassword){
         if(!passwordEncoder.matches(rawPassword, encodedPassword)){
             throw new UserException(UserErrorCode.INVALID_PASSWORD);
+        }
+    }
+
+    // 5. 소셜(구글) 유저 검증
+    private void validateSocialUser(User user){
+
+        if(!user.getAuthType().equals(AuthType.GOOGLE)){
+            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
+        }
+    }
+
+    // 6. 로컬 유저 검증
+    private void validateLocalUser(User user){
+        if(!user.getAuthType().equals(AuthType.LOCAL)){
+            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
         }
     }
 }
