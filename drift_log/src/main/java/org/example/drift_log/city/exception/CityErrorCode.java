@@ -10,8 +10,9 @@ public enum CityErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,          "유저를 찾을 수 없습니다."),
     VOYAGE_STATUS_NOT_FOUND(HttpStatus.NOT_FOUND, "항해 상태를 찾을 수 없습니다."),
     CITY_NOT_FOUND(HttpStatus.NOT_FOUND,          "도시를 찾을 수 없습니다."),
-    UNKNOWN_VOYAGE_STATE(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 항해 상태입니다.");
-
+    UNKNOWN_VOYAGE_STATE(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 항해 상태입니다."),
+    CITYROUTES_NOT_FOUND(HttpStatus.NOT_FOUND, "알 수 없는 항로입니다."),
+    INVALID_DESTINATION(HttpStatus.BAD_REQUEST, "잘못된 목적지입니다.");
     private final HttpStatus status;
     private final String message;
 }

@@ -8,12 +8,14 @@ import org.example.drift_log.city.domain.repository.CityRepository;
 import org.example.drift_log.city.domain.repository.CityRouteRepository;
 import org.example.drift_log.city.exception.CityErrorCode;
 import org.example.drift_log.city.exception.CityException;
+import org.example.drift_log.city.presentation.dto.res.DurationTimeResponse;
 import org.example.drift_log.city.presentation.dto.res.MapResponse;
 import org.example.drift_log.user.domain.model.User;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageStatus;
 import org.example.drift_log.voyage.domain.enums.VoyageState;
 import org.example.drift_log.voyage.domain.repository.VoyageStatusRepository;
+import org.flywaydb.core.api.ErrorCode;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -53,6 +55,19 @@ public class MapServiceImpl implements MapService{
         throw new CityException(CityErrorCode.UNKNOWN_VOYAGE_STATE);
     }
 
+    @Override
+    public DurationTimeResponse getRoutes(String userId, Long toCityId) {
+        User user = getUserByUserIdOrThrow(userId);
+        VoyageStatus voyageStatus = getVoyageStatusByUserIdOrThrow(user.getId());
+
+        if(voyageStatus.getCurrentCityId().equals(toCityId)){
+            throw new CityException(CityErrorCode.INVALID_DESTINATION);
+        }
+
+        CityRoute route = getCityRouteByCityIds(voyageStatus.getCurrentCityId(), toCityId);
+
+        return DurationTimeResponse.from(route);
+    }
 
 
     // ======== 리포지토리 조회 메서드 ======== //
@@ -71,5 +86,11 @@ public class MapServiceImpl implements MapService{
     private City getCityByCityId(Long cityId) {
         return cityRepository.findById(cityId)
             .orElseThrow(()-> new CityException(CityErrorCode.CITY_NOT_FOUND));
+    }
+
+    // 4. currentCity + toCity -> CityRoute
+    private CityRoute getCityRouteByCityIds(Long currentCityId, Long toCityId) {
+        return cityRouteRepository.findByFromCityIdAndToCityId(currentCityId, toCityId)
+            .orElseThrow(()-> new CityException(CityErrorCode.CITYROUTES_NOT_FOUND));
     }
 }

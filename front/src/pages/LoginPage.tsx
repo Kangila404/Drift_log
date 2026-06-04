@@ -110,33 +110,33 @@ export default function LoginPage() {
   }, [])
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#07111d]">
+    <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#07111d] px-4">
       <OceanBackground />
       <div className="absolute inset-0 bg-[rgba(5,12,20,0.55)]" />
 
-      <div className="z-10 flex flex-col items-center">
-        <div className="text-center mb-12">
-          <p className="text-[rgba(122,184,200,0.4)] text-xs tracking-widest uppercase mb-3">
+      <div className="z-10 flex flex-col items-center w-full">
+        <div className="text-center mb-8 md:mb-12">
+          <p className="text-[rgba(122,184,200,0.4)] text-[10px] md:text-xs tracking-widest uppercase mb-2 md:mb-3">
             {displayText}
           </p>
-          <h1 className="text-[rgba(180,210,218,0.9)] text-6xl font-light tracking-[0.5em] uppercase">
+          <h1 className="text-[rgba(180,210,218,0.9)] text-4xl md:text-6xl font-light tracking-[0.25em] md:tracking-[0.5em] uppercase whitespace-nowrap">
             DriftLog
           </h1>
-          <p className="text-[rgba(122,184,200,0.4)] text-xs tracking-widest mt-3">
+          <p className="text-[rgba(122,184,200,0.4)] text-[10px] md:text-xs tracking-widest mt-2 md:mt-3">
             가족을 찾아, 도시에서 도시로
           </p>
         </div>
 
-        <div className="border border-[rgba(122,184,200,0.2)] bg-[rgba(6,14,22,0.85)] p-10 w-80 flex flex-col gap-5 backdrop-blur-sm">
+        <div className="border border-[rgba(122,184,200,0.2)] bg-[rgba(6,14,22,0.85)] p-7 md:p-10 w-full max-w-xs flex flex-col gap-5 backdrop-blur-sm">
           <div className="flex flex-col gap-1">
             <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">이메일</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-sm md:text-xs outline-none" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[rgba(122,184,200,0.5)] text-xs tracking-widest uppercase">비밀번호</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-xs outline-none" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-[rgba(122,184,200,0.05)] border border-[rgba(122,184,200,0.2)] text-[rgba(180,210,218,0.8)] px-3 py-2 text-sm md:text-xs outline-none" />
           </div>
-          <button onClick={handleLogin} className="border border-[rgba(122,184,200,0.4)] text-[rgba(180,210,218,0.8)] py-2 text-xs tracking-widest uppercase hover:bg-[rgba(122,184,200,0.1)] transition-all">
+          <button onClick={handleLogin} className="border border-[rgba(122,184,200,0.4)] text-[rgba(180,210,218,0.8)] py-2.5 md:py-2 text-xs tracking-widest uppercase hover:bg-[rgba(122,184,200,0.1)] transition-all">
             출항
           </button>
 
@@ -156,7 +156,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <p className="mt-8 text-[rgba(122,184,200,0.2)] text-xs tracking-widest uppercase">
+        <p className="mt-6 md:mt-8 text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
           오늘의 바다 · {weatherLabel}
         </p>
       </div>

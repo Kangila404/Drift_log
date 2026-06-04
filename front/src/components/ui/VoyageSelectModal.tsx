@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useVoyageStore } from '../../stores/voyageStore'
+import { getRouteDuration } from '../../api/routes' // ← routes.ts 실제 경로에 맞춰 조정
 
 interface City {
   id: string
@@ -12,6 +13,7 @@ interface City {
 }
 
 // DB ID 기준: 1:서울 2:인천 3:대전 4:강릉 5:부산 6:수원 7:광주 8:대구 9:포항 10:제주
+// 좌표(x, y)는 SVG 지도 렌더용 프론트 고유 데이터. 소요 시간은 서버에서 받는다.
 const CITIES: City[] = [
   { id: '1',  name: '서울', x: 45.5, y: 53.0, visited: true  },
   { id: '2',  name: '인천', x: 36.0, y: 55.0, visited: false },
@@ -28,6 +30,13 @@ const CITIES: City[] = [
 const KOREA_PATH = `M 78.1,2.0 L 76.0,3.1 L 75.7,7.9 L 70.5,8.1 L 66.2,12.3 L 60.1,11.4 L 55.5,12.5 L 58.3,14.8 L 58.0,18.3 L 47.2,17.5 L 43.3,14.0 L 39.0,16.0 L 39.3,18.1 L 33.2,22.7 L 29.5,22.7 L 13.0,30.3 L 16.1,35.3 L 21.0,34.3 L 25.2,37.2 L 21.3,42.4 L 22.8,44.6 L 19.7,45.0 L 15.8,49.6 L 21.0,49.8 L 19.7,51.3 L 22.2,51.3 L 22.8,53.3 L 25.8,53.3 L 28.0,50.6 L 32.6,53.3 L 35.9,51.5 L 35.0,55.7 L 41.7,57.6 L 39.0,59.0 L 43.3,61.3 L 41.7,62.0 L 37.8,60.3 L 32.3,63.0 L 35.0,63.8 L 35.3,67.0 L 35.9,63.8 L 37.8,64.0 L 40.5,71.8 L 35.0,76.6 L 35.0,78.9 L 30.7,81.0 L 31.0,85.0 L 35.0,83.3 L 31.0,87.5 L 36.2,84.0 L 36.2,86.5 L 43.9,86.7 L 42.7,84.8 L 46.0,82.3 L 47.2,84.0 L 44.5,85.8 L 49.4,85.8 L 48.2,82.7 L 52.1,83.3 L 52.8,80.6 L 54.6,83.3 L 58.3,80.6 L 64.4,83.3 L 64.7,80.0 L 62.2,80.8 L 61.9,79.1 L 67.1,79.8 L 74.5,75.4 L 75.7,69.9 L 72.9,70.3 L 72.9,57.8 L 61.9,48.9 L 58.0,42.4 L 49.7,39.7 L 49.4,34.3 L 61.6,30.9 L 63.8,28.4 L 69.0,27.4 L 69.0,25.9 L 75.7,23.2 L 75.7,14.8 L 79.0,11.2 L 86.7,9.5 L 85.5,6.4 L 83.0,6.4 Z`
 const JEJU_PATH = `M 32.0,96.7 L 33.5,96.9 L 33.8,97.8 L 35.3,96.9 L 37.2,97.8 L 37.5,96.9 L 41.4,96.9 L 41.4,95.5 L 42.7,94.7 L 35.3,94.6 L 35.0,95.3 L 34.1,95.3 Z`
 
+function formatDuration(min: number): string {
+  if (min < 60) return `약 ${min}분`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m === 0 ? `약 ${h}시간` : `약 ${h}시간 ${m}분`
+}
+
 interface VoyageSelectModalProps {
   open: boolean
   onClose: () => void
@@ -37,6 +46,8 @@ interface VoyageSelectModalProps {
 export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSelectModalProps) {
   const { currentCity } = useVoyageStore()
   const [selected, setSelected] = useState<City | null>(null)
+  const [durationMin, setDurationMin] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
 
   // 현재 도시 ID 기반으로 current 표시
   const citiesWithCurrent = CITIES.map(c => ({
@@ -46,15 +57,42 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
 
   const current = citiesWithCurrent.find(c => c.current)
 
-  const handleCityClick = (city: City) => {
+  const resetSelection = () => {
+    setSelected(null)
+    setDurationMin(null)
+    setLoading(false)
+  }
+
+  const handleCityClick = async (city: City) => {
     if (city.current) return
-    setSelected(prev => prev?.id === city.id ? null : city)
+    // 같은 도시 다시 누르면 선택 해제
+    if (selected?.id === city.id) {
+      resetSelection()
+      return
+    }
+    setSelected(city)
+    setDurationMin(null)
+    setLoading(true)
+    try {
+      // 현재 도시는 서버가 JWT로 식별 → 목적지(toCityId)만 전달
+      const data = await getRouteDuration(city.id)
+      setDurationMin(data.durationTime)
+    } catch {
+      setDurationMin(null) // 실패해도 모달은 유지, 예상 시간만 비움
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    resetSelection()
+    onClose()
   }
 
   const handleConfirm = () => {
     if (!selected) return
     onConfirm(selected.id)
-    setSelected(null)
+    resetSelection()
     onClose()
   }
 
@@ -67,7 +105,7 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               position: 'fixed', inset: 0,
               backgroundColor: 'rgba(2, 8, 18, 0.75)',
@@ -101,7 +139,7 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
                     목적지를 선택하세요
                   </p>
                 </div>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(100, 160, 200, 0.4)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0.2rem' }}>✕</button>
+                <button onClick={handleClose} style={{ background: 'none', border: 'none', color: 'rgba(100, 160, 200, 0.4)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0.2rem' }}>✕</button>
               </div>
 
               <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
@@ -156,13 +194,24 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
                 </svg>
               </div>
 
-              <div style={{ minHeight: '1.4rem', textAlign: 'center' }}>
+              {/* 선택 결과 + 예상 항해 시간 */}
+              <div style={{ minHeight: '3rem' }}>
                 {selected ? (
-                  <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: '0.8rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.2em' }}>
-                    {current?.name} → {selected.name}
-                  </p>
+                  <>
+                    <p style={{ textAlign: 'center', fontFamily: '"Noto Serif KR", serif', fontSize: '0.8rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.2em', marginBottom: '0.7rem' }}>
+                      {current?.name} &rarr; {selected.name}
+                    </p>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ fontFamily: 'monospace', fontSize: '0.5rem', letterSpacing: '0.2em', color: 'rgba(100, 160, 200, 0.4)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                        예상 항해 시간
+                      </p>
+                      <p style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'rgba(126, 184, 212, 0.85)' }}>
+                        {loading ? '계산 중…' : durationMin != null ? formatDuration(durationMin) : '—'}
+                      </p>
+                    </div>
+                  </>
                 ) : (
-                  <p style={{ fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(100, 160, 200, 0.3)', letterSpacing: '0.2em' }}>
+                  <p style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(100, 160, 200, 0.3)', letterSpacing: '0.2em', lineHeight: '3rem' }}>
                     지도에서 목적지를 선택하세요
                   </p>
                 )}
