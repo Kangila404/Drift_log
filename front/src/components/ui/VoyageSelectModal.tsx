@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useVoyageStore } from '../../stores/voyageStore'
 import { getRouteDuration } from '../../api/routes' // ← routes.ts 실제 경로에 맞춰 조정
@@ -49,6 +49,19 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
   const [durationMin, setDurationMin] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // 데스크탑 여부 — md(768px) 기준, 리사이즈 따라감 (isTall 판별과 동일 패턴)
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 768,
+  )
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // 최신 요청만 반영하기 위한 토큰 (도시 빠르게 전환 시 stale 응답 무시)
+  const reqIdRef = useRef(0)
+
   // 현재 도시 ID 기반으로 current 표시
   const citiesWithCurrent = CITIES.map(c => ({
     ...c,
@@ -58,6 +71,7 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
   const current = citiesWithCurrent.find(c => c.current)
 
   const resetSelection = () => {
+    reqIdRef.current++      // 진행 중인 요청 무효화
     setSelected(null)
     setDurationMin(null)
     setLoading(false)
@@ -73,14 +87,16 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
     setSelected(city)
     setDurationMin(null)
     setLoading(true)
+
+    const myReq = ++reqIdRef.current   // 이번 요청 고유 번호
     try {
       // 현재 도시는 서버가 JWT로 식별 → 목적지(toCityId)만 전달
       const data = await getRouteDuration(city.id)
-      setDurationMin(data.durationTime)
+      if (myReq === reqIdRef.current) setDurationMin(data.durationTime)
     } catch {
-      setDurationMin(null) // 실패해도 모달은 유지, 예상 시간만 비움
+      if (myReq === reqIdRef.current) setDurationMin(null) // 실패해도 모달 유지, 시간만 비움
     } finally {
-      setLoading(false)
+      if (myReq === reqIdRef.current) setLoading(false)
     }
   }
 
@@ -95,6 +111,127 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
     resetSelection()
     onClose()
   }
+
+  // ── 지도 SVG (데스크탑/모바일 공유) ──
+  const mapSvg = (
+    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
+      <rect width="100" height="100" fill="#040d16" />
+      <defs>
+        <pattern id="grid2" width="5" height="5" patternUnits="userSpaceOnUse">
+          <path d="M 5 0 L 0 0 0 5" fill="none" stroke="#0a1f2e" strokeWidth="0.25" />
+        </pattern>
+        <filter id="glow2">
+          <feGaussianBlur stdDeviation="1.2" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      <rect width="100" height="100" fill="url(#grid2)" opacity="0.5" />
+
+      <g transform="translate(10 2) scale(0.78)">
+        <path d={KOREA_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.65" />
+        <path d={KOREA_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.22" opacity="0.5" filter="url(#glow2)" />
+        <path d={JEJU_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.45" />
+        <path d={JEJU_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.18" opacity="0.45" />
+
+        {selected && current && (
+          <line x1={current.x} y1={current.y} x2={selected.x} y2={selected.y} stroke="#4a9abb" strokeWidth="0.6" strokeDasharray="1.5,1.5" opacity="0.6" />
+        )}
+
+        {citiesWithCurrent.map(city => {
+          const isCurrent = Boolean(city.current)
+          const isSelected = selected?.id === city.id
+          return (
+            <g key={city.id} style={{ cursor: isCurrent ? 'default' : 'pointer' }} onClick={() => handleCityClick(city)}>
+              {isSelected && (
+                <circle cx={city.x} cy={city.y} r="3.5" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
+                  <animate attributeName="r" values="2.5;5;2.5" dur="1.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.5;0;0.5" dur="1.5s" repeatCount="indefinite" />
+                </circle>
+              )}
+              {isCurrent && (
+                <circle cx={city.x} cy={city.y} r="3" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
+                  <animate attributeName="r" values="2;4.5;2" dur="2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+                </circle>
+              )}
+              <circle cx={city.x} cy={city.y} r={isCurrent ? 1.4 : isSelected ? 1.6 : 1.0} fill={isCurrent ? '#7eb8d4' : isSelected ? '#a8d4e8' : city.visited ? '#2a5a74' : '#0d2233'} stroke={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#1a4a64' : '#1a3a50'} strokeWidth="0.4" />
+              <text x={city.x + 2} y={city.y + 0.8} fontSize="2.4" fill={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#3a6880' : '#1a3a50'} fontFamily="monospace">{city.name}</text>
+            </g>
+          )
+        })}
+      </g>
+    </svg>
+  )
+
+  // ── 선택 결과 + 예상 항해 시간 (공유) ──
+  const selectionInfo = (
+    <div style={{ minHeight: '3rem' }}>
+      {selected ? (
+        <>
+          <p style={{ textAlign: 'center', fontFamily: '"Noto Serif KR", serif', fontSize: '0.8rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.2em', marginBottom: '0.7rem' }}>
+            {current?.name} &rarr; {selected.name}
+          </p>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontFamily: 'monospace', fontSize: '0.5rem', letterSpacing: '0.2em', color: 'rgba(100, 160, 200, 0.4)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+              예상 항해 시간
+            </p>
+            <p style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'rgba(126, 184, 212, 0.85)' }}>
+              {loading ? '계산 중…' : durationMin != null ? formatDuration(durationMin) : '—'}
+            </p>
+          </div>
+        </>
+      ) : (
+        <p style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(100, 160, 200, 0.3)', letterSpacing: '0.2em', lineHeight: '3rem' }}>
+          지도에서 목적지를 선택하세요
+        </p>
+      )}
+    </div>
+  )
+
+  // ── 출항 버튼 (공유) ──
+  const confirmButton = (
+    <button
+      onClick={handleConfirm}
+      disabled={!selected}
+      style={{
+        background: 'transparent',
+        border: `1px solid ${selected ? 'rgba(100, 160, 200, 0.5)' : 'rgba(100, 160, 200, 0.15)'}`,
+        color: selected ? 'rgba(180, 210, 230, 0.85)' : 'rgba(100, 160, 200, 0.25)',
+        fontFamily: '"Noto Serif KR", serif',
+        fontSize: '0.75rem', letterSpacing: '0.3em',
+        padding: '0.7rem', cursor: selected ? 'pointer' : 'default',
+        transition: 'all 0.3s ease', width: '100%',
+      }}
+      onMouseEnter={e => {
+        if (!selected) return
+        ;(e.target as HTMLButtonElement).style.borderColor = 'rgba(100, 160, 200, 0.8)'
+        ;(e.target as HTMLButtonElement).style.color = 'rgba(220, 240, 255, 0.95)'
+      }}
+      onMouseLeave={e => {
+        if (!selected) return
+        ;(e.target as HTMLButtonElement).style.borderColor = 'rgba(100, 160, 200, 0.5)'
+        ;(e.target as HTMLButtonElement).style.color = 'rgba(180, 210, 230, 0.85)'
+      }}
+    >
+      출항하기
+    </button>
+  )
+
+  // ── 헤더 (공유) ──
+  const header = (
+    <div>
+      <p style={{ fontFamily: 'monospace', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'rgba(100, 160, 200, 0.5)', marginBottom: '0.4rem' }}>
+        SELECT DESTINATION
+      </p>
+      <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: '0.95rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.15em' }}>
+        목적지를 선택하세요
+      </p>
+    </div>
+  )
+
+  const closeButton = (
+    <button onClick={handleClose} style={{ background: 'none', border: 'none', color: 'rgba(100, 160, 200, 0.4)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0.2rem' }}>✕</button>
+  )
 
   return (
     <AnimatePresence>
@@ -116,7 +253,9 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
           <div style={{
             position: 'fixed', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
-            zIndex: 51, width: '380px',
+            zIndex: 51,
+            width: isDesktop ? 'min(1100px, 94vw)' : 'min(380px, 92vw)',
+            height: isDesktop ? 'min(760px, 90vh)' : 'auto',
           }}>
             <motion.div
               initial={{ opacity: 0, y: 24 }}
@@ -124,124 +263,62 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
               exit={{ opacity: 0, y: 24 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
               style={{
+                position: 'relative',
                 backgroundColor: '#050e18',
                 border: '1px solid rgba(100, 160, 200, 0.15)',
-                padding: '2rem',
-                display: 'flex', flexDirection: 'column', gap: '1.2rem',
+                width: '100%', height: '100%',
+                display: 'flex',
+                flexDirection: isDesktop ? 'row' : 'column',
+                gap: isDesktop ? 0 : '1.2rem',
+                padding: isDesktop ? 0 : '2rem',
+                overflow: 'hidden',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <p style={{ fontFamily: 'monospace', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'rgba(100, 160, 200, 0.5)', marginBottom: '0.4rem' }}>
-                    SELECT DESTINATION
-                  </p>
-                  <p style={{ fontFamily: '"Noto Serif KR", serif', fontSize: '0.85rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.15em' }}>
-                    목적지를 선택하세요
-                  </p>
-                </div>
-                <button onClick={handleClose} style={{ background: 'none', border: 'none', color: 'rgba(100, 160, 200, 0.4)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '0.2rem' }}>✕</button>
-              </div>
+              {isDesktop ? (
+                <>
+                  {/* 닫기 — 모달 우상단 고정 */}
+                  <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
+                    {closeButton}
+                  </div>
 
-              <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
-
-              <div style={{ width: '100%', height: '320px', backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
-                <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-                  <rect width="100" height="100" fill="#040d16" />
-                  <defs>
-                    <pattern id="grid2" width="5" height="5" patternUnits="userSpaceOnUse">
-                      <path d="M 5 0 L 0 0 0 5" fill="none" stroke="#0a1f2e" strokeWidth="0.25" />
-                    </pattern>
-                    <filter id="glow2">
-                      <feGaussianBlur stdDeviation="1.2" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                    </filter>
-                  </defs>
-                  <rect width="100" height="100" fill="url(#grid2)" opacity="0.5" />
-
-                  <g transform="translate(10 2) scale(0.78)">
-                    <path d={KOREA_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.65" />
-                    <path d={KOREA_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.22" opacity="0.5" filter="url(#glow2)" />
-                    <path d={JEJU_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.45" />
-                    <path d={JEJU_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.18" opacity="0.45" />
-
-                    {selected && current && (
-                      <line x1={current.x} y1={current.y} x2={selected.x} y2={selected.y} stroke="#4a9abb" strokeWidth="0.6" strokeDasharray="1.5,1.5" opacity="0.6" />
-                    )}
-
-                    {citiesWithCurrent.map(city => {
-                      const isCurrent = Boolean(city.current)
-                      const isSelected = selected?.id === city.id
-                      return (
-                        <g key={city.id} style={{ cursor: isCurrent ? 'default' : 'pointer' }} onClick={() => handleCityClick(city)}>
-                          {isSelected && (
-                            <circle cx={city.x} cy={city.y} r="3.5" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
-                              <animate attributeName="r" values="2.5;5;2.5" dur="1.5s" repeatCount="indefinite" />
-                              <animate attributeName="opacity" values="0.5;0;0.5" dur="1.5s" repeatCount="indefinite" />
-                            </circle>
-                          )}
-                          {isCurrent && (
-                            <circle cx={city.x} cy={city.y} r="3" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
-                              <animate attributeName="r" values="2;4.5;2" dur="2s" repeatCount="indefinite" />
-                              <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
-                            </circle>
-                          )}
-                          <circle cx={city.x} cy={city.y} r={isCurrent ? 1.4 : isSelected ? 1.6 : 1.0} fill={isCurrent ? '#7eb8d4' : isSelected ? '#a8d4e8' : city.visited ? '#2a5a74' : '#0d2233'} stroke={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#1a4a64' : '#1a3a50'} strokeWidth="0.4" />
-                          <text x={city.x + 2} y={city.y + 0.8} fontSize="2.4" fill={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#3a6880' : '#1a3a50'} fontFamily="monospace">{city.name}</text>
-                        </g>
-                      )
-                    })}
-                  </g>
-                </svg>
-              </div>
-
-              {/* 선택 결과 + 예상 항해 시간 */}
-              <div style={{ minHeight: '3rem' }}>
-                {selected ? (
-                  <>
-                    <p style={{ textAlign: 'center', fontFamily: '"Noto Serif KR", serif', fontSize: '0.8rem', color: 'rgba(180, 210, 230, 0.8)', letterSpacing: '0.2em', marginBottom: '0.7rem' }}>
-                      {current?.name} &rarr; {selected.name}
-                    </p>
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{ fontFamily: 'monospace', fontSize: '0.5rem', letterSpacing: '0.2em', color: 'rgba(100, 160, 200, 0.4)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
-                        예상 항해 시간
-                      </p>
-                      <p style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'rgba(126, 184, 212, 0.85)' }}>
-                        {loading ? '계산 중…' : durationMin != null ? formatDuration(durationMin) : '—'}
-                      </p>
+                  {/* 왼쪽 — 헤더 + 큰 지도 */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2.2rem', gap: '1.5rem' }}>
+                    {header}
+                    <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
+                    <div style={{ flex: 1, minHeight: 0, backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
+                      {mapSvg}
                     </div>
-                  </>
-                ) : (
-                  <p style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '0.65rem', color: 'rgba(100, 160, 200, 0.3)', letterSpacing: '0.2em', lineHeight: '3rem' }}>
-                    지도에서 목적지를 선택하세요
-                  </p>
-                )}
-              </div>
+                  </div>
 
-              <button
-                onClick={handleConfirm}
-                disabled={!selected}
-                style={{
-                  background: 'transparent',
-                  border: `1px solid ${selected ? 'rgba(100, 160, 200, 0.5)' : 'rgba(100, 160, 200, 0.15)'}`,
-                  color: selected ? 'rgba(180, 210, 230, 0.85)' : 'rgba(100, 160, 200, 0.25)',
-                  fontFamily: '"Noto Serif KR", serif',
-                  fontSize: '0.75rem', letterSpacing: '0.3em',
-                  padding: '0.7rem', cursor: selected ? 'pointer' : 'default',
-                  transition: 'all 0.3s ease',
-                }}
-                onMouseEnter={e => {
-                  if (!selected) return
-                  ;(e.target as HTMLButtonElement).style.borderColor = 'rgba(100, 160, 200, 0.8)'
-                  ;(e.target as HTMLButtonElement).style.color = 'rgba(220, 240, 255, 0.95)'
-                }}
-                onMouseLeave={e => {
-                  if (!selected) return
-                  ;(e.target as HTMLButtonElement).style.borderColor = 'rgba(100, 160, 200, 0.5)'
-                  ;(e.target as HTMLButtonElement).style.color = 'rgba(180, 210, 230, 0.85)'
-                }}
-              >
-                출항하기
-              </button>
+                  {/* 오른쪽 — 선택 정보 + 출항 */}
+                  <div style={{
+                    width: '340px', flexShrink: 0,
+                    borderLeft: '1px solid rgba(100, 160, 200, 0.1)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                    gap: '2rem', padding: '2.5rem 2rem',
+                  }}>
+                    {selectionInfo}
+                    {confirmButton}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* 모바일 — 기존 세로 스택 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    {header}
+                    {closeButton}
+                  </div>
+
+                  <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
+
+                  <div style={{ width: '100%', height: '320px', backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
+                    {mapSvg}
+                  </div>
+
+                  {selectionInfo}
+                  {confirmButton}
+                </>
+              )}
             </motion.div>
           </div>
         </>

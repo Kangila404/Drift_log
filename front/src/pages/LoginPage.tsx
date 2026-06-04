@@ -47,36 +47,66 @@ export default function LoginPage() {
     }
   };
 
-  // 구글 버튼 초기화 — GIS 스크립트가 로드될 때까지 기다렸다가 렌더
+  // 컨테이너 폭에 맞춰 구글 버튼 렌더 (width는 200~400px 숫자만 허용)
   useEffect(() => {
     let cancelled = false;
+    let observer: ResizeObserver | null = null;
+    let initialized = false;
 
-    const renderGoogleButton = () => {
-      // 스크립트가 아직 안 왔거나 ref가 없으면 false 반환 → 폴링 계속
-      if (!window.google || !googleBtnRef.current) return false;
+    const drawButton = () => {
+      const el = googleBtnRef.current;
+      if (!el) return;
 
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleLogin,
-      });
-      window.google.accounts.id.renderButton(googleBtnRef.current, {
+      // 컨테이너 실제 폭 측정 → 200~400 사이로 클램프
+      const containerWidth = el.clientWidth || 256;
+      const width = Math.min(Math.max(Math.round(containerWidth), 200), 400);
+
+      // 재렌더 시 기존 버튼 제거 (renderButton 중복 누적 방지)
+      el.innerHTML = "";
+      window.google.accounts.id.renderButton(el, {
         theme: "outline",
         size: "large",
-        width: 256,
+        width,
         text: "signin_with",
         shape: "rectangular",
+        logo_alignment: "center",
       });
+    };
+
+    const tryInit = () => {
+      if (!window.google || !googleBtnRef.current) return false;
+
+      if (!initialized) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleGoogleLogin,
+        });
+        initialized = true;
+      }
+
+      drawButton();
+
+      // 폭 변할 때마다 다시 그림 (반응형 대응)
+      observer = new ResizeObserver(() => {
+        if (!cancelled) drawButton();
+      });
+      observer.observe(googleBtnRef.current);
       return true;
     };
 
-    // 1차 시도 — 이미 로드돼 있으면 즉시 렌더하고 끝
-    if (renderGoogleButton()) return;
+    // 1차 시도 — 이미 로드돼 있으면 즉시
+    if (tryInit()) {
+      return () => {
+        cancelled = true;
+        observer?.disconnect();
+      };
+    }
 
-    // 아직이면 100ms 간격으로 재시도, 최대 10초(100회)까지
+    // 아직이면 100ms 간격 재시도, 최대 10초
     let attempts = 0;
     const timer = setInterval(() => {
       attempts++;
-      if (cancelled || renderGoogleButton() || attempts >= 100) {
+      if (cancelled || tryInit() || attempts >= 100) {
         clearInterval(timer);
       }
     }, 100);
@@ -84,6 +114,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
       clearInterval(timer);
+      observer?.disconnect();
     };
   }, []);
 
@@ -147,8 +178,8 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-[rgba(122,184,200,0.15)]" />
           </div>
 
-          {/* 구글 로그인 버튼 (GIS가 여기에 렌더) */}
-          <div ref={googleBtnRef} className="flex justify-center" />
+          {/* 구글 로그인 버튼 (GIS가 컨테이너 폭에 맞춰 렌더) */}
+          <div ref={googleBtnRef} className="w-full overflow-hidden" />
 
           <p className="text-center text-[rgba(122,184,200,0.3)] text-xs">
             처음이신가요?{" "}
