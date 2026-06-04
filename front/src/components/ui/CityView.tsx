@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import HUD from './HUD'
 import TraceModal from './TraceModal'
 import VoyageSelectModal from './VoyageSelectModal'
+import BoatMaintenanceModal from './BoatMaintenanceModal'
 import { useVoyageStore } from '../../stores/voyageStore'
 import { useVoyageActions } from '../../hooks/useVoyageActions'
 import OceanWater from '../r3f/OceanWater'
@@ -104,6 +105,7 @@ export default function CityView() {
   const [buttonsVisible, setButtonsVisible] = useState(false)
   const [traceOpen, setTraceOpen] = useState(false)
   const [voyageOpen, setVoyageOpen] = useState(false)
+  const [maintOpen, setMaintOpen] = useState(false)
   const [muted, setMuted] = useState(bgm.isMuted())
 
   // 첫 방문 흔적 자동 오픈 — 한 번만
@@ -260,6 +262,7 @@ export default function CityView() {
         >
           {[
             { label: '흔적 보기', onClick: () => setTraceOpen(true) },
+            { label: '배 정비', onClick: () => setMaintOpen(true) },
             { label: '항해하기', onClick: () => setVoyageOpen(true) },
           ].map(btn => (
             <button
@@ -294,6 +297,7 @@ export default function CityView() {
 
       <TraceModal open={traceOpen} onClose={() => setTraceOpen(false)} trace={discoveredTrace} />
       <VoyageSelectModal open={voyageOpen} onClose={() => setVoyageOpen(false)} onConfirm={handleVoyageStart} />
+      <BoatMaintenanceModal open={maintOpen} onClose={() => setMaintOpen(false)} />
     </div>
   )
 }
