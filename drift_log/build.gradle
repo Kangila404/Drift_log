@@ -63,7 +63,7 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
-def envFile = file('.env')
+def envFile = file('../.env')
 
 if (envFile.exists()) {
     bootRun {
