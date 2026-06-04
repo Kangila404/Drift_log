@@ -5,6 +5,18 @@ spring:
     username: sa
     password:
 
-    jpa:
-      hibernate:
-        ddl-auto: create-drop
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+  jwt:
+    secret: test-secret-key-for-ci-must-be-at-least-256-bits-long
+    access-token-expiration: 1800000 # 30분
+    refresh-token-expiration: 604800000 # 7일
+
+  weather:
+    api:
+      key: znofxMibTQK6H8TImy0CsA

@@ -21,15 +21,39 @@ repositories {
 }
 
 dependencies {
+    // Web
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
+
+    // DB
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     testImplementation 'com.h2database:h2' // Test용 인메모리 DB
-
-    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
-
-    compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    // DB - 초기데이터 세팅
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
+
+    // google api
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.30.0'
+
+    // Security
+    implementation 'me.paulschwarz:springboot4-dotenv:5.0.1'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // lombok
+    compileOnly 'org.projectlombok:lombok'
+
+    // jwt
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // loki
+    implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
+
+    // prometheus
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.projectlombok:lombok'
@@ -39,14 +63,15 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
-// env : root env를 build.gradle이 받을 수 있게 설정
-def envFile = file('.env')
+def envFile = file('../.env')
 
 if (envFile.exists()) {
-    envFile.readLines().each { line ->
-        if (line.contains('=')) {
-            def (key, value) = line.split('=', 2)
-            environment key.trim(), value.trim()
+    bootRun {
+        envFile.readLines().each { line ->
+            if (line && !line.startsWith('#') && line.contains('=')) {
+                def (key, value) = line.split('=', 2)
+                environment key.trim(), value.trim()
+            }
         }
     }
 }
@@ -66,6 +91,7 @@ spotbugsMain {
 }
 
 // 테스트 설정
-test {
+tasks.named('test') {
     useJUnitPlatform()
 }
+

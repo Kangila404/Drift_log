@@ -7,4 +7,23 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
+
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration: 1800000 # 30분
+    refresh-token-expiration: 604800000 # 7일
+
+  weather:
+    api:
+      key: ${WEATHER_API_KEY}
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: drift_log
