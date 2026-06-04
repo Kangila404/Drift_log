@@ -1,5 +1,4 @@
 # DriftLog
-
 > 목적 의식에서 오는 안도감
 
 홍수로 가라앉은 한국. 물에 잠긴 도시들 사이를 배로 항해하며, 서비스를 켜놓고 일상을 즐기세요.
@@ -7,7 +6,7 @@
 
 <!-- 배포 주소: http://driftlog.kro.kr -->
 <!-- TODO: 대표 스크린샷 / GIF 추가 -->
-<img width="705" height="1212" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
+<img width="405" height="912" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
 
 
 <br>
