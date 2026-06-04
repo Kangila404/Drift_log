@@ -486,8 +486,6 @@ function TracePanel() {
 // ─── 항해록 ───────────────────────────────────────────────────────────────────
 function LogPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([])
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editNote, setEditNote] = useState('')
   const [visitedCityIds, setVisitedCityIds] = useState<number[]>([])
   const [gridOpen, setGridOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState<number | null>(null)
@@ -497,6 +495,12 @@ function LogPanel() {
   const [seekDur, setSeekDur] = useState(0)
   const [selectedEvent, setSelectedEvent] = useState<EventInfo | null>(null)
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({})
+
+  // ── 기록 상세/수정 모달 ──
+  const [detailLog, setDetailLog] = useState<LogEntry | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editNote, setEditNote] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     apiClient.get('/voyage-log').then(res => {
@@ -523,11 +527,31 @@ function LogPanel() {
     }).catch(() => {})
   }, [])
 
-  const startEdit = (log: LogEntry) => { setEditingId(log.id); setEditNote(log.note) }
-  const saveEdit = async (id: number) => {
-    await apiClient.post(`/voyage-log/${id}`, { userText: editNote })
-    setLogs(prev => prev.map(l => (l.id === id ? { ...l, note: editNote } : l)))
-    setEditingId(null)
+  // 기록 카드 터치 → 상세 모달 열기 (읽기 모드)
+  const openDetail = (log: LogEntry) => {
+    setDetailLog(log)
+    setEditing(false)
+    setEditNote(log.note)
+  }
+
+  const closeDetail = () => {
+    setDetailLog(null)
+    setEditing(false)
+  }
+
+  const saveEdit = async () => {
+    if (!detailLog || saving) return
+    setSaving(true)
+    try {
+      await apiClient.post(`/voyage-log/${detailLog.id}`, { userText: editNote })
+      setLogs(prev => prev.map(l => (l.id === detailLog.id ? { ...l, note: editNote } : l)))
+      setDetailLog(prev => prev ? { ...prev, note: editNote } : prev)
+      setEditing(false)
+    } catch (e) {
+      console.error('기록 저장 실패:', e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── 음악 미리듣기 ──
@@ -626,7 +650,7 @@ function LogPanel() {
         </button>
       )}
 
-      {/* 기록 목록 — 월별 그룹 */}
+      {/* 기록 목록 — 월별 그룹 (카드는 읽기 전용, 누르면 모달) */}
       {logs.length === 0 && <p className="text-[10px] text-[#1a3a50] italic">— 아직 항해 기록이 없습니다</p>}
       <div className="flex flex-col gap-2">
         {monthGroups.map((group, gIdx) => {
@@ -663,53 +687,45 @@ function LogPanel() {
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="flex flex-col gap-3 pt-3">
+                    <div className="flex flex-col gap-2 pt-3">
                       {group.logs.map((log, i) => (
-                        <motion.div key={log.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="border-l border-[#0d2233] pl-3 py-1.5">
+                        <motion.button
+                          key={log.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          onClick={() => openDetail(log)}
+                          className="text-left border-l border-[#0d2233] hover:border-[#4a9abb]/60 pl-3 py-2 rounded-r transition-colors hover:bg-[#071826]/40 group"
+                        >
                           <div className="flex justify-between items-center mb-1">
-                            <div className="flex gap-2 items-baseline">
-                              <span className="text-[9px] font-mono text-[#2a5a74]">{log.date}</span>
-                              <span className="text-[9px] font-mono text-[#1a3a50]">{log.from} → {log.to}</span>
+                            <div className="flex gap-2 items-baseline min-w-0">
+                              <span className="text-[9px] font-mono text-[#2a5a74] shrink-0">{log.date}</span>
+                              <span className="text-[9px] font-mono text-[#1a3a50] truncate">{log.from} → {log.to}</span>
                             </div>
-                            {editingId !== log.id && (
-                              <button onClick={() => startEdit(log)} className="text-[8px] font-mono text-[#1a3a50] hover:text-[#4a9abb] px-1">수정</button>
-                            )}
+                            <span className="text-[10px] font-mono text-[#1a3a50] group-hover:text-[#4a9abb] transition-colors shrink-0">›</span>
                           </div>
-                          <p className="text-[9px] text-[#2a5a74] mb-1">{log.autoText}</p>
 
                           {/* 이벤트 썸네일 — 이 항해에서 본 랜덤 이벤트 */}
                           {log.events.length > 0 && (
                             <div className="flex gap-1.5 flex-wrap mb-1.5">
                               {log.events.map((ev, idx) => (
-                                <button
+                                <div
                                   key={idx}
-                                  onClick={() => setSelectedEvent(ev)}
-                                  className="w-9 h-9 rounded overflow-hidden border border-[#1a4a64]/50 hover:border-[#4a9abb] transition-colors shrink-0"
+                                  className="w-9 h-9 rounded overflow-hidden border border-[#1a4a64]/50 shrink-0"
                                   title={ev.name}
                                 >
                                   <img src={ev.imageUrl!} alt={ev.name} className="w-full h-full object-cover" draggable={false} />
-                                </button>
+                                </div>
                               ))}
                             </div>
                           )}
 
-                          {editingId === log.id ? (
-                            <div className="flex flex-col gap-1.5 mt-1">
-                              <textarea value={editNote} onChange={e => setEditNote(e.target.value)} maxLength={100} rows={2} placeholder="오늘의 항해를 기록하세요..." className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-2 py-1.5 text-[11px] text-[#7eb8d4] resize-none outline-none focus:border-[#2a5a74] placeholder-[#1a3a50]" />
-                              <div className="flex justify-between">
-                                <span className="text-[8px] font-mono text-[#1a3a50]">{editNote.length}/100</span>
-                                <div className="flex gap-2">
-                                  <button onClick={() => setEditingId(null)} className="text-[8px] font-mono text-[#1a3a50]">취소</button>
-                                  <button onClick={() => saveEdit(log.id)} className="text-[8px] font-mono text-[#4a9abb]">저장</button>
-                                </div>
-                              </div>
-                            </div>
-                          ) : log.note ? (
-                            <p className="text-[11px] text-[#4a7a94] font-light leading-relaxed">{log.note}</p>
+                          {log.note ? (
+                            <p className="text-[11px] text-[#4a7a94] font-light leading-relaxed line-clamp-2">{log.note}</p>
                           ) : (
-                            <p className="text-[10px] text-[#1a3a50] italic">— 기록 없음 · 수정으로 추가</p>
+                            <p className="text-[10px] text-[#1a3a50] italic">— 기록 없음 · 눌러서 작성</p>
                           )}
-                        </motion.div>
+                        </motion.button>
                       ))}
                     </div>
                   </motion.div>
@@ -719,6 +735,126 @@ function LogPanel() {
           )
         })}
       </div>
+
+      {/* ───── 기록 상세/수정 모달 ───── */}
+      {createPortal(
+        <AnimatePresence>
+          {detailLog && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={closeDetail}
+              className="fixed inset-0 z-[9999] flex items-center justify-center cursor-pointer px-4 py-8"
+              style={{ background: 'rgba(2,6,14,0.9)', backdropFilter: 'blur(8px)' }}
+            >
+              <motion.div
+                onClick={e => e.stopPropagation()}
+                initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+                className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-[#050e18] border border-[#1a4a64]/50 rounded-lg p-6 md:p-7 flex flex-col gap-4 cursor-default"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                {/* 헤더 */}
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase">{detailLog.date}</p>
+                    <h3 className="mt-1 text-[17px] font-serif text-[#a8d4e8] tracking-wide">
+                      {detailLog.from} <span className="text-[#3a6880]">→</span> {detailLog.to}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={closeDetail}
+                    className="shrink-0 w-8 h-8 rounded-full border border-[#1a3a50] flex items-center justify-center text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/50 transition-colors text-[14px]"
+                    aria-label="닫기"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* 자동 기록 */}
+                <div className="border-l-2 border-[#1a4a64]/50 pl-3">
+                  <p className="text-[8px] font-mono text-[#2a5a74] tracking-widest uppercase mb-1">항해 기록</p>
+                  <p className="text-[12px] text-[#5a8aa4] font-light leading-relaxed whitespace-pre-line">{detailLog.autoText}</p>
+                </div>
+
+                {/* 이벤트 썸네일 */}
+                {detailLog.events.length > 0 && (
+                  <div>
+                    <p className="text-[8px] font-mono text-[#2a5a74] tracking-widest uppercase mb-2">항해 중 마주친 것</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {detailLog.events.map((ev, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedEvent(ev)}
+                          className="w-14 h-14 rounded overflow-hidden border border-[#1a4a64]/50 hover:border-[#4a9abb] transition-colors shrink-0"
+                          title={ev.name}
+                        >
+                          <img src={ev.imageUrl!} alt={ev.name} className="w-full h-full object-cover" draggable={false} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 나의 기록 — 읽기 / 수정 토글 */}
+                <div className="border-t border-[#0d2233] pt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[8px] font-mono text-[#2a5a74] tracking-widest uppercase">나의 한 줄</p>
+                    {!editing && (
+                      <span className="text-[9px] font-mono text-[#3a6880]">
+                        {detailLog.note ? '수정' : '작성'} ›
+                      </span>
+                    )}
+                  </div>
+
+                  {editing ? (
+                    <div className="flex flex-col gap-2">
+                      <textarea
+                        value={editNote}
+                        onChange={e => setEditNote(e.target.value)}
+                        maxLength={100}
+                        rows={4}
+                        autoFocus
+                        placeholder="오늘의 항해를 기록하세요..."
+                        className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[13px] text-[#cce8f5] resize-none outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50] leading-relaxed"
+                      />
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-mono text-[#1a3a50]">{editNote.length}/100</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditing(false)}
+                            className="px-4 py-2 text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors"
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={saveEdit}
+                            disabled={saving}
+                            className="px-5 py-2 border border-[#4a9abb]/50 rounded text-[10px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors disabled:opacity-40"
+                          >
+                            {saving ? '저장 중' : '저장'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditing(true); setEditNote(detailLog.note) }}
+                      className="w-full text-left rounded border border-transparent hover:border-[#1a4a64]/40 hover:bg-[#071826]/40 px-3 py-2.5 -mx-3 transition-colors cursor-text"
+                    >
+                      {detailLog.note ? (
+                        <p className="text-[14px] text-[#7eb8d4] font-light leading-relaxed whitespace-pre-line">{detailLog.note}</p>
+                      ) : (
+                        <p className="text-[11px] text-[#1a3a50] italic">아직 기록이 없습니다. 눌러서 한 줄을 남겨보세요.</p>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* 음악 미리듣기 모달 */}
       {createPortal(
@@ -906,7 +1042,7 @@ function LogPanel() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setSelectedEvent(null)}
-              className="fixed inset-0 z-[9999] flex items-center justify-center cursor-pointer px-6"
+              className="fixed inset-0 z-[10000] flex items-center justify-center cursor-pointer px-6"
               style={{ background: 'rgba(2,6,14,0.9)', backdropFilter: 'blur(8px)' }}
             >
               <motion.div

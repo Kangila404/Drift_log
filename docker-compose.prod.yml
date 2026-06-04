@@ -2,7 +2,7 @@ services:
   # 바깥 Nginx — 외부 80 입구, 경로 분배 (/ → frontend, /api → backend)
   nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: nginxf
     ports:
       - "80:80"
     volumes:
