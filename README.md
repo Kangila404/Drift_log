@@ -4,9 +4,9 @@
 홍수로 가라앉은 한국. 물에 잠긴 도시들 사이를 배로 항해하며, 서비스를 켜놓고 일상을 즐기세요.
 조작이나 점수가 아니라, 그냥 시간이 지나면 가고 싶은 곳으로 흘러가도록 설계했습니다.
 
-<!-- 배포 주소: http://driftlog.kro.kr -->
-<!-- TODO: 대표 스크린샷 / GIF 추가 -->
-<img width="405" height="712" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
+배포 주소: http://driftlog.kro.kr
+
+<img width="305" height="512" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
 
 
 <br>
