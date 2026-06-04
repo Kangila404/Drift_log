@@ -15,6 +15,7 @@ import { useVoyageActions } from '../hooks/useVoyageActions'
 import { useWeather } from '../contexts/WeatherContext'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 import { useEclipse } from '../hooks/useEclipse'
+import { useViewport } from '../hooks/useViewport'
 import { resolveScene } from '../constants/scenePreset'
 import EventOverlay from '../components/event/EventOverlay'
 import { useRandomEvent } from '../hooks/useRandomEvent'
@@ -30,6 +31,7 @@ export default function VoyagePage() {
   const { completeVoyage } = useVoyageActions()
   const [scene, setScene] = useState<Scene>('ocean')
   const randomEvent = useRandomEvent()
+  const { isMobile } = useViewport()
 
   const completedRef = useRef(false)
   const prevStateRef = useRef(voyageState)   // 직전 항해 상태
@@ -125,7 +127,7 @@ export default function VoyagePage() {
   }, [showEnding])
 
   return (
-    <div className="w-full h-screen relative bg-[#07111d] overflow-hidden">
+    <div className="w-full h-[100dvh] relative bg-[#07111d] overflow-hidden">
 
 {/* 오션 씬 — arriving까지 유지 */}
       {(scene === 'ocean' || scene === 'arriving') && (
@@ -144,7 +146,7 @@ export default function VoyagePage() {
 
           <Canvas
             dpr={[1.5, 2]}
-            camera={{ position: [0, 1.45, 10.8], fov: 46 }}
+            camera={{ position: [0, 1.45, 10.8], fov: isMobile ? 60 : 46 }}
             gl={{
               antialias: true,
               alpha: true,
@@ -183,14 +185,14 @@ export default function VoyagePage() {
       <AnimatePresence>
         {greeting && (
           <motion.div
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-none"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-none px-6 text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1.2 }}
           >
             <motion.p
-              className="text-[14px] font-mono text-[#7eb8d4] tracking-[0.4em]"
+              className="text-[12px] md:text-[14px] font-mono text-[#7eb8d4] tracking-[0.4em]"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1 }}
@@ -198,12 +200,12 @@ export default function VoyagePage() {
               {greeting.msg}
             </motion.p>
             <motion.p
-              className="mt-4 font-serif text-[26px] text-[#a8d4e8] tracking-[0.3em]"
+              className="mt-4 font-serif text-[20px] md:text-[26px] text-[#a8d4e8] tracking-[0.3em]"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 1 }}
             >
-              {greeting.name}
+              {greeting.name}님
             </motion.p>
           </motion.div>
         )}
@@ -213,7 +215,7 @@ export default function VoyagePage() {
       <AnimatePresence>
         {scene === 'arriving' && (
           <motion.div
-            className="absolute inset-0 flex flex-col items-center justify-center z-20 pointer-events-none"
+            className="absolute inset-0 flex flex-col items-center justify-center z-20 pointer-events-none px-6 text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -228,7 +230,7 @@ export default function VoyagePage() {
             </motion.p>
             {currentCity && (
               <motion.p
-                className="mt-3 font-serif text-[22px] text-[#a8d4e8] tracking-[0.3em]"
+                className="mt-3 font-serif text-[18px] md:text-[22px] text-[#a8d4e8] tracking-[0.3em]"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.8 }}
