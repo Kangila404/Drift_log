@@ -1,27 +1,102 @@
 services:
-  mysql:
-    env_file: .env
-    image: mysql:8.0
-    container_name: driftlog-mysql
+  # 바깥 Nginx — 외부 80 입구, 경로 분배 (/ → frontend, /api → backend)
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
     ports:
-      - "3307:3306"
+      - "80:80"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - ./Nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+  # 프론트 — React 정적 서빙 (내부 nginx, 외부 노출 안 함)
+  frontend:
+    image: kangila/driftlog-frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+
+  # 백엔드 — Spring Boot (prod 프로파일)
+  backend:
+    image: kangila/driftlog-backend:latest
+    container_name: backend
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MySQL — DB (외부 노출 안 함, 백엔드만 접근)
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
+  # Loki — 로그 수집
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: loki
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./front
-      dockerfile: Dockerfile
+  # Prometheus — 메트릭 수집 (backend:8080 긁음)
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    volumes:
+      - prometheus-data:/prometheus
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    restart: unless-stopped
+
+  # Grafana — 시각화 대시보드
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
     ports:
-      - "30001:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "30000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-12345678}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 15s
+      scrape_configs:
+        - job_name: 'drift_log'
+          metrics_path: '/actuator/prometheus'
+          static_configs:
+            - targets: ['backend:8080']
 
 volumes:
   mysql-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:
