@@ -1,0 +1,47 @@
+name: cd.drift_log.yml
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Docker Hub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+
+      - name: 3. 백엔드 이미지 build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./drift_log
+          push: true
+          tags: ${{secrets.DOCKERHUB_USERNAME}}/driftlog-backend:latest
+
+      - name: 4. 프론트 이미지 build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./front
+          push: true
+          tags: ${{secrets.DOCKERHUB_USERNAME}}/driftlog-frontend:latest
+          build-args: |
+            VITE_GOOGLE_CLIENT_ID=${{secrets.GOOGLE_CLIENT_ID}}
+
+      - name: 5. EC2 SSH 접속 -> 배포
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{secrets.EC2_HOST}}
+          username: ${{secrets.EC2_USER}}
+          key: ${{secrets.EC2_SSH_KEY}}
+          script: |
+            cd ~/driftlog
+            sudo docker compose -f docker-compose.prod.yml pull
+            sudo docker compose -f docker-compose.prod.yml up -d
+            sudo docker image prune -f

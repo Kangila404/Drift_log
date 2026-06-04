@@ -47,15 +47,18 @@ export default function LoginPage() {
     }
   };
 
-  // 구글 버튼 초기화
+  // 구글 버튼 초기화 — GIS 스크립트가 로드될 때까지 기다렸다가 렌더
   useEffect(() => {
-    console.log("CLIENT_ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
-    if (!window.google) return;
-    window.google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      callback: handleGoogleLogin,
-    });
-    if (googleBtnRef.current) {
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      // 스크립트가 아직 안 왔거나 ref가 없으면 false 반환 → 폴링 계속
+      if (!window.google || !googleBtnRef.current) return false;
+
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleGoogleLogin,
+      });
       window.google.accounts.id.renderButton(googleBtnRef.current, {
         theme: "outline",
         size: "large",
@@ -63,7 +66,25 @@ export default function LoginPage() {
         text: "signin_with",
         shape: "rectangular",
       });
-    }
+      return true;
+    };
+
+    // 1차 시도 — 이미 로드돼 있으면 즉시 렌더하고 끝
+    if (renderGoogleButton()) return;
+
+    // 아직이면 100ms 간격으로 재시도, 최대 10초(100회)까지
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts++;
+      if (cancelled || renderGoogleButton() || attempts >= 100) {
+        clearInterval(timer);
+      }
+    }, 100);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   const [displayText, setDisplayText] = useState('')

@@ -29,6 +29,8 @@ jobs:
         run: cd drift_log  && ./gradlew test
         env:
           SPRING_PROFILES_ACTIVE: test
+          JWT_SECRET: ${{secrets.JWT_SECRET}}
+          GOOGLE_CLIENT_ID: ${{secrets.GOOGLE_CLIENT_ID}}
 
       - name: 5. Gradle Build & SpotBugs
         run: cd drift_log && ./gradlew build spotbugsMain -x test
