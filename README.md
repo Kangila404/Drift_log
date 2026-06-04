@@ -6,7 +6,7 @@
 
 <!-- 배포 주소: http://driftlog.kro.kr -->
 <!-- TODO: 대표 스크린샷 / GIF 추가 -->
-<img width="405" height="912" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
+<img width="405" height="712" alt="image" src="https://github.com/user-attachments/assets/d9b0a9c2-33cd-47a6-bab2-f4cb1abbeee0" />
 
 
 <br>
