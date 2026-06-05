@@ -258,7 +258,8 @@ export default function CityView() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: buttonsVisible ? 1 : 0, y: buttonsVisible ? 0 : 10 }}
           transition={{ duration: 1.5, ease: 'easeInOut' }}
-          style={{ display: 'flex', gap: '2rem', pointerEvents: buttonsVisible ? 'auto' : 'none' }}
+          className="flex flex-row flex-wrap justify-center gap-2.5 sm:gap-6 px-4 w-full max-w-md sm:max-w-none"
+          style={{ pointerEvents: buttonsVisible ? 'auto' : 'none' }}
         >
           {[
             { label: '흔적 보기', onClick: () => setTraceOpen(true) },
@@ -268,24 +269,11 @@ export default function CityView() {
             <button
               key={btn.label}
               onClick={btn.onClick}
-              style={{
-                background: 'rgba(4, 12, 28, 0.4)', border: '1px solid rgba(100, 160, 200, 0.3)',
-                color: 'rgba(180, 210, 230, 0.7)', fontFamily: '"Noto Serif KR", serif',
-                fontSize: '0.75rem', letterSpacing: '0.25em', padding: '0.6rem 1.6rem',
-                cursor: 'pointer', transition: 'all 0.3s ease', backdropFilter: 'blur(8px)', whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={e => {
-                const t = e.currentTarget
-                t.style.borderColor = 'rgba(100, 160, 200, 0.7)'
-                t.style.color = 'rgba(200, 230, 245, 0.95)'
-                t.style.background = 'rgba(4, 12, 28, 0.6)'
-              }}
-              onMouseLeave={e => {
-                const t = e.currentTarget
-                t.style.borderColor = 'rgba(100, 160, 200, 0.3)'
-                t.style.color = 'rgba(180, 210, 230, 0.7)'
-                t.style.background = 'rgba(4, 12, 28, 0.4)'
-              }}
+              className="rounded font-serif whitespace-nowrap transition-all duration-300 backdrop-blur-md
+                         text-[0.7rem] sm:text-[0.75rem] tracking-[0.2em] sm:tracking-[0.25em]
+                         px-4 py-2.5 sm:px-6 sm:py-2.5
+                         border border-[#64a0c8]/30 text-[#b4d2e6]/70 bg-[#040c1c]/40
+                         hover:border-[#64a0c8]/70 hover:text-[#c8e6f5]/95 hover:bg-[#040c1c]/60"
             >
               {btn.label}
             </button>

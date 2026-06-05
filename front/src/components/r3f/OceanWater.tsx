@@ -142,7 +142,7 @@ export default function OceanWater({ preset }: OceanWaterProps) {
   })
 
   return (
-    <mesh position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+   <mesh position={[0, -2.7, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <planeGeometry args={[300, 300, 400, 400]} />
       <shaderMaterial
         ref={materialRef}
