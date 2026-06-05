@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()  // 로그인, 회원가입은 토큰 없이 허용
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll() // 스웨거 통과
                 .requestMatchers("/api/weather/today").permitAll()
+                .requestMatchers("/api/version").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()                // 나머지 토큰

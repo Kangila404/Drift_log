@@ -3,12 +3,18 @@ package org.example.drift_log.admin.application;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.drift_log.admin.domain.model.AppVersion;
+import org.example.drift_log.admin.domain.repository.AppVersionRepository;
 import org.example.drift_log.admin.exception.AdminErrorCode;
 import org.example.drift_log.admin.exception.AdminException;
+import org.example.drift_log.admin.presentation.dto.req.UpdateVersionRequest;
 import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
+import org.example.drift_log.admin.presentation.dto.res.UpdateVersionResponse;
+import org.example.drift_log.admin.presentation.dto.res.VersionResponse;
 import org.example.drift_log.feedback.domain.model.EndingFeedback;
 import org.example.drift_log.feedback.domain.repository.EndingFeedBackRepository;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
@@ -31,7 +37,10 @@ public class AdminServiceImpl implements AdminService{
     private final EndingFeedBackRepository endingFeedBackRepository;
     private final VoyageStatusRepository voyageStatusRepository;
     private final VoyageLogRepository voyageLogRepository;
+    private final AppVersionRepository appVersionRepository;
 
+    // 디폴트 버전
+    private static final String DEFAULT_VERSION = "v1.0.0";
 
     @Override
     public AdminDashboardResponse getDashboard() {
@@ -93,11 +102,35 @@ public class AdminServiceImpl implements AdminService{
         userRepository.save(user);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public VersionResponse getVersion() {
+        return appVersionRepository.findLatestAppVersion()
+            .map(VersionResponse::from)
+            .orElseGet(() -> VersionResponse.of(DEFAULT_VERSION));
+    }
+
+
+    @Override
+    public UpdateVersionResponse updateVersion(UpdateVersionRequest request) {
+        AppVersion appVersion = appVersionRepository.findLatestAppVersion()
+            .orElseGet(() -> AppVersion.create(request.version()));
+        appVersion.updateVersion(request.version());
+        appVersionRepository.save(appVersion);
+        return UpdateVersionResponse.from("success");
+    }
+
 
     // ==== 메서드 모음 ==== //
     // 1. (String)userId -> User 찾기
     private User findUserByUserIdOrThrow(String userId) {
         return userRepository.findByUserId(userId)
             .orElseThrow(()-> new AdminException(AdminErrorCode.ADMIN_USER_NOT_FOUND));
+    }
+
+    // 2. 최신 버전 찾기
+    private Optional<AppVersion> findLatestAppVersion(){
+        return appVersionRepository.findLatestAppVersion();
+
     }
 }

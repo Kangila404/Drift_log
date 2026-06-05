@@ -4,6 +4,7 @@ import { login, socialLogin } from "../api/auth";
 import OceanBackground from "../components/OceanBackground";
 import { getTodayWeather } from "../api/weather";
 import { WEATHER_MAP } from "../constants/weather";
+import { getVersion } from "../api/version";
 
 // 구글 전역 객체 타입
 declare global {
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [weatherLabel, setWeatherLabel] = useState('잔잔한 수면')
+  const [version, setVersion] = useState('')
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = async () => {
@@ -52,6 +54,7 @@ export default function LoginPage() {
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let initialized = false;
+    let lastWidth = 0;   // 마지막으로 그린 폭 — 같으면 다시 안 그림 (무한 루프 차단)
 
     const drawButton = () => {
       const el = googleBtnRef.current;
@@ -60,6 +63,10 @@ export default function LoginPage() {
       // 컨테이너 실제 폭 측정 → 200~400 사이로 클램프
       const containerWidth = el.clientWidth || 256;
       const width = Math.min(Math.max(Math.round(containerWidth), 200), 400);
+
+      // 폭이 안 바뀌었으면 재렌더 안 함 → ResizeObserver 자가발화 루프 차단
+      if (width === lastWidth) return;
+      lastWidth = width;
 
       // 재렌더 시 기존 버튼 제거 (renderButton 중복 누적 방지)
       el.innerHTML = "";
@@ -86,7 +93,7 @@ export default function LoginPage() {
 
       drawButton();
 
-      // 폭 변할 때마다 다시 그림 (반응형 대응)
+      // 폭 변할 때마다 다시 그림 (반응형 대응) — lastWidth 가드로 같은 폭이면 무시
       observer = new ResizeObserver(() => {
         if (!cancelled) drawButton();
       });
@@ -140,6 +147,12 @@ export default function LoginPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    getVersion()
+      .then(d => setVersion(d.version))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#07111d] px-4">
       <OceanBackground />
@@ -187,9 +200,17 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <p className="mt-6 md:mt-8 text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
-          오늘의 바다 · {weatherLabel}
-        </p>
+        <div className="mt-6 md:mt-8 flex flex-col items-center gap-1">
+          <p className="text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
+            오늘의 바다 · {weatherLabel}
+          </p>
+          {version && (
+            <p className="text-[rgba(122,184,200,0.15)] text-[9px] md:text-[10px] tracking-widest text-center font-mono">
+              {version}
+            </p>
+          )}
+        </div>
+
       </div>
     </div>
   )

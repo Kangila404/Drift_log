@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { PerspectiveCamera } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as THREE from 'three'
 import OceanWater from '../components/r3f/OceanWater'
@@ -22,8 +23,11 @@ import { useRandomEvent } from '../hooks/useRandomEvent'
 import { apiClient } from '../api/client'
 import CityArrivalSequence from '../components/CityArrivalSequence'
 import { bgm } from '../audio/bgmManager'
+import OpeningSequence from '../components/OpeningSequence'
 
 type Scene = 'ocean' | 'arriving' | 'cityIntro' | 'city'
+
+
 
 export default function VoyagePage() {
   const { ready } = useVoyageInit()
@@ -36,6 +40,8 @@ export default function VoyagePage() {
   const completedRef = useRef(false)
   const prevStateRef = useRef(voyageState)   // 직전 항해 상태
   const [showEnding, setShowEnding] = useState(false)
+  const [showOpening, setShowOpening] = useState<boolean | null>(null)
+  const introCheckedRef = useRef(false)
 
   // ── BGM (항해/도시) ──
   useEffect(() => {
@@ -45,6 +51,16 @@ export default function VoyagePage() {
       bgm.playCity(currentCity.bgmUrl)
     }
   }, [voyageState, currentCity])
+
+  // ── 오프닝 — 정박 중 + 항해 기록 0건 = 첫 진입 1회 ──
+  useEffect(() => {
+    if (!ready || introCheckedRef.current) return
+    if (voyageState !== 'ANCHORED') { introCheckedRef.current = true; setShowOpening(false); return }
+    introCheckedRef.current = true
+    apiClient.get('/voyage-log')
+      .then(res => setShowOpening((res.data?.length ?? 0) === 0))
+      .catch(() => setShowOpening(false))
+  }, [ready, voyageState])
 
   // ── 진입 인사 (로그인/회원가입 직후 1회) ──
   const [greeting, setGreeting] = useState<{ msg: string; name: string } | null>(null)
@@ -66,6 +82,10 @@ export default function VoyagePage() {
         setTimeout(() => setGreeting(null), 4000)
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    return () => bgm.stop()
   }, [])
 
   // ── 날씨/시간대 → preset ──
@@ -129,7 +149,7 @@ export default function VoyagePage() {
   return (
     <div className="w-full h-[100dvh] relative bg-[#07111d] overflow-hidden">
 
-{/* 오션 씬 — arriving까지 유지 */}
+      {/* 오션 씬 — arriving까지 유지 */}
       {(scene === 'ocean' || scene === 'arriving') && (
         <motion.div
           className="absolute inset-0"
@@ -144,9 +164,8 @@ export default function VoyagePage() {
             }}
           />
 
-          <Canvas
+           <Canvas
             dpr={[1.5, 2]}
-            camera={{ position: [0, 1.45, 10.8], fov: isMobile ? 60 : 46 }}
             gl={{
               antialias: true,
               alpha: true,
@@ -155,6 +174,12 @@ export default function VoyagePage() {
             }}
             style={{ background: 'transparent' }}
           >
+            <PerspectiveCamera
+              makeDefault
+              position={[0, 1.7, 10.2]}
+              fov={isMobile ? 64 : 52}
+            />
+
             {/* <color attach="background" .../> 제거 — 그라데이션 div가 배경 담당 */}
             <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
             <ambientLight intensity={0.48 * preset.ambientIntensity * (1 - coverage * 0.9)} color="#6fa4d8" />
@@ -272,6 +297,11 @@ export default function VoyagePage() {
       {/* 엔딩 시퀀스 (방금 재회 시 1회, 피드백 포함) */}
       {showEnding && (
         <EndingSequence onFinish={() => setShowEnding(false)} />
+      )}
+
+      {/* 오프닝 인트로 — 첫 진입 1회 */}
+      {showOpening === true && (
+        <OpeningSequence onFinish={() => setShowOpening(false)} />
       )}
     </div>
   )
