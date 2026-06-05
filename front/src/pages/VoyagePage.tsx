@@ -68,6 +68,10 @@ export default function VoyagePage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+  return () => bgm.stop()
+}, [])
+
   // ── 날씨/시간대 → preset ──
   const { weatherId, abnormalType } = useWeather()
   const timeOfDay = useTimeOfDay()
