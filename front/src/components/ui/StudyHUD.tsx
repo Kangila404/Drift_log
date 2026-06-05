@@ -129,9 +129,29 @@ export default function StudyHUD() {
     }
   }
 
+  
+
   const leaveStudy = () => {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 나가시겠습니까?')) return
     nav('/')
+  }
+
+  const handleLogout = async () => {
+    if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 로그아웃하시겠습니까?')) return
+    if (!window.confirm('로그아웃 하시겠습니까?')) return
+    const refreshToken = localStorage.getItem('refreshToken')
+    try {
+      if (refreshToken) {
+        const { apiClient } = await import('../../api/client')
+        await apiClient.post('/auth/logout', { refreshToken })
+      }
+    } catch (e) {
+      console.error('로그아웃 요청 실패:', e)
+    } finally {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      window.location.href = '/login'
+    }
   }
 
   const liveToday = summary.todaySeconds + (running ? elapsed : 0)
@@ -214,7 +234,14 @@ export default function StudyHUD() {
                 <LogTab totalSeconds={summary.totalSeconds} onChanged={refreshSummary} />
               </div>
 
-              <button onClick={leaveStudy} className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors">
+              <div className="p-4">
+                <button onClick={handleLogout}
+                  className="w-full py-2.5 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-red-300 hover:border-red-500/50 tracking-widest transition-colors text-center">
+                  ⏻ 로그아웃
+                </button>
+              </div>
+              <button onClick={leaveStudy}
+                className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors text-center">
                 ‹ 모드 선택으로
               </button>
             </motion.div>

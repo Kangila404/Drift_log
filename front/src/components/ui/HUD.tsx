@@ -6,9 +6,6 @@ import { useVoyageStore } from '../../stores/voyageStore'
 import EndingSequence from '../EndingSequence'
 import { bgm } from '../../audio/bgmManager'
 import { getDiscoveredTraces, type DiscoveredTrace } from '../../api/trace'
-import { useNavigate } from 'react-router-dom'
-import OpeningSequence from '../OpeningSequence'
-
 
 type EventInfo = { name: string; text: string; imageUrl: string | null }
 type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
@@ -39,8 +36,6 @@ const fmtTime = (sec: number) => {
   const s = Math.floor(sec % 60)
   return `${m}:${String(s).padStart(2, '0')}`
 }
-
-
 
 // ─── 남은 시간 카운트다운 다이얼 (progress 비례 원호 + 매초 시간) ───
 function CountdownDial({ remainingSeconds, progress, paused }: {
@@ -100,15 +95,41 @@ function isMobileDevice() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 }
 
+// ─── 카운트다운 (진행바용) ──────────────────
+function useCountdown(remainingSeconds: number, isRunning: boolean) {
+  const [display, setDisplay] = useState(remainingSeconds)
+  const remainingRef = useRef(remainingSeconds)
 
+  useEffect(() => {
+    remainingRef.current = remainingSeconds
+    setDisplay(remainingSeconds)
+  }, [remainingSeconds])
+
+  useEffect(() => {
+    if (!isRunning) return
+    const tick = setInterval(() => {
+      remainingRef.current = Math.max(0, remainingRef.current - 1)
+      setDisplay(remainingRef.current)
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [isRunning, remainingSeconds])
+
+  if (display <= 0) return '도착'
+  const h = Math.floor(display / 3600)
+  const m = Math.floor((display % 3600) / 60)
+  const s = display % 60
+  if (h > 0) return `${h}시간 ${m}분`
+  if (m > 0) return `${m}분 ${s}초`
+  return `${s}초`
+}
 
 // ─── 진행바 ───────────────────────────────────────────────────────────────────
-function ProgressBar({ from, to, progress, voyageState }: {
-  from: string; to: string; progress: number
+function ProgressBar({ from, to, progress, remainingSeconds, voyageState }: {
+  from: string; to: string; progress: number; remainingSeconds: number
   voyageState: 'ANCHORED' | 'SAILING' | 'PAUSED'
 }) {
   const isPaused = voyageState === 'PAUSED'
-
+  const countdown = useCountdown(remainingSeconds, voyageState === 'SAILING')
   const safeProgress = Math.max(0, Math.min(1, progress))
 
   return (
@@ -301,7 +322,6 @@ function TracePanel() {
   const [traces, setTraces] = useState<DiscoveredTrace[]>([])
   const [selected, setSelected] = useState<DiscoveredTrace | null>(null)
   const [replayEnding, setReplayEnding] = useState(false)
-  const [replayIntro, setReplayIntro] = useState(false) 
 
   useEffect(() => {
     getDiscoveredTraces().then(setTraces).catch(() => {})
@@ -317,17 +337,6 @@ function TracePanel() {
         <h2 className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase opacity-70">가족의 흔적</h2>
         <span className="text-[9px] font-mono text-[#2a5a74]">{discoveredCount} / {TOTAL_TRACES}</span>
       </div>
-      {/* 처음 이야기 다시 보기 — 엔딩 버튼 위 */}
-      <button
-        onClick={() => setReplayIntro(true)}
-        className="w-full py-3 border border-[#1a4a64]/50 rounded text-[11px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#4a9abb]/70 tracking-widest transition-colors bg-[#071826]/40"
-      >
-        ✦ 처음 이야기 다시 보기
-      </button>
-      {replayIntro && createPortal(
-        <OpeningSequence onFinish={() => setReplayIntro(false)} />,
-        document.body
-      )}
       {allFound && (
         <button
           onClick={() => { bgm.playEnding(); setReplayEnding(true) }}
@@ -376,7 +385,6 @@ function TracePanel() {
         ))}
       </div>
       <AnimatePresence>
-        
         {selected && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1078,8 +1086,6 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [muted, setMuted] = useState(bgm.isMuted())
 
-  const nav = useNavigate()
-
   useEffect(() => {
     if (voyageState !== 'SAILING') return
     const { setProgress, setVoyageState, setRemainingSeconds } = useVoyageStore.getState()
@@ -1156,7 +1162,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
       {!isAnchored && (
         <div className="absolute top-8 right-8 pointer-events-auto">
           <div className="flex items-start gap-4">
-            <ProgressBar from={fromName} to={toName} progress={progress} voyageState={voyageState} />
+            <ProgressBar from={fromName} to={toName} progress={progress} remainingSeconds={remainingSeconds} voyageState={voyageState} />
             <div className="flex flex-col items-center gap-3 mt-[2px]">
               {(voyageState === 'SAILING' || voyageState === 'PAUSED') && (
                 <motion.button
@@ -1225,20 +1231,10 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
 
       <AnimatePresence>
         {panelOpen && (
-          <motion.div initial={{ x: -340 }} animate={{ x: 0 }} exit={{ x: -340 }}
+          <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
             transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-            className="absolute left-0 top-0 bottom-0 w-80 bg-[#050e18]/95 border-r border-[#0d2233] pointer-events-auto flex flex-col"
+            className="absolute left-0 top-0 bottom-0 w-72 bg-[#050e18]/92 border-r border-[#0d2233] pointer-events-auto flex flex-col"
             style={{ backdropFilter: 'blur(8px)' }}>
-            {/* 헤더 — 제목 + 닫기 (StudyHUD와 동일) */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d2233]">
-              <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">항해 메뉴</span>
-              <button onClick={() => setPanelOpen(false)}
-                className="flex items-center gap-1 text-[10px] font-mono text-[#3a6880] hover:text-[#cce8f5] tracking-widest uppercase transition-colors">
-                닫기 ›
-              </button>
-            </div>
-
-            {/* 탭 */}
             <div className="flex border-b border-[#0d2233]">
               {menuItems.map(item => (
                 <button key={item.id} onClick={() => setActivePanel(item.id)}
@@ -1250,7 +1246,6 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
                 </button>
               ))}
             </div>
-
             <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: 'none' }}>
               <AnimatePresence mode="wait">
                 <motion.div key={activePanel} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
@@ -1261,11 +1256,8 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
                 </motion.div>
               </AnimatePresence>
             </div>
-
-            {/* 풋터 — 모드 선택으로 (StudyHUD와 동일) */}
-            <button onClick={() => nav('/')}
-              className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors">
-              ‹ 모드 선택으로
+            <button onClick={() => setPanelOpen(false)} className="p-3 border-t border-[#0d2233] text-[9px] font-mono text-[#1a3a50] hover:text-[#2a5a74] tracking-widest uppercase transition-colors">
+              ‹ 닫기
             </button>
           </motion.div>
         )}
