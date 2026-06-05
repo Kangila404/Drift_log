@@ -4,6 +4,7 @@ import { signup } from "../api/auth";
 import OceanBackground from "../components/OceanBackground";
 import { getTodayWeather } from "../api/weather";
 import { WEATHER_MAP } from "../constants/weather";
+import { getVersion } from "../api/version";
 
 export default function SignupPage() {
   const navigate = useNavigate()
@@ -12,6 +13,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [weatherLabel, setWeatherLabel] = useState('잔잔한 수면')
+  const [version, setVersion] = useState('')
 
   const handleSignup = async () => {
     if (password !== passwordConfirm) {
@@ -49,6 +51,12 @@ export default function SignupPage() {
   useEffect(() => {
     getTodayWeather()
       .then(w => setWeatherLabel(WEATHER_MAP[w.weatherId]))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    getVersion()
+      .then(d => setVersion(d.version))
       .catch(() => {})
   }, [])
 
@@ -96,9 +104,16 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <p className="mt-6 md:mt-8 text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
-          오늘의 바다 · {weatherLabel}
-        </p>
+        <div className="mt-6 md:mt-8 flex flex-col items-center gap-1">
+          <p className="text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
+            오늘의 바다 · {weatherLabel}
+          </p>
+          {version && (
+            <p className="text-[rgba(122,184,200,0.15)] text-[9px] md:text-[10px] tracking-widest text-center font-mono">
+              {version}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
