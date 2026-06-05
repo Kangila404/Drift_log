@@ -95,41 +95,15 @@ function isMobileDevice() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 }
 
-// ─── 카운트다운 (진행바용) ──────────────────
-function useCountdown(remainingSeconds: number, isRunning: boolean) {
-  const [display, setDisplay] = useState(remainingSeconds)
-  const remainingRef = useRef(remainingSeconds)
 
-  useEffect(() => {
-    remainingRef.current = remainingSeconds
-    setDisplay(remainingSeconds)
-  }, [remainingSeconds])
-
-  useEffect(() => {
-    if (!isRunning) return
-    const tick = setInterval(() => {
-      remainingRef.current = Math.max(0, remainingRef.current - 1)
-      setDisplay(remainingRef.current)
-    }, 1000)
-    return () => clearInterval(tick)
-  }, [isRunning, remainingSeconds])
-
-  if (display <= 0) return '도착'
-  const h = Math.floor(display / 3600)
-  const m = Math.floor((display % 3600) / 60)
-  const s = display % 60
-  if (h > 0) return `${h}시간 ${m}분`
-  if (m > 0) return `${m}분 ${s}초`
-  return `${s}초`
-}
 
 // ─── 진행바 ───────────────────────────────────────────────────────────────────
-function ProgressBar({ from, to, progress, remainingSeconds, voyageState }: {
-  from: string; to: string; progress: number; remainingSeconds: number
+function ProgressBar({ from, to, progress, voyageState }: {
+  from: string; to: string; progress: number
   voyageState: 'ANCHORED' | 'SAILING' | 'PAUSED'
 }) {
   const isPaused = voyageState === 'PAUSED'
-  const countdown = useCountdown(remainingSeconds, voyageState === 'SAILING')
+
   const safeProgress = Math.max(0, Math.min(1, progress))
 
   return (
@@ -1162,7 +1136,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
       {!isAnchored && (
         <div className="absolute top-8 right-8 pointer-events-auto">
           <div className="flex items-start gap-4">
-            <ProgressBar from={fromName} to={toName} progress={progress} remainingSeconds={remainingSeconds} voyageState={voyageState} />
+            <ProgressBar from={fromName} to={toName} progress={progress} voyageState={voyageState} />
             <div className="flex flex-col items-center gap-3 mt-[2px]">
               {(voyageState === 'SAILING' || voyageState === 'PAUSED') && (
                 <motion.button

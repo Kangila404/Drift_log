@@ -251,7 +251,7 @@ export default function CityView() {
       {/* 하단 버튼 */}
       <div style={{
         position: 'absolute',
-        bottom: 'calc(clamp(2rem, 5vh, 5rem) + env(safe-area-inset-bottom))',
+        bottom: 'calc(9rem + env(safe-area-inset-bottom))',
         left: 0, right: 0,
         display: 'flex', justifyContent: 'center', zIndex: 10, pointerEvents: 'none',
       }}>
