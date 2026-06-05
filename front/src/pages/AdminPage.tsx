@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { apiClient } from '../api/client'
+import {
+  getDashboard,
+  getUserList,
+  getUserDetail,
+  banUser,
+  activateUser,
+  getVersion,
+  updateVersion,
+} from '../api/admin'
 
 // ─── 타입 ──────────────────────────────────────────────
 type Feedback = { userName: string; content: string; createdAt: string }
@@ -37,7 +45,7 @@ function DashboardTab() {
   const [err, setErr] = useState(false)
 
   useEffect(() => {
-    apiClient.get('/admin/dashboard').then(r => setData(r.data)).catch(() => setErr(true))
+    getDashboard().then(setData).catch(() => setErr(true))
   }, [])
 
   if (err) return <p className="text-[11px] font-mono text-red-400/60">대시보드를 불러오지 못했습니다.</p>
@@ -84,10 +92,9 @@ function UserTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const load = () => {
-    apiClient.get('/admin/user').then(r => setUsers(r.data)).catch(() => setErr(true))
-  }
-  useEffect(load, [])
+  useEffect(() => {
+    getUserList().then(setUsers).catch(() => setErr(true))
+  }, [])
 
   const toggleStatus = async (u: UserRow) => {
     if (busyId) return
@@ -97,7 +104,8 @@ function UserTab() {
 
     setBusyId(u.userId)
     try {
-      await apiClient.patch(`/admin/user/${u.userId}/${willBan ? 'ban' : 'activation'}`)
+      if (willBan) await banUser(u.userId)
+      else await activateUser(u.userId)
       setUsers(prev => prev.map(x =>
         x.userId === u.userId ? { ...x, userStatus: willBan ? 'SUSPENDED' : 'ACTIVE' } : x
       ))
@@ -167,7 +175,7 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
   const [err, setErr] = useState(false)
 
   useEffect(() => {
-    apiClient.get(`/admin/user/${userId}`).then(r => setDetail(r.data)).catch(() => setErr(true))
+    getUserDetail(userId).then(setDetail).catch(() => setErr(true))
   }, [userId])
 
   return createPortal(
@@ -260,8 +268,85 @@ function Field({ label, value }: { label: string; value: string }) {
   )
 }
 
+// ─── 버전 관리 탭 ───────────────────────────────────────
+function VersionTab() {
+  const [current, setCurrent] = useState<string | null>(null)
+  const [input, setInput] = useState('')
+  const [err, setErr] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    getVersion()
+      .then(d => { setCurrent(d.version); setInput(d.version) })
+      .catch(() => setErr(true))
+  }, [])
+
+  const trimmed = input.trim()
+  const dirty = trimmed !== '' && trimmed !== current
+  const tooLong = trimmed.length > 50
+
+  const save = async () => {
+    if (!dirty || tooLong || saving) return
+    setSaving(true)
+    setSaved(false)
+    try {
+      await updateVersion(trimmed)
+      setCurrent(trimmed)
+      setSaved(true)
+    } catch {
+      alert('버전 저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (err) return <p className="text-[11px] font-mono text-red-400/60">버전 정보를 불러오지 못했습니다.</p>
+
+  return (
+    <div className="flex flex-col gap-8 max-w-md">
+      {/* 현재 버전 */}
+      <div className="bg-[#050e18] border border-[#0d2233] rounded-lg p-6 flex flex-col gap-2">
+        <span className="text-[9px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase">현재 버전</span>
+        <span className="font-mono text-[32px] text-[#4a9abb]">
+          {current === null ? '...' : current}
+        </span>
+      </div>
+
+      {/* 수정 */}
+      <div className="flex flex-col gap-3">
+        <span className="text-[9px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase">버전 수정</span>
+        <input
+          value={input}
+          onChange={e => { setInput(e.target.value); setSaved(false) }}
+          onKeyDown={e => { if (e.key === 'Enter') save() }}
+          placeholder="v1.1.0"
+          disabled={current === null}
+          className="bg-[#040d16] border border-[#0d2233] rounded px-4 py-3 text-[13px] font-mono text-[#a8d4e8] tracking-widest placeholder:text-[#1a3a50] focus:outline-none focus:border-[#1a4a64]/70 disabled:opacity-40 transition-colors"
+        />
+        <div className="flex items-center justify-between min-h-[16px]">
+          {tooLong ? (
+            <span className="text-[9px] font-mono text-red-400/70">50자를 초과할 수 없습니다</span>
+          ) : saved ? (
+            <span className="text-[9px] font-mono text-[#3a8a6a] tracking-widest">저장됨</span>
+          ) : (
+            <span />
+          )}
+          <button
+            onClick={save}
+            disabled={!dirty || tooLong || saving}
+            className="px-4 py-1.5 rounded text-[9px] font-mono tracking-widest uppercase border border-[#1a4a64]/60 text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 disabled:opacity-30 disabled:hover:text-[#7eb8d4] disabled:hover:border-[#1a4a64]/60 transition-colors"
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── 메인 ──────────────────────────────────────────────
-type Tab = 'dashboard' | 'users'
+type Tab = 'dashboard' | 'users' | 'version'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('dashboard')
@@ -275,7 +360,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-1 border-b border-[#0d2233]">
-          {([['dashboard', '대시보드'], ['users', '유저 관리']] as const).map(([id, label]) => (
+          {([['dashboard', '대시보드'], ['users', '유저 관리'], ['version', '버전 관리']] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -290,7 +375,9 @@ export default function AdminPage() {
 
         <AnimatePresence mode="wait">
           <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
-            {tab === 'dashboard' ? <DashboardTab /> : <UserTab />}
+            {tab === 'dashboard' && <DashboardTab />}
+            {tab === 'users' && <UserTab />}
+            {tab === 'version' && <VersionTab />}
           </motion.div>
         </AnimatePresence>
       </div>

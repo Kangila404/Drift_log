@@ -65,11 +65,7 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/version")
-    public ResponseEntity<UpdateVersionResponse> updateVersion(@Valid @RequestBody UpdateVersionRequest request){
-        UpdateVersionResponse response = adminService.updateVersion(request);
-        return ResponseEntity.ok(response);
-    }
+
 
 
 }
