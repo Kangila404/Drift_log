@@ -1,16 +1,22 @@
 package org.example.drift_log.admin.presentation.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.example.drift_log.admin.application.AdminService;
+import org.example.drift_log.admin.presentation.dto.req.UpdateVersionRequest;
 import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
+import org.example.drift_log.admin.presentation.dto.res.UpdateVersionResponse;
+import org.example.drift_log.admin.presentation.dto.res.VersionResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -52,5 +58,18 @@ public class AdminController {
         adminService.activateUser(userId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/version")
+    public ResponseEntity<VersionResponse> getVersion(){
+        VersionResponse response = adminService.getVersion();
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/version")
+    public ResponseEntity<UpdateVersionResponse> updateVersion(@Valid @RequestBody UpdateVersionRequest request){
+        UpdateVersionResponse response = adminService.updateVersion(request);
+        return ResponseEntity.ok(response);
+    }
+
 
 }
