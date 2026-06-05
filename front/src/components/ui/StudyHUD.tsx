@@ -85,12 +85,15 @@ export default function StudyHUD() {
     return cleanup
   }, [])
 
-  useEffect(() => {
+    useEffect(() => {
     if (!running || !startAtRef.current) return
     const id = setInterval(() => {
       const e = Math.floor((Date.now() - startAtRef.current!.getTime()) / 1000)
       setElapsed(e)
-      if (e >= goalMin * 60) finish()
+      if (e >= goalMin * 60) {
+        clearInterval(id) 
+        finish()
+      }
     }, 1000)
     return () => clearInterval(id)
   }, [running, goalMin])
@@ -108,8 +111,9 @@ export default function StudyHUD() {
 
   const finish = async () => {
     if (saving || !startAtRef.current) return
-    setSaving(true)
     const start = startAtRef.current
+    startAtRef.current = null
+    setRunning(false)
     try {
       await saveStudyTime(start, new Date(), subject)
       await refreshSummary()
@@ -119,8 +123,6 @@ export default function StudyHUD() {
       localStorage.removeItem(START_KEY)
       localStorage.removeItem(GOAL_KEY)
       localStorage.removeItem(SUBJ_KEY)
-      startAtRef.current = null
-      setRunning(false)
       setElapsed(0)
       setSubject('')
       setSaving(false)

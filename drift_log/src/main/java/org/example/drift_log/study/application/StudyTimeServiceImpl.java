@@ -17,7 +17,7 @@ import org.example.drift_log.user.exception.UserErrorCode;
 import org.example.drift_log.user.exception.UserException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.time.ZoneId;
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -25,6 +25,7 @@ public class StudyTimeServiceImpl implements StudyTimeService {
 
     private final StudyTimeRepository studyTimeRepository;
     private final UserRepository userRepository;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
 
     @Override
@@ -49,7 +50,7 @@ public class StudyTimeServiceImpl implements StudyTimeService {
 
         User user = findUserByUserId(userId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
 

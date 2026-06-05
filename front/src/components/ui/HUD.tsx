@@ -62,7 +62,7 @@ function CountdownDial({ remainingSeconds, progress, paused }: {
   const timeText = sec <= 0 ? '도착' : h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`
 
   return (
-    <div className="relative w-28 h-28">
+    <div className="relative w-28 h-28 md:w-36 md:h-36 lg:w-44 lg:h-44">
       <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
         <circle cx="50" cy="50" r={R} fill="none" stroke="#0d2233" strokeWidth="2" />
         <motion.circle
@@ -81,7 +81,7 @@ function CountdownDial({ remainingSeconds, progress, paused }: {
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[15px] font-mono text-[#cce8f5] tabular-nums tracking-wide leading-none">{timeText}</span>
+        <span className="text-[15px] md:text-[19px] lg:text-[22px] font-mono text-[#cce8f5] tabular-nums tracking-wide leading-none">{timeText}</span>
         <span className="text-[7px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase mt-1">
           {paused ? '정지' : sec <= 0 ? '' : '남음'}
         </span>
@@ -150,13 +150,9 @@ function ProgressBar({ from, to, progress, remainingSeconds, voyageState }: {
       <div className="flex justify-between items-baseline">
         <span className="text-[14px] font-mono text-[#2a5a74]">
           {isPaused ? (
-            <span className="text-[#7eb8d4]">항해 정지 중 · 시간 멈춤</span>
-          ) : remainingSeconds === 0 ? (
-            <span className="text-[#4a9abb] animate-pulse">계산 중...</span>
-          ) : countdown === '도착' ? (
-            <span className="text-[#4a9abb]">도착</span>
+            <span className="text-[#7eb8d4]">항해 정지 중</span>
           ) : (
-            <>도착까지 <span className="text-[#4a9abb]">{countdown}</span></>
+            <span className="text-[#4a9abb]">{to}로 항해 중</span>
           )}
         </span>
         <span className="text-[14px] font-mono text-[#4a7a94]">{Math.round(safeProgress * 100)}%</span>
@@ -1225,9 +1221,11 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
 
       <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-auto">
         <motion.button onClick={() => setPanelOpen(v => !v)}
-          className="flex items-center pl-2 pr-3 py-3 bg-[#050e18]/60 border-r border-t border-b border-[#0d2233] rounded-r-sm hover:bg-[#071525]/80 transition-colors duration-300 group"
-          whileHover={{ x: 2 }} whileTap={{ scale: 0.96 }}>
-          <motion.span animate={{ rotate: panelOpen ? 180 : 0 }} transition={{ duration: 0.3 }} className="text-[10px] font-mono text-[#2a5a74] group-hover:text-[#7eb8d4]">›</motion.span>
+          className="flex items-center gap-1 pl-3 pr-4 py-5 bg-[#050e18]/70 border-r border-t border-b border-[#1a4a64]/50 rounded-r-lg hover:bg-[#071525]/90 hover:border-[#4a9abb]/50 transition-colors group"
+          whileHover={{ x: 3 }} whileTap={{ scale: 0.96 }}>
+          <motion.span animate={{ rotate: panelOpen ? 180 : 0 }} transition={{ duration: 0.3 }}
+            className="text-[18px] text-[#7eb8d4] group-hover:text-[#cce8f5] transition-colors">›</motion.span>
+          <span className="text-[10px] font-mono text-[#4a7a94] group-hover:text-[#7eb8d4] tracking-widest [writing-mode:vertical-rl] mt-1">메뉴</span>
         </motion.button>
       </div>
 
