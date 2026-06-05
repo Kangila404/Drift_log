@@ -59,12 +59,12 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/version")
-    public ResponseEntity<VersionResponse> getVersion(){
-        VersionResponse response = adminService.getVersion();
+
+    @PatchMapping("/version")
+    public ResponseEntity<UpdateVersionResponse> updateVersion(@Valid @RequestBody UpdateVersionRequest request){
+        UpdateVersionResponse response = adminService.updateVersion(request);
         return ResponseEntity.ok(response);
     }
-
 
 
 

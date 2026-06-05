@@ -30,11 +30,6 @@ export const activateUser = async (userId: string) => {
   return response.data;
 };
 
-// 버전 조회
-export const getVersion = async () => {
-  const response = await apiClient.get("/admin/version");
-  return response.data;
-};
 
 // 버전 수정
 export const updateVersion = async (version: string) => {

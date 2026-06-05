@@ -7,9 +7,9 @@ import {
   getUserDetail,
   banUser,
   activateUser,
-  getVersion,
   updateVersion,
 } from '../api/admin'
+import { getVersion } from '../api/version'
 
 // ─── 타입 ──────────────────────────────────────────────
 type Feedback = { userName: string; content: string; createdAt: string }

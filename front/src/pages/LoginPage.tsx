@@ -4,6 +4,7 @@ import { login, socialLogin } from "../api/auth";
 import OceanBackground from "../components/OceanBackground";
 import { getTodayWeather } from "../api/weather";
 import { WEATHER_MAP } from "../constants/weather";
+import { getVersion } from "../api/version";
 
 // 구글 전역 객체 타입
 declare global {
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [weatherLabel, setWeatherLabel] = useState('잔잔한 수면')
+  const [version, setVersion] = useState('')
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = async () => {
@@ -140,6 +142,12 @@ export default function LoginPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    getVersion()
+      .then(d => setVersion(d.version))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#07111d] px-4">
       <OceanBackground />
@@ -187,9 +195,17 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <p className="mt-6 md:mt-8 text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
-          오늘의 바다 · {weatherLabel}
-        </p>
+        <div className="mt-6 md:mt-8 flex flex-col items-center gap-1">
+          <p className="text-[rgba(122,184,200,0.2)] text-[10px] md:text-xs tracking-widest uppercase text-center">
+            오늘의 바다 · {weatherLabel}
+          </p>
+          {version && (
+            <p className="text-[rgba(122,184,200,0.15)] text-[9px] md:text-[10px] tracking-widest text-center font-mono">
+              {version}
+            </p>
+          )}
+        </div>
+        
       </div>
     </div>
   )
