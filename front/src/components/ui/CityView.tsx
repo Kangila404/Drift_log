@@ -140,8 +140,7 @@ export default function CityView() {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#040c1a' }}>
-
+    <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', backgroundColor: '#040c1a' }}>
       <style>{`
         @keyframes shimmer {
           0%, 100% { opacity: 0.2; transform: scaleX(1); }
@@ -251,7 +250,9 @@ export default function CityView() {
 
       {/* 하단 버튼 */}
       <div style={{
-        position: 'absolute', bottom: 'clamp(2rem, 5vh, 5rem)', left: 0, right: 0,
+        position: 'absolute',
+        bottom: 'calc(clamp(2rem, 5vh, 5rem) + env(safe-area-inset-bottom))',
+        left: 0, right: 0,
         display: 'flex', justifyContent: 'center', zIndex: 10, pointerEvents: 'none',
       }}>
         <motion.div
