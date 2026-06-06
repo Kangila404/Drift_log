@@ -23,5 +23,10 @@ public class TraceRepositoryImpl implements TraceRepository {
         return traceJpaRepository.count();
     }
 
+    @Override
+    public Optional<Trace> findById(Long traceId) {
+        return traceJpaRepository.findById(traceId);
+    }
+
 
 }

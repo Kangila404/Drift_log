@@ -10,6 +10,9 @@ import {
   updateVersion,
 } from '../api/admin'
 import { getVersion } from '../api/version'
+import { getAdminInquiries, writeAnswer, updateAnswer, deleteAnswer, type Inquiry } from '../api/inquiry'
+import { getAdminNotices, writeNotice, updateNotice, deleteNotice, type Notice } from '../api/notice'  // ← 이 줄 추가
+
 
 // ─── 타입 ──────────────────────────────────────────────
 type Feedback = { userName: string; content: string; createdAt: string }
@@ -345,8 +348,294 @@ function VersionTab() {
   )
 }
 
+// ─── 고객센터 관리 탭 (공지 관리 / 문의 관리) ──────────────
+function SupportTab() {
+  const [sub, setSub] = useState<'notice' | 'inquiry'>('notice')
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex gap-2">
+        {([['notice', '공지 관리'], ['inquiry', '문의 관리']] as const).map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)}
+            className={`px-4 py-1.5 rounded border text-[10px] font-mono tracking-widest uppercase transition-colors ${
+              sub === id
+                ? 'border-[#4a9abb]/70 text-[#cce8f5] bg-[#0a2233]/60'
+                : 'border-[#1a4a64]/40 text-[#3a6880] hover:text-[#7eb8d4]'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div key={sub}
+          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+          {sub === 'notice' ? <AdminNoticeManage /> : <AdminInquiryManage />}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── 공지 관리 ───
+function AdminNoticeManage() {
+  const [notices, setNotices] = useState<Notice[]>([])
+  const [err, setErr] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<Notice | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  const load = () =>
+    getAdminNotices().then(n => { setNotices(n); setLoaded(true) }).catch(() => setErr(true))
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async (n: Notice) => {
+    if (busyId) return
+    if (!window.confirm(`"${n.title}" 공지를 삭제하시겠습니까?`)) return
+    setBusyId(n.noticeId)
+    try {
+      await deleteNotice(n.noticeId)
+      setNotices(prev => prev.filter(x => x.noticeId !== n.noticeId))
+    } catch {
+      alert('삭제에 실패했습니다.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (err) return <p className="text-[11px] font-mono text-red-400/60">공지 목록을 불러오지 못했습니다.</p>
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-between items-center">
+        <span className="text-[10px] font-mono text-[#2a5a74] tracking-widest uppercase">{notices.length}개의 공지</span>
+        <button onClick={() => setCreating(true)}
+          className="px-4 py-2 border border-[#4a9abb]/50 rounded text-[10px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors">
+          + 새 공지 작성
+        </button>
+      </div>
+
+      {loaded && notices.length === 0 && (
+        <p className="text-[10px] font-mono text-[#1a3a50] italic">— 등록된 공지가 없습니다</p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {notices.map((n, i) => (
+          <motion.div key={n.noticeId}
+            initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
+            className="border border-[#0d2233] rounded p-4 bg-[#050e18]/60 flex flex-col gap-2">
+            <div className="flex justify-between items-baseline gap-3">
+              <span className="text-[13px] font-serif text-[#cce8f5] truncate">{n.title}</span>
+              <span className="text-[9px] font-mono text-[#2a5a74] shrink-0">{n.authorName} · {fmtDate(n.createdAt)}</span>
+            </div>
+            <p className="text-[11px] text-[#4a7a94] font-light leading-relaxed line-clamp-2 whitespace-pre-line">{n.content}</p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setEditing(n)}
+                className="px-3 py-1 rounded text-[9px] font-mono tracking-widest border border-[#1a4a64]/60 text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 transition-colors">
+                수정
+              </button>
+              <button onClick={() => handleDelete(n)} disabled={busyId === n.noticeId}
+                className="px-3 py-1 rounded text-[9px] font-mono tracking-widest border border-red-900/50 text-red-400/70 hover:text-red-300 hover:border-red-500/60 transition-colors disabled:opacity-40">
+                삭제
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {(creating || editing) && (
+        <NoticeFormModal notice={editing}
+          onClose={() => { setCreating(false); setEditing(null) }}
+          onSaved={load} />
+      )}
+    </div>
+  )
+}
+
+// ─── 문의 관리 (답변 작성/수정/삭제) ───
+function AdminInquiryManage() {
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
+  const [err, setErr] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [answerDraft, setAnswerDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = () =>
+    getAdminInquiries()
+      .then(list => {
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        setInquiries(sorted); setLoaded(true)
+      })
+      .catch(() => setErr(true))
+  useEffect(() => { load() }, [])
+
+  const openInquiry = (n: Inquiry) => {
+    setExpandedId(expandedId === n.inquiryId ? null : n.inquiryId)
+    setAnswerDraft(n.answerContent ?? '')
+  }
+
+  const submitAnswer = async (n: Inquiry) => {
+    if (!answerDraft.trim() || busy) return
+    setBusy(true)
+    try {
+      if (n.answerContent) await updateAnswer(n.inquiryId, { content: answerDraft.trim() })
+      else await writeAnswer(n.inquiryId, { content: answerDraft.trim() })
+      await load()
+    } catch {
+      alert('답변 저장에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeAnswer = async (n: Inquiry) => {
+    if (busy || !window.confirm('답변을 삭제할까요?')) return
+    setBusy(true)
+    try {
+      await deleteAnswer(n.inquiryId)
+      await load()
+      setAnswerDraft('')
+    } catch {
+      alert('답변 삭제에 실패했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (err) return <p className="text-[11px] font-mono text-red-400/60">문의 목록을 불러오지 못했습니다.</p>
+
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-[10px] font-mono text-[#2a5a74] tracking-widest uppercase">{inquiries.length}개의 문의</span>
+      {loaded && inquiries.length === 0 && (
+        <p className="text-[10px] font-mono text-[#1a3a50] italic">— 등록된 문의가 없습니다</p>
+      )}
+
+      {inquiries.map((n, i) => {
+        const isOpen = expandedId === n.inquiryId
+        const answered = n.inquiryStatus === 'ANSWERED'
+        return (
+          <motion.div key={n.inquiryId}
+            initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
+            className="border border-[#0d2233] rounded bg-[#050e18]/60 overflow-hidden">
+            <button onClick={() => openInquiry(n)}
+              className="w-full text-left px-4 py-3 flex justify-between items-center gap-3 hover:bg-[#071525]/40 transition-colors">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded shrink-0 tracking-widest ${
+                  answered ? 'bg-[#1a4a3a]/60 text-[#5abb8a]' : 'bg-[#3a3a1a]/60 text-[#bbaa5a]'
+                }`}>{answered ? '답변완료' : '대기중'}</span>
+                <span className="text-[13px] font-serif text-[#cce8f5] truncate">{n.title}</span>
+              </span>
+              <span className="text-[9px] font-mono text-[#2a5a74] shrink-0">{n.authorName} · {fmtDate(n.createdAt)}</span>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }} className="overflow-hidden">
+                  <div className="px-4 pb-4 pt-1 flex flex-col gap-3 border-t border-[#1a4a64]/30">
+                    <p className="text-[12px] text-[#7eb8d4] font-light leading-relaxed whitespace-pre-line">{n.content}</p>
+
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[9px] font-mono text-[#4a9abb] tracking-[0.2em] uppercase">
+                        {n.answerContent ? '답변 수정' : '답변 작성'}
+                      </p>
+                      <textarea value={answerDraft} onChange={e => setAnswerDraft(e.target.value)} rows={4}
+                        placeholder="답변 내용"
+                        className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[12px] text-[#cce8f5] resize-none outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50] leading-relaxed" />
+                      <div className="flex justify-end gap-2">
+                        {n.answerContent && (
+                          <button onClick={() => removeAnswer(n)} disabled={busy}
+                            className="px-3 py-1.5 rounded text-[9px] font-mono tracking-widest border border-red-900/50 text-red-400/70 hover:text-red-300 hover:border-red-500/60 transition-colors disabled:opacity-40">
+                            답변 삭제
+                          </button>
+                        )}
+                        <button onClick={() => submitAnswer(n)} disabled={busy || !answerDraft.trim()}
+                          className="px-4 py-1.5 rounded text-[9px] font-mono tracking-widest border border-[#4a9abb]/50 text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 transition-colors disabled:opacity-40">
+                          {busy ? '저장 중' : n.answerContent ? '답변 수정' : '답변 등록'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── 공지 작성/수정 모달 ───
+function NoticeFormModal({ notice, onClose, onSaved }: {
+  notice: Notice | null; onClose: () => void; onSaved: () => void
+}) {
+  const isEdit = !!notice
+  const [title, setTitle] = useState(notice?.title ?? '')
+  const [content, setContent] = useState(notice?.content ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!title.trim() || !content.trim() || saving) return
+    setSaving(true)
+    try {
+      if (isEdit) await updateNotice(notice!.noticeId, { title: title.trim(), content: content.trim() })
+      else await writeNotice({ title: title.trim(), content: content.trim() })
+      onSaved()
+      onClose()
+    } catch {
+      alert('저장에 실패했습니다.')
+      setSaving(false)
+    }
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+        onClick={onClose}
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-6 cursor-pointer"
+        style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(6px)' }}>
+        <motion.div onClick={e => e.stopPropagation()}
+          initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 14, opacity: 0 }}
+          className="w-full max-w-lg bg-[#050e18] border border-[#1a4a64]/50 rounded-lg p-7 flex flex-col gap-5 cursor-default">
+          <p className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">{isEdit ? '공지 수정' : '새 공지 작성'}</p>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[9px] font-mono text-[#2a5a74] tracking-widest uppercase">제목</span>
+            <input value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
+              placeholder="공지 제목"
+              className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[13px] text-[#cce8f5] outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50]" />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[9px] font-mono text-[#2a5a74] tracking-widest uppercase">내용</span>
+            <textarea value={content} onChange={e => setContent(e.target.value)} rows={8}
+              placeholder="공지 내용"
+              className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[13px] text-[#cce8f5] resize-none outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50] leading-relaxed" />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button onClick={onClose}
+              className="px-4 py-2 text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors">취소</button>
+            <button onClick={save} disabled={saving || !title.trim() || !content.trim()}
+              className="px-5 py-2 border border-[#4a9abb]/50 rounded text-[10px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors disabled:opacity-40">
+              {saving ? '저장 중' : isEdit ? '수정' : '작성'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body
+  )
+}
+
 // ─── 메인 ──────────────────────────────────────────────
-type Tab = 'dashboard' | 'users' | 'version'
+type Tab = 'dashboard' | 'users' | 'support' | 'version'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('dashboard')
@@ -360,7 +649,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-1 border-b border-[#0d2233]">
-          {([['dashboard', '대시보드'], ['users', '유저 관리'], ['version', '버전 관리']] as const).map(([id, label]) => (
+          {([['dashboard', '대시보드'], ['users', '유저 관리'], ['support', '고객센터'], ['version', '버전 관리']] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -377,6 +666,7 @@ export default function AdminPage() {
           <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
             {tab === 'dashboard' && <DashboardTab />}
             {tab === 'users' && <UserTab />}
+            {tab === 'support' && <SupportTab />}
             {tab === 'version' && <VersionTab />}
           </motion.div>
         </AnimatePresence>

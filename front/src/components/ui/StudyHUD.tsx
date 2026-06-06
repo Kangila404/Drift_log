@@ -1,14 +1,18 @@
+// src/components/study/StudyHUD.tsx
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { saveStudyTime, getStudySummary, getStudyLogs, updateStudySubject, deleteStudyLog, type StudySummary, type StudyLog } from '../../api/study'
 import { noise, type NoiseKey } from '../../audio/noiseManager'
+import CustomerCenter from '../CustomerCenter'
 
 const PRESETS = [25, 50, 90]
 const START_KEY = 'studyStartAt'
 const GOAL_KEY = 'studyGoalMin'
 const SUBJ_KEY = 'studySubject'
+
+const emitStudyChange = () => window.dispatchEvent(new Event('study-change'))
 
 const fmtClock = (sec: number) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60
@@ -50,20 +54,33 @@ export default function StudyHUD() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [soundOpen, setSoundOpen] = useState(false)
   const startAtRef = useRef<Date | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {})
   useEffect(() => { refreshSummary() }, [])
 
-  // 새로고침 복구
+  // 새로고침 복구 — F5는 복구, 단 목표시간 넘긴 방치 세션은 폐기(부활 방지)
   useEffect(() => {
     const saved = localStorage.getItem(START_KEY)
-    if (saved) {
-      startAtRef.current = new Date(saved)
-      setGoalMin(Number(localStorage.getItem(GOAL_KEY)) || 25)
-      setSubject(localStorage.getItem(SUBJ_KEY) || '')
-      setElapsed(Math.floor((Date.now() - startAtRef.current.getTime()) / 1000))
-      setRunning(true)
+    if (!saved) return
+
+    const start = new Date(saved)
+    const goal = Number(localStorage.getItem(GOAL_KEY)) || 25
+    const elapsedSec = Math.floor((Date.now() - start.getTime()) / 1000)
+
+    // 목표시간을 이미 넘긴 채 방치된 세션은 복구하지 않고 폐기
+    if (elapsedSec >= goal * 60) {
+      localStorage.removeItem(START_KEY)
+      localStorage.removeItem(GOAL_KEY)
+      localStorage.removeItem(SUBJ_KEY)
+      return
     }
+
+    startAtRef.current = start
+    setGoalMin(goal)
+    setSubject(localStorage.getItem(SUBJ_KEY) || '')
+    setElapsed(elapsedSec)
+    setRunning(true)
   }, [])
 
   // 파도 기본 — 첫 사용자 인터랙션에 확실히 재생 (자동재생 정책 회피)
@@ -85,13 +102,13 @@ export default function StudyHUD() {
     return cleanup
   }, [])
 
-    useEffect(() => {
+  useEffect(() => {
     if (!running || !startAtRef.current) return
     const id = setInterval(() => {
       const e = Math.floor((Date.now() - startAtRef.current!.getTime()) / 1000)
       setElapsed(e)
       if (e >= goalMin * 60) {
-        clearInterval(id) 
+        clearInterval(id)
         finish()
       }
     }, 1000)
@@ -107,6 +124,7 @@ export default function StudyHUD() {
     setElapsed(0)
     setRunning(true)
     setSetupOpen(false)
+    emitStudyChange()
   }
 
   const finish = async () => {
@@ -129,16 +147,30 @@ export default function StudyHUD() {
     }
   }
 
-  
+  const confirmFinish = () => {
+    setConfirmOpen(false)
+    finish()
+  }
 
+  // 모드 선택으로 나가기 — 진행 중 세션 폐기(저장 안 함)
   const leaveStudy = () => {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 나가시겠습니까?')) return
+    startAtRef.current = null
+    setRunning(false)
+    localStorage.removeItem(START_KEY)
+    localStorage.removeItem(GOAL_KEY)
+    localStorage.removeItem(SUBJ_KEY)
     nav('/')
   }
 
   const handleLogout = async () => {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 로그아웃하시겠습니까?')) return
     if (!window.confirm('로그아웃 하시겠습니까?')) return
+    // 진행 중 공부 세션 폐기
+    startAtRef.current = null
+    localStorage.removeItem(START_KEY)
+    localStorage.removeItem(GOAL_KEY)
+    localStorage.removeItem(SUBJ_KEY)
     const refreshToken = localStorage.getItem('refreshToken')
     try {
       if (refreshToken) {
@@ -166,34 +198,40 @@ export default function StudyHUD() {
 
       {/* ── 하단 가로 긴 바: 오늘 공부량 + 타이머 + 버튼 ── */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-auto w-[min(92vw,640px)]">
-        <div className="flex items-center gap-5 px-6 py-3.5 rounded-2xl"
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 px-6 py-3.5 rounded-2xl"
           style={{ background: 'rgba(5,14,24,0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(26,74,100,0.45)' }}>
-          <div className="flex flex-col shrink-0">
-            <p className="text-[14px] font-mono text-[#a8d4e8] tabular-nums leading-none">{fmtSummary(liveToday)}</p>
-            <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.25em] uppercase mt-1">오늘 공부량</p>
-          </div>
-          <div className="w-px self-stretch bg-[#1a3a50]/50" />
-          <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-            <div className="flex items-baseline justify-between">
-              <p className="text-[28px] font-mono text-[#cce8f5] tabular-nums tracking-wider leading-none">{fmtClock(elapsed)}</p>
-              {running && <span className="text-[10px] font-mono text-[#4a7a94] truncate ml-3">{subject || '공부 중'} · 목표 {goalMin}분</span>}
+
+          {/* 위(모바일)/왼쪽(데스크탑): 오늘 공부량 + 타이머 */}
+          <div className="flex items-center gap-4 sm:gap-5 flex-1 min-w-0">
+            <div className="flex flex-col shrink-0">
+              <p className="text-[14px] font-mono text-[#a8d4e8] tabular-nums leading-none">{fmtSummary(liveToday)}</p>
+              <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.25em] uppercase mt-1">오늘 공부량</p>
             </div>
-            {running && (
-              <div className="relative h-[3px] bg-[#0d2233] rounded-full overflow-hidden">
-                <motion.div className="absolute top-0 left-0 h-full bg-[#4a9abb] rounded-full"
-                  animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
+            <div className="w-px self-stretch bg-[#1a3a50]/50" />
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[26px] sm:text-[28px] font-mono text-[#cce8f5] tabular-nums tracking-wider leading-none shrink-0">{fmtClock(elapsed)}</p>
+                {running && <span className="text-[10px] font-mono text-[#4a7a94] truncate">{subject || '공부 중'} · 목표 {goalMin}분</span>}
               </div>
-            )}
+              {running && (
+                <div className="relative h-[3px] bg-[#0d2233] rounded-full overflow-hidden">
+                  <motion.div className="absolute top-0 left-0 h-full bg-[#4a9abb] rounded-full"
+                    animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* 아래(모바일)/오른쪽(데스크탑): 버튼 */}
           {!running ? (
             <button onClick={() => setSetupOpen(true)}
-              className="shrink-0 px-8 py-2.5 border border-[#4a9abb]/50 rounded-lg text-[13px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-[0.25em] uppercase transition-colors">
+              className="w-full sm:w-auto shrink-0 px-8 py-2.5 border border-[#4a9abb]/50 rounded-lg text-[13px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-[0.25em] uppercase transition-colors">
               시작
             </button>
           ) : (
-            <button onClick={finish} disabled={saving}
-              className="shrink-0 px-8 py-2.5 border border-[#1a4a64]/60 rounded-lg text-[13px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-[0.25em] uppercase transition-colors disabled:opacity-40">
-              {saving ? '저장 중' : '종료'}
+            <button onClick={() => setConfirmOpen(true)} disabled={saving}
+              className="w-full sm:w-auto shrink-0 px-6 py-2.5 border border-[#1a4a64]/60 rounded-lg text-[13px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-[0.15em] uppercase transition-colors disabled:opacity-40 whitespace-nowrap">
+              {saving ? '저장 중' : '종료 및 저장'}
             </button>
           )}
         </div>
@@ -221,7 +259,7 @@ export default function StudyHUD() {
               transition={{ type: 'spring', stiffness: 280, damping: 28 }}
               className="fixed left-0 top-0 bottom-0 w-80 bg-[#050e18]/95 border-r border-[#0d2233] z-30 pointer-events-auto flex flex-col"
               style={{ backdropFilter: 'blur(8px)' }}>
-              {/* 헤더 — 제목 + 닫기(좌측 화살표 형태로 자연스럽게) */}
+              {/* 헤더 — 제목 + 닫기 */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d2233]">
                 <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">공부일지</span>
                 <button onClick={() => setPanelOpen(false)}
@@ -234,7 +272,8 @@ export default function StudyHUD() {
                 <LogTab totalSeconds={summary.totalSeconds} onChanged={refreshSummary} />
               </div>
 
-              <div className="p-4">
+              <div className="p-4 flex flex-col gap-2">
+                <CustomerCenter />
                 <button onClick={handleLogout}
                   className="w-full py-2.5 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-red-300 hover:border-red-500/50 tracking-widest transition-colors text-center">
                   ⏻ 로그아웃
@@ -289,6 +328,41 @@ export default function StudyHUD() {
                   className="py-3 border border-[#4a9abb]/50 rounded-lg text-[13px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-[0.3em] uppercase transition-colors">
                   시작하기
                 </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ── 종료 확인 모달 ── */}
+      {createPortal(
+        <AnimatePresence>
+          {confirmOpen && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setConfirmOpen(false)}
+              className="fixed inset-0 z-[9999] flex items-center justify-center px-6 cursor-pointer"
+              style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(8px)' }}>
+              <motion.div onClick={e => e.stopPropagation()}
+                initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+                className="w-full max-w-xs bg-[#050e18] border border-[#1a4a64]/50 rounded-2xl p-7 flex flex-col gap-6 cursor-default">
+                <div className="flex flex-col items-center gap-2.5">
+                  <p className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase">공부 종료</p>
+                  <p className="text-[32px] font-mono text-[#cce8f5] tabular-nums leading-none">{fmtClock(elapsed)}</p>
+                  <p className="text-[12px] font-mono text-[#4a7a94] text-center">
+                    {subject || '이번 공부'} 기록을 저장하고 종료할까요?
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirmOpen(false)}
+                    className="flex-1 py-2.5 border border-[#1a3a50] rounded-lg text-[12px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#1a4a64] tracking-[0.2em] uppercase transition-colors">
+                    취소
+                  </button>
+                  <button onClick={confirmFinish} disabled={saving}
+                    className="flex-1 py-2.5 border border-[#4a9abb]/50 rounded-lg text-[12px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-[0.2em] uppercase transition-colors disabled:opacity-40">
+                    확인
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -376,6 +450,7 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
   const [editVal, setEditVal] = useState('')
   const [busy, setBusy] = useState(false)
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({})
+  const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({})
 
   const load = () => getStudyLogs().then(l => { setLogs(l); setLoaded(true) }).catch(() => setLoaded(true))
   useEffect(() => { load() }, [])
@@ -396,6 +471,7 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
     finally { setBusy(false) }
   }
 
+  // 상세 모달용 삭제 (확인창)
   const remove = async () => {
     if (!selected || busy || !window.confirm('이 기록을 삭제할까요?')) return
     setBusy(true)
@@ -406,6 +482,22 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
       onChanged()
     } catch (e) { console.error('삭제 실패:', e) }
     finally { setBusy(false) }
+  }
+
+  // 스와이프 삭제 — 확인 후 삭제(낙관적 업데이트). 취소 시 false 반환 → 항목 제자리 복귀
+  const removeById = async (id: number): Promise<boolean> => {
+    if (!window.confirm('이 기록을 삭제할까요?')) return false
+    const target = logs.find(l => l.id === id)
+    setLogs(prev => prev.filter(l => l.id !== id))
+    onChanged()
+    try {
+      await deleteStudyLog(id)
+    } catch (e) {
+      console.error('삭제 실패:', e)
+      if (target) setLogs(prev => [...prev, target]) // 실패 시 복구
+      onChanged()
+    }
+    return true
   }
 
   const sorted = [...logs].sort((a, b) =>
@@ -436,9 +528,13 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
     })
   })()
 
+  // 월: 첫 달만 펼침 / 일: 기본 펼침
   const isCollapsed = (key: string, idx: number) => collapsedMonths[key] ?? idx !== 0
   const toggleMonth = (key: string, idx: number) =>
     setCollapsedMonths(prev => ({ ...prev, [key]: !(prev[key] ?? idx !== 0) }))
+  const isCollapsedDay = (key: string) => collapsedDays[key] ?? false
+  const toggleDay = (key: string) =>
+    setCollapsedDays(prev => ({ ...prev, [key]: !(prev[key] ?? false) }))
 
   return (
     <div className="flex flex-col gap-3">
@@ -468,31 +564,39 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.25, ease: 'easeInOut' }} className="overflow-hidden">
                   <div className="flex flex-col gap-3 pt-3">
-                    {mg.days.map(day => (
-                      <div key={day.dKey} className="flex flex-col gap-1.5">
-                        <div className="flex justify-between items-baseline px-1">
-                          <span className="text-[9px] font-mono text-[#3a6880] tracking-widest">{day.label}</span>
-                          <span className="text-[9px] font-mono text-[#2a5a74]">일간 공부량 {fmtSummary(day.totalSec)}</span>
+                    {mg.days.map(day => {
+                      const dayCollapsed = isCollapsedDay(day.dKey)
+                      return (
+                        <div key={day.dKey} className="flex flex-col gap-1.5">
+                          <button onClick={() => toggleDay(day.dKey)}
+                            className="flex justify-between items-baseline px-1 py-0.5 rounded hover:bg-[#071826]/40 transition-colors group">
+                            <span className="flex items-center gap-1.5">
+                              <motion.span animate={{ rotate: dayCollapsed ? 0 : 90 }} transition={{ duration: 0.2 }}
+                                className="text-[8px] font-mono text-[#2a5a74] group-hover:text-[#7eb8d4]">›</motion.span>
+                              <span className="text-[9px] font-mono text-[#3a6880] group-hover:text-[#7eb8d4] tracking-widest">{day.label}</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-[#2a5a74]">일간 공부량 {fmtSummary(day.totalSec)}</span>
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {!dayCollapsed && (
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.22, ease: 'easeInOut' }} className="overflow-hidden">
+                                <div className="flex flex-col gap-1.5">
+                                  <AnimatePresence initial={false}>
+                                    {day.logs.map((l, i) => (
+                                      <SwipeLog key={l.id} log={l} index={i}
+                                        onOpen={() => openDetail(l)}
+                                        onDelete={() => removeById(l.id)} />
+                                    ))}
+                                  </AnimatePresence>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
-                        {day.logs.map((l, i) => (
-                          <motion.button key={l.id}
-                            initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                            onClick={() => openDetail(l)}
-                            className="text-left border-l border-[#0d2233] hover:border-[#4a9abb]/60 pl-3 pr-2 py-2 rounded-r transition-colors hover:bg-[#071826]/50 group cursor-pointer">
-                            <div className="flex justify-between items-center">
-                              <p className="text-[11px] font-mono text-[#7eb8d4]">{fmtHM(l.studyStartTimeAt)} ~ {fmtHM(l.studyEndTimeAt)}</p>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-mono text-[#4a9abb]">{logMinutes(l)}분</span>
-                                <span className="text-[11px] font-mono text-[#1a3a50] group-hover:text-[#4a9abb] transition-colors">›</span>
-                              </div>
-                            </div>
-                            <p className={`text-[11px] font-light mt-0.5 line-clamp-1 ${l.subject ? 'text-[#4a7a94]' : 'text-[#1a3a50] italic'}`}>
-                              {l.subject || '내용을 추가하려면 눌러주세요'}
-                            </p>
-                          </motion.button>
-                        ))}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -562,5 +666,61 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
         document.body
       )}
     </div>
+  )
+}
+
+// ─── 스와이프로 삭제되는 로그 항목 ───
+function SwipeLog({ log, index, onOpen, onDelete }: {
+  log: StudyLog; index: number; onOpen: () => void; onDelete: () => Promise<boolean>
+}) {
+  const x = useMotionValue(0)
+  const bgOpacity = useTransform(x, [-90, -25, 0], [1, 0.35, 0])
+  const iconScale = useTransform(x, [-90, -45], [1, 0.5])
+  const draggedRef = useRef(false)
+
+  const snapBack = () => animate(x, 0, { type: 'spring', stiffness: 400, damping: 35 })
+
+  return (
+    <motion.div className="relative" layout
+      initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+      exit={{ height: 0, opacity: 0, marginTop: 0, transition: { duration: 0.2 } }}
+      transition={{ delay: index * 0.03 }}>
+      {/* 뒤에 드러나는 삭제 배경 */}
+      <motion.div style={{ opacity: bgOpacity }}
+        className="absolute inset-0 flex items-center justify-end pr-4 rounded-r bg-red-950/40 pointer-events-none">
+        <motion.span style={{ scale: iconScale }}
+          className="text-[10px] font-mono text-red-300/90 tracking-widest">삭제 ✕</motion.span>
+      </motion.div>
+
+      <motion.button
+        drag="x"
+        dragConstraints={{ left: -110, right: 0 }}
+        dragElastic={0.15}
+        dragMomentum={false}
+        style={{ x }}
+        onDragStart={() => { draggedRef.current = true }}
+        onDragEnd={async (_, info) => {
+          if (info.offset.x < -90 || info.velocity.x < -600) {
+            const ok = await onDelete()   // confirm 포함
+            if (!ok) snapBack()           // 취소하면 제자리로
+          } else {
+            snapBack()                    // 덜 밀었으면 제자리로
+          }
+          setTimeout(() => { draggedRef.current = false }, 60)
+        }}
+        onClick={() => { if (!draggedRef.current) onOpen() }}
+        className="relative w-full text-left border-l border-[#0d2233] hover:border-[#4a9abb]/60 pl-3 pr-2 py-2 rounded-r transition-colors group cursor-pointer bg-[#050e18]">
+        <div className="flex justify-between items-center">
+          <p className="text-[11px] font-mono text-[#7eb8d4]">{fmtHM(log.studyStartTimeAt)} ~ {fmtHM(log.studyEndTimeAt)}</p>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-mono text-[#4a9abb]">{logMinutes(log)}분</span>
+            <span className="text-[11px] font-mono text-[#1a3a50] group-hover:text-[#4a9abb] transition-colors">›</span>
+          </div>
+        </div>
+        <p className={`text-[11px] font-light mt-0.5 line-clamp-1 ${log.subject ? 'text-[#4a7a94]' : 'text-[#1a3a50] italic'}`}>
+          {log.subject || '내용을 추가하려면 눌러주세요'}
+        </p>
+      </motion.button>
+    </motion.div>
   )
 }

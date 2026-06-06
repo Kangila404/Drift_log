@@ -6,6 +6,8 @@ import { useVoyageStore } from '../../stores/voyageStore'
 import EndingSequence from '../EndingSequence'
 import { bgm } from '../../audio/bgmManager'
 import { getDiscoveredTraces, type DiscoveredTrace } from '../../api/trace'
+import OpeningSequence from '../OpeningSequence'
+import CustomerCenter from '../CustomerCenter'
 
 type EventInfo = { name: string; text: string; imageUrl: string | null }
 type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
@@ -290,9 +292,9 @@ function MapPanel() {
 }
 
 // ─── 흔적 도감 ───────────────────────────────────────────────────────────────
-const TOTAL_TRACES = 4
+const TOTAL_TRACES = 5
 
-function TracePanel() {
+function TracePanel({ onReplayIntro }: { onReplayIntro: () => void }) {
   const [traces, setTraces] = useState<DiscoveredTrace[]>([])
   const [selected, setSelected] = useState<DiscoveredTrace | null>(null)
   const [replayEnding, setReplayEnding] = useState(false)
@@ -311,6 +313,12 @@ function TracePanel() {
         <h2 className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase opacity-70">가족의 흔적</h2>
         <span className="text-[9px] font-mono text-[#2a5a74]">{discoveredCount} / {TOTAL_TRACES}</span>
       </div>
+      <button
+        onClick={onReplayIntro}
+        className="w-full py-3 border border-[#1a4a64]/50 rounded text-[11px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#4a9abb]/70 tracking-widest transition-colors bg-[#071826]/40"
+      >
+        ✦ 인트로 다시 보기
+      </button>
       {allFound && (
         <button
           onClick={() => { bgm.playEnding(); setReplayEnding(true) }}
@@ -1027,6 +1035,7 @@ function ProfilePanel() {
         )}
       </AnimatePresence>
       <div className="border-t border-[#0d2233]" />
+      <CustomerCenter />
       <button onClick={() => setDonateOpen(true)}
         className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors">
         ♡ 개발자 후원하기
@@ -1059,6 +1068,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
   const [hudOpacity, setHudOpacity] = useState(0.35)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [muted, setMuted] = useState(bgm.isMuted())
+  const [replayIntro, setReplayIntro] = useState(false)
 
   useEffect(() => {
     if (voyageState !== 'SAILING') return
@@ -1209,6 +1219,14 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
             transition={{ type: 'spring', stiffness: 280, damping: 28 }}
             className="absolute left-0 top-0 bottom-0 w-72 bg-[#050e18]/92 border-r border-[#0d2233] pointer-events-auto flex flex-col"
             style={{ backdropFilter: 'blur(8px)' }}>
+            {/* 헤더 — 제목 + 닫기 */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d2233]">
+              <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">메뉴</span>
+              <button onClick={() => setPanelOpen(false)}
+                className="flex items-center gap-1 text-[10px] font-mono text-[#3a6880] hover:text-[#cce8f5] tracking-widest uppercase transition-colors">
+                닫기 ›
+              </button>
+            </div>
             <div className="flex border-b border-[#0d2233]">
               {menuItems.map(item => (
                 <button key={item.id} onClick={() => setActivePanel(item.id)}
@@ -1225,19 +1243,25 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
                 <motion.div key={activePanel} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
                   {activePanel === 'map' && <MapPanel />}
                   {activePanel === 'log' && <LogPanel />}
-                  {activePanel === 'trace' && <TracePanel />}
+                  {activePanel === 'trace' && <TracePanel onReplayIntro={() => { setPanelOpen(false); setReplayIntro(true) }} />}
                   {activePanel === 'profile' && <ProfilePanel />}
                 </motion.div>
               </AnimatePresence>
             </div>
-            <button onClick={() => setPanelOpen(false)} className="p-3 border-t border-[#0d2233] text-[9px] font-mono text-[#1a3a50] hover:text-[#2a5a74] tracking-widest uppercase transition-colors">
-              ‹ 닫기
+             <button onClick={() => { window.location.href = '/' }}
+              className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors text-center">
+              ‹ 모드 선택으로
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
       {panelOpen && <div className="absolute inset-0 pointer-events-auto" style={{ zIndex: -1 }} onClick={() => setPanelOpen(false)} />}
+
+      {replayIntro && createPortal(
+        <OpeningSequence onFinish={() => setReplayIntro(false)} />,
+        document.body
+      )}
     </div>
   )
 }
