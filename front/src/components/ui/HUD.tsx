@@ -7,6 +7,7 @@ import EndingSequence from '../EndingSequence'
 import { bgm } from '../../audio/bgmManager'
 import { getDiscoveredTraces, type DiscoveredTrace } from '../../api/trace'
 import OpeningSequence from '../OpeningSequence'
+import CustomerCenter from '../CustomerCenter'
 
 type EventInfo = { name: string; text: string; imageUrl: string | null }
 type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
@@ -1034,6 +1035,7 @@ function ProfilePanel() {
         )}
       </AnimatePresence>
       <div className="border-t border-[#0d2233]" />
+      <CustomerCenter />
       <button onClick={() => setDonateOpen(true)}
         className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors">
         ♡ 개발자 후원하기

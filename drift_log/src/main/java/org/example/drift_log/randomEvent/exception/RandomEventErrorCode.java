@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum RandomEventErrorCode {
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "이벤트가 없습니다.");
-
     private final HttpStatus status;
     private final String message;
 }

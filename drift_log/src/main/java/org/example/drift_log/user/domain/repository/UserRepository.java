@@ -23,4 +23,6 @@ public interface UserRepository {
 
     List<User> findAll();
 
+    List<User> findAllById(List<Long> userIds);
+
 }
