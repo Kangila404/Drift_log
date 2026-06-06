@@ -84,7 +84,11 @@ function Particles() {
   )
 }
 
-export default function CityView() {
+interface CityViewProps {
+  isFirstVoyage?: boolean
+}
+
+export default function CityView({ isFirstVoyage = false }: CityViewProps) {
   const { currentCity, discoveredTrace } = useVoyageStore()
   const { startVoyage } = useVoyageActions()
 
@@ -107,6 +111,7 @@ export default function CityView() {
   const [voyageOpen, setVoyageOpen] = useState(false)
   const [maintOpen, setMaintOpen] = useState(false)
   const [muted, setMuted] = useState(bgm.isMuted())
+  const [voyageStarted, setVoyageStarted] = useState(false)   // 첫 항해 시작 여부
 
   // 첫 방문 흔적 자동 오픈 — 한 번만
   const autoOpenedRef = useRef(false)
@@ -121,7 +126,7 @@ export default function CityView() {
   useEffect(() => {
     if (discoveredTrace && !autoOpenedRef.current) {
       autoOpenedRef.current = true
-      const t = setTimeout(() => setTraceOpen(true), 3500)
+      const t = setTimeout(() => setTraceOpen(true), 500)
       return () => clearTimeout(t)
     }
   }, [discoveredTrace])
@@ -133,11 +138,15 @@ export default function CityView() {
 
   const handleVoyageStart = async (cityId: string) => {
     try {
+      setVoyageStarted(true)   // 항해 시작 → 안내 영구 종료
       await startVoyage(Number(cityId))
     } catch (e) {
       console.error('항해 시작 실패:', e)
     }
   }
+
+  // 첫 유저 안내: 버튼 떠있고 / 흔적·항해 모달 안 떠있고 / 아직 항해 시작 안 했을 때
+  const showHint = isFirstVoyage && buttonsVisible && !traceOpen && !voyageOpen && !voyageStarted
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', backgroundColor: '#040c1a' }}>
@@ -248,13 +257,29 @@ export default function CityView() {
         </motion.div>
       </div>
 
-      {/* 하단 버튼 */}
+      {/* 하단 버튼 + 첫 유저 안내 */}
       <div style={{
         position: 'absolute',
         bottom: 'calc(9rem + env(safe-area-inset-bottom))',
         left: 0, right: 0,
-        display: 'flex', justifyContent: 'center', zIndex: 10, pointerEvents: 'none',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem',
+        zIndex: 10, pointerEvents: 'none',
       }}>
+        {/* 첫 유저 안내 텍스트 */}
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: showHint ? 1 : 0, y: showHint ? 0 : 8 }}
+          transition={{ duration: 1, ease: 'easeInOut' }}
+          className="font-serif text-[#a8d4e8] text-center px-6"
+          style={{
+            fontSize: 'clamp(13px, 1.6vw, 16px)', letterSpacing: '0.15em',
+            textShadow: '0 0 20px rgba(100,160,200,0.4)',
+            pointerEvents: 'none',
+          }}
+        >
+          항해하기 버튼을 눌러 항해를 시작하세요
+        </motion.p>
+
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: buttonsVisible ? 1 : 0, y: buttonsVisible ? 0 : 10 }}
@@ -266,19 +291,31 @@ export default function CityView() {
             { label: '흔적 보기', onClick: () => setTraceOpen(true) },
             { label: '배 정비', onClick: () => setMaintOpen(true) },
             { label: '항해하기', onClick: () => setVoyageOpen(true) },
-          ].map(btn => (
-            <button
-              key={btn.label}
-              onClick={btn.onClick}
-              className="rounded font-serif whitespace-nowrap transition-all duration-300 backdrop-blur-md
-                         text-[0.7rem] sm:text-[0.75rem] tracking-[0.2em] sm:tracking-[0.25em]
-                         px-4 py-2.5 sm:px-6 sm:py-2.5
-                         border border-[#64a0c8]/30 text-[#b4d2e6]/70 bg-[#040c1c]/40
-                         hover:border-[#64a0c8]/70 hover:text-[#c8e6f5]/95 hover:bg-[#040c1c]/60"
-            >
-              {btn.label}
-            </button>
-          ))}
+          ].map(btn => {
+            const highlight = showHint && btn.label === '항해하기'
+            return (
+              <motion.button
+                key={btn.label}
+                onClick={btn.onClick}
+                animate={highlight ? {
+                  boxShadow: [
+                    '0 0 0px rgba(126,184,212,0)',
+                    '0 0 22px rgba(126,184,212,0.55)',
+                    '0 0 0px rgba(126,184,212,0)',
+                  ],
+                } : { boxShadow: '0 0 0px rgba(126,184,212,0)' }}
+                transition={highlight ? { duration: 2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
+                className={`rounded font-serif whitespace-nowrap transition-colors duration-300 backdrop-blur-md
+                           text-[0.7rem] sm:text-[0.75rem] tracking-[0.2em] sm:tracking-[0.25em]
+                           px-4 py-2.5 sm:px-6 sm:py-2.5 border
+                           ${highlight
+                             ? 'border-[#7eb8d4]/80 text-[#cce8f5] bg-[#0a2233]/70'
+                             : 'border-[#64a0c8]/30 text-[#b4d2e6]/70 bg-[#040c1c]/40 hover:border-[#64a0c8]/70 hover:text-[#c8e6f5]/95 hover:bg-[#040c1c]/60'}`}
+              >
+                {btn.label}
+              </motion.button>
+            )
+          })}
         </motion.div>
       </div>
 

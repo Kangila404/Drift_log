@@ -3,6 +3,16 @@ package org.example.drift_log.user.application;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.city.exception.CityErrorCode;
+import org.example.drift_log.city.exception.CityException;
+import org.example.drift_log.trace.domain.model.DiscoveredTrace;
+import org.example.drift_log.trace.domain.model.Trace;
+import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
+import org.example.drift_log.trace.domain.repository.TraceRepository;
+import org.example.drift_log.trace.exception.TraceErrorCode;
+import org.example.drift_log.trace.exception.TraceException;
 import org.example.drift_log.user.domain.enums.AuthType;
 import org.example.drift_log.user.domain.enums.UserStatus;
 import org.example.drift_log.user.domain.model.RefreshToken;
@@ -41,6 +51,9 @@ public class AuthServiceImpl implements AuthService{
     private final VoyageStatusRepository voyageStatusRepository;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final DiscoveredTraceRepository discoveredTraceRepository;
+    private final TraceRepository traceRepository;
+    private final CityRepository cityRepository;
 
     @Override
     public SignUpResponse signup(SignUpRequest request) {
@@ -65,6 +78,9 @@ public class AuthServiceImpl implements AuthService{
             .isFamilyReunited(false)
             .build();
         voyageStatusRepository.save(voyageStatus);
+
+        // 첫 가족 흔적 초기화
+        registerSeoulTrace(user.getId());
 
         // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
@@ -104,12 +120,14 @@ public class AuthServiceImpl implements AuthService{
                 userRepository.save(newUser);
 
                 voyageStatusRepository.save(VoyageStatus.builder()
-                    .userId(newUser.getId())     // save 후 id 채워짐
+                    .userId(newUser.getId())
                     .voyageState(VoyageState.ANCHORED)
                     .currentCityId(1L)
                     .progress(0.0f)
                     .isFamilyReunited(false)
                     .build());
+
+                registerSeoulTrace(newUser.getId());
 
                 return newUser;
             });
@@ -255,5 +273,25 @@ public class AuthServiceImpl implements AuthService{
         if(!user.getAuthType().equals(AuthType.LOCAL)){
             throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
         }
+    }
+
+    // 서울(시작 도시) 흔적 자동 발견 — 가입 시
+    private void registerSeoulTrace(Long userId) {
+        Long seoulTraceId = 5L;
+        Long seoulCityId = 1L;
+
+        Trace trace = traceRepository.findById(seoulTraceId)
+            .orElseThrow(() -> new TraceException(TraceErrorCode.TRACE_NOT_FOUND));
+        City city = cityRepository.findById(seoulCityId)
+            .orElseThrow(() -> new CityException(CityErrorCode.CITY_NOT_FOUND));
+
+        discoveredTraceRepository.save(
+            DiscoveredTrace.builder()
+                .userId(userId)
+                .trace(trace)
+                .city(city)
+                .discoveredAt(LocalDateTime.now())
+                .build()
+        );
     }
 }

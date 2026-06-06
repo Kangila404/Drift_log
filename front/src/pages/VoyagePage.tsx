@@ -24,6 +24,7 @@ import { apiClient } from '../api/client'
 import CityArrivalSequence from '../components/CityArrivalSequence'
 import { bgm } from '../audio/bgmManager'
 import OpeningSequence from '../components/OpeningSequence'
+import { getDiscoveredTraces } from '../api/trace'
 
 type Scene = 'ocean' | 'arriving' | 'cityIntro' | 'city'
 
@@ -41,6 +42,7 @@ export default function VoyagePage() {
   const prevStateRef = useRef(voyageState)   // 직전 항해 상태
   const [showEnding, setShowEnding] = useState(false)
   const [showOpening, setShowOpening] = useState<boolean | null>(null)
+  const [firstVoyage, setFirstVoyage] = useState(false)   // 항해 0건 = 첫 유저
   const introCheckedRef = useRef(false)
 
   // ── BGM (항해/도시) ──
@@ -58,7 +60,11 @@ export default function VoyagePage() {
     if (voyageState !== 'ANCHORED') { introCheckedRef.current = true; setShowOpening(false); return }
     introCheckedRef.current = true
     apiClient.get('/voyage-log')
-      .then(res => setShowOpening((res.data?.length ?? 0) === 0))
+      .then(res => {
+        const noLogs = (res.data?.length ?? 0) === 0
+        setShowOpening(noLogs)
+        setFirstVoyage(noLogs)
+      })
       .catch(() => setShowOpening(false))
   }, [ready, voyageState])
 
@@ -276,7 +282,7 @@ export default function VoyagePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 1.2, ease: 'easeInOut' }}
           >
-            <CityView />
+            <CityView isFirstVoyage={firstVoyage} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -301,7 +307,22 @@ export default function VoyagePage() {
 
       {/* 오프닝 인트로 — 첫 진입 1회 */}
       {showOpening === true && (
-        <OpeningSequence onFinish={() => setShowOpening(false)} />
+        <OpeningSequence
+          onFinish={async () => {
+            try {
+              const traces = await getDiscoveredTraces()
+              const seoul = traces.find(t => t.cityName === '서울')
+              if (seoul) {
+                useVoyageStore.getState().setDiscoveredTrace({
+                  familyMember: seoul.familyMember,
+                  content: seoul.content,
+                  imgUrl: seoul.imageUrl ?? undefined,
+                })
+              }
+            } catch {}
+            setShowOpening(false)
+          }}
+        />
       )}
     </div>
   )

@@ -1,16 +1,16 @@
+// src/components/study/StudyHUD.tsx
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { saveStudyTime, getStudySummary, getStudyLogs, updateStudySubject, deleteStudyLog, type StudySummary, type StudyLog } from '../../api/study'
 import { noise, type NoiseKey } from '../../audio/noiseManager'
-
+import CustomerCenter from '../CustomerCenter'
 
 const PRESETS = [25, 50, 90]
 const START_KEY = 'studyStartAt'
 const GOAL_KEY = 'studyGoalMin'
 const SUBJ_KEY = 'studySubject'
-
 
 const emitStudyChange = () => window.dispatchEvent(new Event('study-change'))
 
@@ -59,16 +59,28 @@ export default function StudyHUD() {
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {})
   useEffect(() => { refreshSummary() }, [])
 
-  // 새로고침 복구
+  // 새로고침 복구 — F5는 복구, 단 목표시간 넘긴 방치 세션은 폐기(부활 방지)
   useEffect(() => {
     const saved = localStorage.getItem(START_KEY)
-    if (saved) {
-      startAtRef.current = new Date(saved)
-      setGoalMin(Number(localStorage.getItem(GOAL_KEY)) || 25)
-      setSubject(localStorage.getItem(SUBJ_KEY) || '')
-      setElapsed(Math.floor((Date.now() - startAtRef.current.getTime()) / 1000))
-      setRunning(true)
+    if (!saved) return
+
+    const start = new Date(saved)
+    const goal = Number(localStorage.getItem(GOAL_KEY)) || 25
+    const elapsedSec = Math.floor((Date.now() - start.getTime()) / 1000)
+
+    // 목표시간을 이미 넘긴 채 방치된 세션은 복구하지 않고 폐기
+    if (elapsedSec >= goal * 60) {
+      localStorage.removeItem(START_KEY)
+      localStorage.removeItem(GOAL_KEY)
+      localStorage.removeItem(SUBJ_KEY)
+      return
     }
+
+    startAtRef.current = start
+    setGoalMin(goal)
+    setSubject(localStorage.getItem(SUBJ_KEY) || '')
+    setElapsed(elapsedSec)
+    setRunning(true)
   }, [])
 
   // 파도 기본 — 첫 사용자 인터랙션에 확실히 재생 (자동재생 정책 회피)
@@ -90,13 +102,13 @@ export default function StudyHUD() {
     return cleanup
   }, [])
 
-    useEffect(() => {
+  useEffect(() => {
     if (!running || !startAtRef.current) return
     const id = setInterval(() => {
       const e = Math.floor((Date.now() - startAtRef.current!.getTime()) / 1000)
       setElapsed(e)
       if (e >= goalMin * 60) {
-        clearInterval(id) 
+        clearInterval(id)
         finish()
       }
     }, 1000)
@@ -132,25 +144,33 @@ export default function StudyHUD() {
       setElapsed(0)
       setSubject('')
       setSaving(false)
-      
     }
   }
-  
+
   const confirmFinish = () => {
-  setConfirmOpen(false)
-  finish()
-}
+    setConfirmOpen(false)
+    finish()
+  }
 
-  
-
+  // 모드 선택으로 나가기 — 진행 중 세션 폐기(저장 안 함)
   const leaveStudy = () => {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 나가시겠습니까?')) return
+    startAtRef.current = null
+    setRunning(false)
+    localStorage.removeItem(START_KEY)
+    localStorage.removeItem(GOAL_KEY)
+    localStorage.removeItem(SUBJ_KEY)
     nav('/')
   }
 
   const handleLogout = async () => {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 로그아웃하시겠습니까?')) return
     if (!window.confirm('로그아웃 하시겠습니까?')) return
+    // 진행 중 공부 세션 폐기
+    startAtRef.current = null
+    localStorage.removeItem(START_KEY)
+    localStorage.removeItem(GOAL_KEY)
+    localStorage.removeItem(SUBJ_KEY)
     const refreshToken = localStorage.getItem('refreshToken')
     try {
       if (refreshToken) {
@@ -239,7 +259,7 @@ export default function StudyHUD() {
               transition={{ type: 'spring', stiffness: 280, damping: 28 }}
               className="fixed left-0 top-0 bottom-0 w-80 bg-[#050e18]/95 border-r border-[#0d2233] z-30 pointer-events-auto flex flex-col"
               style={{ backdropFilter: 'blur(8px)' }}>
-              {/* 헤더 — 제목 + 닫기(좌측 화살표 형태로 자연스럽게) */}
+              {/* 헤더 — 제목 + 닫기 */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d2233]">
                 <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">공부일지</span>
                 <button onClick={() => setPanelOpen(false)}
@@ -252,7 +272,8 @@ export default function StudyHUD() {
                 <LogTab totalSeconds={summary.totalSeconds} onChanged={refreshSummary} />
               </div>
 
-              <div className="p-4">
+              <div className="p-4 flex flex-col gap-2">
+                <CustomerCenter />
                 <button onClick={handleLogout}
                   className="w-full py-2.5 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-red-300 hover:border-red-500/50 tracking-widest transition-colors text-center">
                   ⏻ 로그아웃
@@ -313,6 +334,7 @@ export default function StudyHUD() {
         </AnimatePresence>,
         document.body
       )}
+
       {/* ── 종료 확인 모달 ── */}
       {createPortal(
         <AnimatePresence>
@@ -356,11 +378,9 @@ function SoundButton({ open, setOpen }: { open: boolean; setOpen: (v: boolean) =
   const [current, setCurrent] = useState<NoiseKey | null>(noise.getCurrent())
   const [muted, setMuted] = useState(noise.isMuted())
 
-
   const pick = (key: NoiseKey) => { noise.select(key); setCurrent(noise.getCurrent()) }
   const off = () => { noise.select(null); setCurrent(null) }
   const toggleMute = () => setMuted(noise.toggleMute())
-  
 
   return (
     <div className="relative">
