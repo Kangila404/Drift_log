@@ -363,9 +363,9 @@ function Hull({ hull, hullShadow, lamp }: { hull: string; hullShadow: string; la
 // PAUSED  → 제자리에서 퍼지는 동심원 (정지감)
 const WAKE_Y = -0.30
 
-function WakeFX() {
-  const NUM_WAVES = 7      // 항적 곡선 개수
-  const SEGS = 48          // 곡선 한 줄당 점 수
+function WakeFX({ forceSailing = false }: { forceSailing?: boolean }) {
+  const NUM_WAVES = 7
+  const SEGS = 48         
 
   // 곡선 한 줄 생성 (V자로 휘는 부드러운 호)
   const waves = useMemo(() => {
@@ -398,10 +398,10 @@ function WakeFX() {
   const lastRing = useRef(0)
   const sailFade = useRef(0)
 
-  useFrame(({ clock }) => {
+    useFrame(({ clock }) => {
     const state = useVoyageStore.getState().voyageState
-    const sailing = state === 'SAILING'
-    const paused = state === 'PAUSED'
+    const sailing = forceSailing || state === 'SAILING'   // ← 강제 항해 추가
+    const paused = !forceSailing && state === 'PAUSED'     // ← 강제 시엔 정지 동심원 끔
     const t = clock.elapsedTime
 
     sailFade.current += ((sailing ? 1 : 0) - sailFade.current) * 0.05
@@ -581,7 +581,7 @@ function BoatModel({ colors }: { colors: BoatColors }) {
   )
 }
 
-export default function Boat({ preset }: { preset?: ScenePreset }) {
+export default function Boat({ preset, forceSailing = false }: { preset?: ScenePreset; forceSailing?: boolean }) {
   const boatRef = useRef<THREE.Group>(null)
   const colors = useBoatStore((s) => s.colors)
 
@@ -590,7 +590,8 @@ export default function Boat({ preset }: { preset?: ScenePreset }) {
   const lampOn = isDark || isStorm
 
   useFrame(({ clock }) => {
-    const isPaused = useVoyageStore.getState().voyageState === 'PAUSED'
+    // 강제 항해 모드면 voyageStore의 PAUSED 무시
+    const isPaused = !forceSailing && useVoyageStore.getState().voyageState === 'PAUSED'
     if (!boatRef.current) return
 
     if (isPaused) {
@@ -607,16 +608,15 @@ export default function Boat({ preset }: { preset?: ScenePreset }) {
     const amp = 0.04 * intensity
     boatRef.current.position.y = amp + Math.sin(t * 1.0) * amp
     boatRef.current.rotation.z = Math.sin(t * 0.72) * 0.012 * intensity
-    boatRef.current.rotation.x = Math.sin(t * 0.55) * 0.008 * intensity})
+    boatRef.current.rotation.x = Math.sin(t * 0.55) * 0.008 * intensity
+  })
 
   return (
     <group position={[0, -2.0, -4]} scale={1.8}>
-      {/* 물결 — 흔들리지 않는 바깥 그룹에 둬서 수면에 고정 + 배 따라다님 */}
-      <WakeFX />
+      <WakeFX forceSailing={forceSailing} />
 
       <group ref={boatRef}>
         <BoatModel colors={colors} />
-
         {lampOn && (
           <>
             <pointLight position={[0, 1.5, -0.2]} color={colors.lamp} intensity={2.4} distance={10} decay={1.4} />
