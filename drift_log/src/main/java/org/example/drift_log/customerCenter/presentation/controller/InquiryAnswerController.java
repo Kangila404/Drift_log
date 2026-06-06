@@ -48,18 +48,18 @@ public class InquiryAnswerController {
         return ResponseEntity.ok(response);
     }
 
-    @PatchMapping("/{answerId}/answer")
+    @PatchMapping("/{inquiryId}/answer")
     public ResponseEntity<InquiryAnswerUpdateResponse> updateAnswer(
-        @PathVariable Long answerId,
+        @PathVariable Long inquiryId,
         @Valid @RequestBody InquiryAnswerUpdateRequest request
     ){
-        InquiryAnswerUpdateResponse response = inquiryAnswerService.updateAnswer(answerId, request);
+        InquiryAnswerUpdateResponse response = inquiryAnswerService.updateAnswer(inquiryId, request);
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{answerId}/answer")
-    public ResponseEntity<Void> deleteAnswer(@PathVariable Long answerId){
-        inquiryAnswerService.deleteAnswer(answerId);
+    @DeleteMapping("/{inquiryId}/answer")
+    public ResponseEntity<Void> deleteAnswer(@PathVariable Long inquiryId){
+        inquiryAnswerService.deleteAnswer(inquiryId);
         return ResponseEntity.ok().build();
     }
 

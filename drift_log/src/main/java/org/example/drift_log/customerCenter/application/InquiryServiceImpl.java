@@ -1,6 +1,6 @@
 package org.example.drift_log.customerCenter.application;
 
-import jakarta.persistence.criteria.CriteriaBuilder.In;
+
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -81,7 +81,7 @@ public class InquiryServiceImpl implements InquiryService{
     public UpdateInquiryResponse updateInquiry(String userId, Long inquiryId, UpdateInquiryRequest request) {
         User user = findUserByUserIdOrThrow(userId);
         Inquiry inquiry = findInquiryByIdOrThrow(inquiryId);
-        validatonInquiryOwned(inquiry, user.getId());
+        validationInquiryOwned(inquiry, user.getId());
 
         inquiry.update(request.title(), request.content());
 
@@ -93,7 +93,7 @@ public class InquiryServiceImpl implements InquiryService{
     public void deleteInquiry(String userId, Long inquiryId) {
         User user = findUserByUserIdOrThrow(userId);
         Inquiry inquiry = findInquiryByIdOrThrow(inquiryId);
-        validatonInquiryOwned(inquiry, user.getId());
+        validationInquiryOwned(inquiry, user.getId());
 
         inquiryRepository.deleteById(inquiry.getId());
     }
@@ -113,7 +113,7 @@ public class InquiryServiceImpl implements InquiryService{
     }
 
     // 2. 검증 메서드
-    private void validatonInquiryOwned(Inquiry inquiry, Long userId){
+    private void validationInquiryOwned(Inquiry inquiry, Long userId){
         if (!inquiry.getAuthorId().equals(userId)) {
             throw new CustomerCenterException(CustomerCenterErrorCode.INVALID_INQUIRY_ACCESS);
         }

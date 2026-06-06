@@ -65,7 +65,7 @@ public class AdminNoticeServiceImpl implements AdminNoticeService{
 
         noticeRepository.save(notice);
 
-        return new WriteNoticeResponse("message");
+        return new WriteNoticeResponse("success");
     }
 
     @Override

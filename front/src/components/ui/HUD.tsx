@@ -292,7 +292,7 @@ function MapPanel() {
 }
 
 // ─── 흔적 도감 ───────────────────────────────────────────────────────────────
-const TOTAL_TRACES = 4
+const TOTAL_TRACES = 5
 
 function TracePanel({ onReplayIntro }: { onReplayIntro: () => void }) {
   const [traces, setTraces] = useState<DiscoveredTrace[]>([])
