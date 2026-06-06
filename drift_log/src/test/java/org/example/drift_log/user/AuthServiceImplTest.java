@@ -10,6 +10,11 @@ import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.example.drift_log.city.domain.model.City;
+import org.example.drift_log.city.domain.repository.CityRepository;
+import org.example.drift_log.trace.domain.model.Trace;
+import org.example.drift_log.trace.domain.repository.DiscoveredTraceRepository;
+import org.example.drift_log.trace.domain.repository.TraceRepository;
 import org.example.drift_log.user.application.AuthServiceImpl;
 import org.example.drift_log.user.domain.model.RefreshToken;
 import org.example.drift_log.user.domain.model.User;
@@ -38,6 +43,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.BeanUtils;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceImplTest {
@@ -51,6 +58,9 @@ public class AuthServiceImplTest {
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private VoyageStatusRepository voyageStatusRepository;
+    @Mock private DiscoveredTraceRepository discoveredTraceRepository;
+    @Mock private TraceRepository traceRepository;
+    @Mock private CityRepository cityRepository;
 
     // ── 공통 픽스처 ──────────────────────────────────────────────
     private User 활성유저() {
@@ -82,6 +92,18 @@ public class AuthServiceImplTest {
             .build();
     }
 
+    private Trace 서울흔적() {
+        Trace trace = BeanUtils.instantiateClass(Trace.class);
+        ReflectionTestUtils.setField(trace, "id", 5L);
+        return trace;
+    }
+
+    private City 서울도시() {
+        City city = BeanUtils.instantiateClass(City.class);
+        ReflectionTestUtils.setField(city, "id", 1L);
+        return city;
+    }
+
     // ================================================================
     // 회원가입
     // ================================================================
@@ -99,12 +121,16 @@ public class AuthServiceImplTest {
             given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
             given(jwtTokenProvider.createRefreshToken(any())).willReturn("refresh-token");
             given(refreshTokenRepository.findByUserId(any())).willReturn(Optional.empty());
+            // 서울 흔적 자동 발견 (registerSeoulTrace)
+            given(traceRepository.findById(5L)).willReturn(Optional.of(서울흔적()));
+            given(cityRepository.findById(1L)).willReturn(Optional.of(서울도시()));
 
             // when
             authService.signup(request);
 
-            // then - 유저 저장 + voyageStatus 초기화 둘 다 호출됐는지 검증
+            // then - 유저 저장 + voyageStatus 초기화 + 서울 흔적 저장 검증
             verify(voyageStatusRepository).save(any());
+            verify(discoveredTraceRepository).save(any());
         }
 
         @Test
@@ -156,6 +182,9 @@ public class AuthServiceImplTest {
             given(jwtTokenProvider.createAccessToken(any(), any())).willReturn("access-token");
             given(jwtTokenProvider.createRefreshToken(any())).willReturn("refresh-token");
             given(refreshTokenRepository.findByUserId(any())).willReturn(Optional.empty());
+            // 서울 흔적 자동 발견 (registerSeoulTrace)
+            given(traceRepository.findById(5L)).willReturn(Optional.of(서울흔적()));
+            given(cityRepository.findById(1L)).willReturn(Optional.of(서울도시()));
 
             // when
             SocialLoginResponse response = authService.socialLogin(request);
@@ -165,6 +194,7 @@ public class AuthServiceImplTest {
             assertThat(response.accessToken()).isEqualTo("access-token");
             assertThat(response.refreshToken()).isEqualTo("refresh-token");
             verify(voyageStatusRepository).save(any());
+            verify(discoveredTraceRepository).save(any());
         }
 
         @Test
