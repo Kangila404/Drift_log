@@ -6,6 +6,8 @@ const SOURCES: Record<NoiseKey, string> = {
   fire: '/sound/fire.mp3',
 }
 
+const emitNoiseChange = () => window.dispatchEvent(new Event('noise-change'))
+
 class NoiseManager {
   private els: Partial<Record<NoiseKey, HTMLAudioElement>> = {}
   private current: NoiseKey | null = null
@@ -28,6 +30,7 @@ class NoiseManager {
     if (key === null || this.current === key) {
       if (this.current) this.els[this.current]?.pause()
       this.current = null
+      emitNoiseChange()   // ← 끌 때도 발사
       return
     }
     this.current = key
@@ -36,6 +39,7 @@ class NoiseManager {
       el.currentTime = 0
       el.play().catch(() => {})
     }
+    emitNoiseChange()     // ← 켤 때 발사
   }
 
   toggleMute(): boolean {
@@ -54,6 +58,7 @@ class NoiseManager {
   stopAll() {
     ;(Object.keys(this.els) as NoiseKey[]).forEach(k => this.els[k]?.pause())
     this.current = null
+    emitNoiseChange()
   }
 }
 

@@ -1,9 +1,10 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useVoyageStore } from '../../stores/voyageStore'
 import { useBoatStore, type BoatColors } from '../../stores/boatStore'
 import type { ScenePreset } from '../../constants/scenePreset'
+import Campfire from './Campfire'
 
 /** hex 색을 factor만큼 어둡게 (factor < 1) */
 function shade(hex: string, factor: number) {
@@ -13,6 +14,19 @@ function shade(hex: string, factor: number) {
 function tint(hex: string, amt: number) {
   return '#' + new THREE.Color(hex).lerp(new THREE.Color(0xffffff), amt).getHexString()
 }
+
+// ── 녹(rust) ──
+const RUST_COLOR = '#357f6e'      // 녹청 (구리 부식 톤)
+const RUST_FULL_SEC = 1200        // 항해 누적 ~20분이면 최대 녹
+const RUST_FLUSH_SEC = 4          // 4초마다 store 반영 (localStorage 쓰기 빈도 제한)
+/** hex를 녹색 쪽으로 amt만큼 섞기 (0~1) */
+function rustMix(hex: string, amt: number) {
+  if (amt <= 0) return hex
+  return '#' + new THREE.Color(hex).lerp(new THREE.Color(RUST_COLOR), Math.min(1, amt)).getHexString()
+}
+
+// ── 따개비 색 (칙칙한 회백색) ──
+const BARNACLE_COLOR = '#b8b3a2'
 
 function Line({ points, opacity = 0.55 }: { points: [number, number, number][]; opacity?: number }) {
   const obj = useMemo(() => {
@@ -271,7 +285,69 @@ function buildDeckGeometry() {
   return g
 }
 
-function Hull({ hull, hullShadow, lamp }: { hull: string; hullShadow: string; lamp: string }) {
+// ── 따개비 ─────────────────────────────────────────────────
+// 환공포증 방지: 군집/구멍 패턴 없이 드문드문 "각진 저폴리 덩어리 + 작은 동반 1개".
+// rust(시각용 추적값) 비례로 개수/크기/투명도 증가. 청소 시 부드럽게 사라짐.
+const BARNACLE_SLOTS = 10
+
+function Barnacles({ rust }: { rust: number }) {
+  const slots = useMemo(() => {
+    return Array.from({ length: BARNACLE_SLOTS }, (_, i) => {
+      const n = (k: number) => (((i * 13 + k * 37) % 100) / 100)  // 0~1 deterministic
+      const side = i % 2 === 0 ? 1 : -1
+      const t = 0.18 + n(1) * 0.64
+      const z = -1.55 + t * 3.0 - 0.42
+      const halfW = 0.16 + 1.20 * Math.pow(Math.sin(t * Math.PI), 0.62)
+      const x = side * halfW * (0.62 + n(2) * 0.3)
+      const y = -0.18 - n(3) * 0.16
+      const baseR = 0.05 + n(4) * 0.055
+      const appearAt = 0.15 + (i / BARNACLE_SLOTS) * 0.7
+      const tilt = (n(5) - 0.5) * 0.6
+      const spin = n(8) * Math.PI
+      return { x, y, z, side, baseR, appearAt, tilt, spin, hasBuddy: n(6) > 0.45, buddyAng: n(7) * Math.PI * 2 }
+    })
+  }, [])
+
+  if (rust <= 0.02) return null
+
+  return (
+    <group>
+      {slots.map((s, i) => {
+        if (rust < s.appearAt) return null
+        const grow = Math.min(1, (rust - s.appearAt) / 0.25)
+        if (grow <= 0.001) return null
+        const r = s.baseR * (0.5 + grow * 0.5)
+        const op = (0.55 + grow * 0.4) * Math.min(1, grow * 2)
+        return (
+          <group
+            key={i}
+            position={[s.x, s.y, s.z]}
+            rotation={[s.spin, s.spin * 0.7, s.side * (0.4 + s.tilt)]}
+          >
+            {/* 각진 저폴리 덩어리 (납작하게 눌러 더께 느낌, 윤곽은 둥글어 안 징그러움) */}
+            <mesh scale={[1, 0.55, 1]}>
+              <dodecahedronGeometry args={[r, 0]} />
+              <meshStandardMaterial color={BARNACLE_COLOR} roughness={0.95} flatShading transparent opacity={op} />
+            </mesh>
+            {/* 작은 동반 1개 (군집 아님) */}
+            {s.hasBuddy && grow > 0.45 && (
+              <mesh
+                position={[Math.cos(s.buddyAng) * r * 1.6, 0, Math.sin(s.buddyAng) * r * 1.6]}
+                rotation={[s.spin * 1.3, 0, 0]}
+                scale={[1, 0.5, 1]}
+              >
+                <dodecahedronGeometry args={[r * 0.55, 0]} />
+                <meshStandardMaterial color={shade(BARNACLE_COLOR, 0.9)} roughness={0.96} flatShading transparent opacity={op * 0.9} />
+              </mesh>
+            )}
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+function Hull({ hull, hullShadow, lamp, rust }: { hull: string; hullShadow: string; lamp: string; rust: number }) {
   const hullGeo = useMemo(() => buildHullGeometry(), [])
   const deckGeo = useMemo(() => buildDeckGeometry(), [])
 
@@ -283,6 +359,9 @@ function Hull({ hull, hullShadow, lamp }: { hull: string; hullShadow: string; la
       <mesh geometry={hullGeo} position={[0, -0.12, -0.42]} scale={[0.94, 0.82, 0.99]}>
         <meshStandardMaterial color={hullShadow} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* 따개비 — 선체 하단에 rust 비례로 */}
+      <Barnacles rust={rust} />
 
       <mesh geometry={deckGeo} position={[0, -0.015, -0.42]}>
         <meshStandardMaterial color="#6e4d31" roughness={0.9} side={THREE.DoubleSide} />
@@ -359,15 +438,12 @@ function Hull({ hull, hullShadow, lamp }: { hull: string; hullShadow: string; la
 }
 
 // ─── 물결(파도) ─────────────────────────────────────────────
-// SAILING → 배 뒤로 흘러가는 V자 곡선 물결 (전진감)
-// PAUSED  → 제자리에서 퍼지는 동심원 (정지감)
 const WAKE_Y = -0.30
 
 function WakeFX({ forceSailing = false }: { forceSailing?: boolean }) {
   const NUM_WAVES = 7
-  const SEGS = 48         
+  const SEGS = 48
 
-  // 곡선 한 줄 생성 (V자로 휘는 부드러운 호)
   const waves = useMemo(() => {
     return Array.from({ length: NUM_WAVES }, (_, i) => {
       const positions = new Float32Array((SEGS + 1) * 3)
@@ -380,7 +456,6 @@ function WakeFX({ forceSailing = false }: { forceSailing?: boolean }) {
     })
   }, [])
 
-  // 정지 동심원 (PAUSED)
   const rings = useMemo(() => {
     return Array.from({ length: 4 }, (_, i) => {
       const geo = new THREE.RingGeometry(0.92, 1.0, 80)
@@ -398,45 +473,40 @@ function WakeFX({ forceSailing = false }: { forceSailing?: boolean }) {
   const lastRing = useRef(0)
   const sailFade = useRef(0)
 
-    useFrame(({ clock }) => {
+  useFrame(({ clock }) => {
     const state = useVoyageStore.getState().voyageState
-    const sailing = forceSailing || state === 'SAILING'   // ← 강제 항해 추가
-    const paused = !forceSailing && state === 'PAUSED'     // ← 강제 시엔 정지 동심원 끔
+    const sailing = forceSailing || state === 'SAILING'
+    const paused = !forceSailing && state === 'PAUSED'
     const t = clock.elapsedTime
 
     sailFade.current += ((sailing ? 1 : 0) - sailFade.current) * 0.05
     const fade = sailFade.current
 
-    // ── V자 물결: 각 곡선이 0→1로 흐르며 뒤로 멀어지고 벌어지고 옅어짐 ──
     const SPEED = 0.12
-    const Z_START = 0.0      // 배 바로 뒤
-    const Z_LEN = 6.0        // 흘러가는 거리
-    const WIDTH = 2.2        // 끝에서 좌우로 벌어지는 폭
+    const Z_START = 0.0
+    const Z_LEN = 6.0
+    const WIDTH = 2.2
 
     waves.forEach((w) => {
-      // 진행도 p (곡선마다 offset 줘서 줄줄이 흐름)
       const p = (t * SPEED + w.offset) % 1
       const baseZ = Z_START + p * Z_LEN
-      const spread = 0.25 + p * WIDTH        // 뒤로 갈수록 넓게
+      const spread = 0.25 + p * WIDTH
       const sink = Math.sin(p * Math.PI) * 0.06
 
       const arr = w.positions
       for (let s = 0; s <= SEGS; s++) {
-        const u = (s / SEGS) * 2 - 1          // -1 ~ 1 (좌 → 우)
+        const u = (s / SEGS) * 2 - 1
         const x = u * spread
-        // V자: 가운데가 배 쪽(앞), 양끝이 뒤로 휨
         const z = baseZ + Math.abs(u) * spread * 0.5
-        const y = sink + Math.sin(u * Math.PI * 2 + t * 2) * 0.015  // 살짝 일렁
+        const y = sink + Math.sin(u * Math.PI * 2 + t * 2) * 0.015
         arr[s * 3] = x
         arr[s * 3 + 1] = y
         arr[s * 3 + 2] = z
       }
       w.line.geometry.attributes.position.needsUpdate = true
-      // 가운데(생성)와 끝(소멸)에서 옅고, 중간에 진하게
       w.mat.opacity = Math.sin(p * Math.PI) * 0.5 * fade
     })
 
-    // ── 정지 동심원 ──
     const INTERVAL = 1.0, DUR = 3.4, MAX_R = 3.4
     if (paused && t - lastRing.current > INTERVAL) {
       const oldest = rings.reduce((a, b) => (a.start < b.start ? a : b))
@@ -460,8 +530,7 @@ function WakeFX({ forceSailing = false }: { forceSailing?: boolean }) {
   )
 }
 
-// VoyagePage의 <Wake /> 가 깨지지 않도록 남겨둔 빈 컴포넌트 (실제 물결은 Boat 내부 WakeFX).
-// 원하면 VoyagePage에서 <Wake /> 와 import 의 Wake 를 지워도 됨.
+// VoyagePage의 <Wake /> 가 깨지지 않도록 남겨둔 빈 컴포넌트
 export function Wake() {
   return null
 }
@@ -538,14 +607,14 @@ function Anchor() {
   )
 }
 
-function BoatModel({ colors }: { colors: BoatColors }) {
+function BoatModel({ colors, rust }: { colors: BoatColors; rust: number }) {
   const hullShadow = shade(colors.hull, 0.5)
   const sailMain = colors.sail
   const sailSub = shade(colors.sail, 0.93)
 
   return (
     <group>
-      <Hull hull={colors.hull} hullShadow={hullShadow} lamp={colors.lamp} />
+      <Hull hull={colors.hull} hullShadow={hullShadow} lamp={colors.lamp} rust={rust} />
       <Anchor />
       <Telescope />
       <mesh position={[0,2.05,-0.42]}>
@@ -581,17 +650,69 @@ function BoatModel({ colors }: { colors: BoatColors }) {
   )
 }
 
-export default function Boat({ preset, forceSailing = false }: { preset?: ScenePreset; forceSailing?: boolean }) {
+interface BoatProps {
+  preset?: ScenePreset
+  forceSailing?: boolean
+  fireActive?: boolean
+}
+
+export default function Boat({ preset, forceSailing, fireActive = false }: BoatProps) {
   const boatRef = useRef<THREE.Group>(null)
   const colors = useBoatStore((s) => s.colors)
+  const rust = useBoatStore((s) => s.rust)
+
+  // 로그인 후 1회: 서버에 저장된 보트 색 불러오기
+  useEffect(() => {
+    useBoatStore.getState().loadFromServer()
+  }, [])
+
+  // 시각용 rust — store rust를 lerp로 부드럽게 추적 (청소 시 스르륵 빠짐)
+  const displayRustRef = useRef(rust)
+  const [displayRust, setDisplayRust] = useState(rust)
+
+  useFrame(() => {
+    const target = rust
+    const cur = displayRustRef.current
+    if (Math.abs(target - cur) > 0.001) {
+      displayRustRef.current = cur + (target - cur) * 0.12
+      setDisplayRust(displayRustRef.current)
+    } else if (cur !== target) {
+      displayRustRef.current = target
+      setDisplayRust(target)
+    }
+  })
+
+  // 녹 적용 — displayRust(추적값) 기준
+  const displayColors = useMemo<BoatColors>(() => ({
+    sail: rustMix(colors.sail, displayRust * 0.45),
+    hull: rustMix(colors.hull, displayRust * 0.9),
+    lamp: colors.lamp,
+  }), [colors, displayRust])
 
   const isDark = preset?.celestialBody === 'moon'
   const isStorm = preset?.effects?.includes('wind') ?? false
   const lampOn = isDark || isStorm
 
-  useFrame(({ clock }) => {
-    // 강제 항해 모드면 voyageStore의 PAUSED 무시
-    const isPaused = !forceSailing && useVoyageStore.getState().voyageState === 'PAUSED'
+  // 항해 중 녹 누적 (4초마다 store 반영)
+  const rustAccum = useRef(0)
+  const rustFlush = useRef(0)
+
+  useFrame((state, delta) => {
+    const vs = useVoyageStore.getState().voyageState
+    const sailing = forceSailing || vs === 'SAILING'
+
+    // 녹은 항해 중일 때만 누적
+    if (sailing) {
+      rustAccum.current += delta
+      rustFlush.current += delta
+      if (rustFlush.current >= RUST_FLUSH_SEC) {
+        useBoatStore.getState().addRust(rustAccum.current / RUST_FULL_SEC)
+        rustAccum.current = 0
+        rustFlush.current = 0
+      }
+    }
+
+    const isPaused = !forceSailing && vs === 'PAUSED'
     if (!boatRef.current) return
 
     if (isPaused) {
@@ -603,7 +724,7 @@ export default function Boat({ preset, forceSailing = false }: { preset?: SceneP
 
     const intensity = Math.min(preset?.waveScale ?? 1.0, 1.3)
     const speed = preset?.waveSpeed ?? 1.0
-    const t = clock.elapsedTime * speed
+    const t = state.clock.elapsedTime * speed
 
     const amp = 0.04 * intensity
     boatRef.current.position.y = amp + Math.sin(t * 1.0) * amp
@@ -616,7 +737,11 @@ export default function Boat({ preset, forceSailing = false }: { preset?: SceneP
       <WakeFX forceSailing={forceSailing} />
 
       <group ref={boatRef}>
-        <BoatModel colors={colors} />
+        <BoatModel colors={displayColors} rust={displayRust} />
+
+        {/* 모닥불 — 갑판 위, 배 출렁임 따라 흔들림 */}
+        <Campfire active={fireActive} position={[0, 0.66, 0.2]} scale={0.6} />
+
         {lampOn && (
           <>
             <pointLight position={[0, 1.5, -0.2]} color={colors.lamp} intensity={2.4} distance={10} decay={1.4} />
