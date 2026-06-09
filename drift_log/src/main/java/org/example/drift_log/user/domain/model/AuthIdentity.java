@@ -59,6 +59,7 @@ public class AuthIdentity extends BaseEntity {
     public static AuthIdentity ofLocal(User user, String email, String encodedPassword){
         return AuthIdentity.builder()
             .user(user)
+            .email(email)
             .provider(AuthType.LOCAL)
             .providerId(email)
             .password(encodedPassword)
