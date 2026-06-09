@@ -38,7 +38,7 @@ public class VoyageLogServiceImplTest {
 
     // ── 공통 픽스처 ──────────────────────────────────────────────
     private User 활성유저(String userId) {
-        User user = User.createLocalUser("test@test.com", "encoded", "테스터");
+        User user = User.createLocalUser("테스터");
         ReflectionTestUtils.setField(user, "id", 1L);
         ReflectionTestUtils.setField(user, "userId", userId);
         return user;

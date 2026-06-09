@@ -807,7 +807,7 @@ function LogPanel() {
 }
 
 // ─── 프로필 ───────────────────────────────────────────────────────────────────
-type EditMode = 'nickname' | 'password' | null
+type EditMode = 'nickname' | 'password'
 
 const MINI_CITY_COORDS: Record<number, { x: number; y: number; name: string }> = {
   1: { x: 45.5, y: 53.0, name: '서울' }, 2: { x: 36.0, y: 55.0, name: '인천' },
@@ -856,28 +856,58 @@ function VisitedMiniMap({ visitedIds }: { visitedIds: number[] }) {
 }
 
 function ProfilePanel() {
-  const [user, setUser] = useState({ name: '', email: '', joined: '', totalVoyages: 0, visitedCities: 0, userRole: 'USER' })
+  const [user, setUser] = useState({ name: '', email: '', joined: '', totalVoyages: 0, visitedCities: 0, userRole: 'USER', authType: 'LOCAL' })
   const [visitedCityIds, setVisitedCityIds] = useState<number[]>([])
-  const [editMode, setEditMode] = useState<EditMode>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTab, setEditTab] = useState<EditMode>('nickname')
   const [newNickname, setNewNickname] = useState('')
+  const [nickSaving, setNickSaving] = useState(false)
+  const [nickSuccess, setNickSuccess] = useState(false)
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwSaving, setPwSaving] = useState(false)
   const [mapOpen, setMapOpen] = useState(false)
   const [donateOpen, setDonateOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
-    apiClient.get('/users/me').then(res => {
-      setUser({ name: res.data.name, email: res.data.email, joined: new Date(res.data.createdAt).toLocaleDateString('ko-KR'), totalVoyages: res.data.totalVoyages ?? 0, visitedCities: res.data.visitedCities ?? 0, userRole: res.data.userRole ?? 'USER' })
-      setVisitedCityIds(res.data.visitedCityIds ?? [])
-    }).catch(() => {})
-  }, [])
+  apiClient.get('/users/me').then(res => {
+    setUser({
+      name: res.data.name,
+      email: res.data.email,
+      joined: new Date(res.data.createdAt).toLocaleDateString('ko-KR'),
+      totalVoyages: res.data.totalVoyages ?? 0,
+      visitedCities: res.data.visitedCities ?? 0,
+      userRole: res.data.userRole ?? 'USER',
+      authType: (res.data.authType ?? 'LOCAL').toUpperCase(),
+    })
+    setVisitedCityIds(res.data.visitedCityIds ?? [])
+  }).catch(() => {})
+}, [])
 
+const isSocial = user.authType !== 'LOCAL'
+
+const openEdit = () => {
+  setEditTab('nickname')
+  setNewNickname(user.name)
+  setPwForm({ current: '', next: '', confirm: '' })
+  setPwError(''); setPwSuccess(false); setNickSuccess(false)
+  setEditOpen(true)
+}
   const saveNickname = async () => {
-    if (!newNickname.trim()) return
-    await apiClient.patch('/users/me', { name: newNickname.trim() })
-    setUser(u => ({ ...u, name: newNickname.trim() })); setEditMode(null); setNewNickname('')
+    if (!newNickname.trim() || nickSaving) return
+    setNickSaving(true)
+    try {
+      await apiClient.patch('/users/me', { name: newNickname.trim() })
+      setUser(u => ({ ...u, name: newNickname.trim() }))
+      setNickSuccess(true)
+      setTimeout(() => setNickSuccess(false), 1500)
+    } catch {
+      /* noop */
+    } finally {
+      setNickSaving(false)
+    }
   }
 
   const savePassword = async () => {
@@ -885,11 +915,18 @@ function ProfilePanel() {
     if (!pwForm.current) return setPwError('현재 비밀번호를 입력하세요')
     if (pwForm.next.length < 8) return setPwError('비밀번호는 8자 이상')
     if (pwForm.next !== pwForm.confirm) return setPwError('비밀번호가 일치하지 않습니다')
+    if (pwSaving) return
+    setPwSaving(true)
     try {
       await apiClient.patch('/users/me/password', { currentPassword: pwForm.current, newPassword: pwForm.next, newPasswordConfirm: pwForm.confirm })
       setPwSuccess(true)
-      setTimeout(() => { setEditMode(null); setPwSuccess(false); setPwForm({ current: '', next: '', confirm: '' }) }, 1200)
-    } catch { setPwError('비밀번호 변경에 실패했습니다.') }
+      setPwForm({ current: '', next: '', confirm: '' })
+      setTimeout(() => setPwSuccess(false), 1500)
+    } catch {
+      setPwError('비밀번호 변경에 실패했습니다.')
+    } finally {
+      setPwSaving(false)
+    }
   }
 
   const handleLogout = async () => {
@@ -908,10 +945,11 @@ function ProfilePanel() {
     }
   }
 
-  const inputCls = 'w-full bg-[#040d16] border border-[#1a3a50] rounded px-2.5 py-1.5 text-[11px] text-[#7eb8d4] outline-none focus:border-[#2a5a74] placeholder-[#1a3a50]'
+  const inputCls = 'w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[13px] text-[#cce8f5] outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50]'
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ─── 다녀온 도시 미니맵 모달 ─── */}
       {createPortal(
         <AnimatePresence>
           {mapOpen && (
@@ -934,6 +972,83 @@ function ProfilePanel() {
         document.body
       )}
 
+      {/* ─── 프로필 수정 모달 ─── */}
+      {createPortal(
+        <AnimatePresence>
+          {editOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+              onClick={() => setEditOpen(false)}
+              className="fixed inset-0 z-[9999] flex items-center justify-center cursor-pointer px-6"
+              style={{ background: 'rgba(2,6,14,0.9)', backdropFilter: 'blur(8px)' }}>
+              <motion.div onClick={e => e.stopPropagation()}
+                initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+                className="w-full max-w-md bg-[#050e18] border border-[#1a4a64]/50 rounded-lg p-6 flex flex-col gap-5 cursor-default">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[9px] font-mono text-[#2a5a74] tracking-[0.3em] uppercase">Edit Profile</p>
+                    <h3 className="mt-1 text-[16px] font-serif text-[#a8d4e8] tracking-wide">프로필 수정</h3>
+                  </div>
+                  <button onClick={() => setEditOpen(false)}
+                    className="shrink-0 w-8 h-8 rounded-full border border-[#1a3a50] flex items-center justify-center text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/50 transition-colors text-[13px]"
+                    aria-label="닫기">✕</button>
+                </div>
+
+               {/* 탭 — 소셜 계정은 닉네임만 가능하므로 숨김 */}
+                {!isSocial && (
+                  <div className="flex gap-1 p-1 rounded-lg bg-[#040d16] border border-[#0d2233]">
+                    {([['nickname', '닉네임'], ['password', '비밀번호']] as const).map(([key, label]) => (
+                      <button key={key} onClick={() => { setEditTab(key); setPwError('') }}
+                        className={`flex-1 py-2 rounded-md text-[10px] font-mono tracking-widest transition-colors ${
+                          editTab === key ? 'bg-[#0a2233] text-[#cce8f5] border border-[#4a9abb]/40' : 'text-[#3a6880] hover:text-[#7eb8d4]'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <AnimatePresence mode="wait">
+                  {(isSocial || editTab === 'nickname') ? (
+                    <motion.div key="nick" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }} className="flex flex-col gap-3">
+                      <label className="text-[9px] font-mono text-[#4a7a94] tracking-widest uppercase">새 닉네임</label>
+                      <input value={newNickname} onChange={e => setNewNickname(e.target.value)} maxLength={20} autoFocus placeholder="새 닉네임" className={inputCls} />
+                      <div className="flex items-center justify-between">
+                        {nickSuccess
+                          ? <span className="text-[10px] font-mono text-[#4a9abb]">변경되었습니다</span>
+                          : <span className="text-[9px] font-mono text-[#1a3a50]">{newNickname.length}/20</span>}
+                        <button onClick={saveNickname} disabled={nickSaving || !newNickname.trim()}
+                          className="px-5 py-2 border border-[#4a9abb]/50 rounded text-[10px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors disabled:opacity-40">
+                          {nickSaving ? '저장 중' : '저장'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="pw" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }} className="flex flex-col gap-3">
+                      <input type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} placeholder="현재 비밀번호" className={inputCls} />
+                      <input type="password" value={pwForm.next} onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} placeholder="새 비밀번호 (8자 이상)" className={inputCls} />
+                      <input type="password" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} placeholder="새 비밀번호 확인" className={inputCls} />
+                      {pwError && <p className="text-[10px] font-mono text-red-400/70">{pwError}</p>}
+                      <div className="flex items-center justify-between">
+                        {pwSuccess
+                          ? <span className="text-[10px] font-mono text-[#4a9abb]">변경되었습니다</span>
+                          : <span />}
+                        <button onClick={savePassword} disabled={pwSaving}
+                          className="px-5 py-2 border border-[#4a9abb]/50 rounded text-[10px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors disabled:opacity-40">
+                          {pwSaving ? '변경 중' : '변경'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ─── 후원 모달 ─── */}
       {createPortal(
         <AnimatePresence>
           {donateOpen && (
@@ -981,6 +1096,8 @@ function ProfilePanel() {
       )}
 
       <h2 className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase opacity-70">마이 페이지</h2>
+
+      {/* 프로필 카드 + 수정 버튼 */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full border border-[#0d2233] bg-[#050e18] flex items-center justify-center">⛵</div>
         <div className="flex-1 min-w-0">
@@ -988,7 +1105,13 @@ function ProfilePanel() {
           <p className="text-[9px] font-mono text-[#2a5a74] truncate">{user.email}</p>
           <p className="text-[8px] font-mono text-[#1a3a50]">항해 시작 {user.joined}</p>
         </div>
+        <button onClick={openEdit}
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#1a4a64]/50 bg-[#071826]/40 text-[9px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors"
+          aria-label="프로필 수정">
+          ✎ 수정
+        </button>
       </div>
+
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-[#050e18] border border-[#0d2233] rounded p-3 text-center">
           <p className="text-[18px] font-mono text-[#4a9abb]">{user.totalVoyages}회</p>
@@ -1000,40 +1123,7 @@ function ProfilePanel() {
           <p className="text-[9px] font-mono text-[#2a5a74] mt-0.5">방문 도시 ›</p>
         </button>
       </div>
-      <div className="border-t border-[#0d2233]" />
-      {editMode === null && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[9px] font-mono text-[#2a5a74] tracking-widest uppercase">계정 설정</p>
-          <button onClick={() => { setEditMode('nickname'); setNewNickname(user.name) }} className="text-left px-3 py-2 bg-[#050e18] border border-[#0d2233] rounded text-[10px] font-mono text-[#3a6880] hover:border-[#1a4a64] hover:text-[#7eb8d4]">닉네임 변경</button>
-          <button onClick={() => setEditMode('password')} className="text-left px-3 py-2 bg-[#050e18] border border-[#0d2233] rounded text-[10px] font-mono text-[#3a6880] hover:border-[#1a4a64] hover:text-[#7eb8d4]">비밀번호 변경</button>
-        </div>
-      )}
-      <AnimatePresence mode="wait">
-        {editMode === 'nickname' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex flex-col gap-2">
-            <p className="text-[9px] font-mono text-[#4a7a94] tracking-widest uppercase">닉네임 변경</p>
-            <input value={newNickname} onChange={e => setNewNickname(e.target.value)} maxLength={20} placeholder="새 닉네임" className={inputCls} />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditMode(null)} className="text-[8px] font-mono text-[#1a3a50]">취소</button>
-              <button onClick={saveNickname} className="text-[8px] font-mono text-[#4a9abb]">저장</button>
-            </div>
-          </motion.div>
-        )}
-        {editMode === 'password' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex flex-col gap-2">
-            <p className="text-[9px] font-mono text-[#4a7a94] tracking-widest uppercase">비밀번호 변경</p>
-            <input type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} placeholder="현재 비밀번호" className={inputCls} />
-            <input type="password" value={pwForm.next} onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} placeholder="새 비밀번호 (8자 이상)" className={inputCls} />
-            <input type="password" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} placeholder="새 비밀번호 확인" className={inputCls} />
-            {pwError && <p className="text-[9px] font-mono text-red-400/70">{pwError}</p>}
-            {pwSuccess && <p className="text-[9px] font-mono text-[#4a9abb]">변경되었습니다</p>}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditMode(null)} className="text-[8px] font-mono text-[#1a3a50]">취소</button>
-              <button onClick={savePassword} className="text-[8px] font-mono text-[#4a9abb]">변경</button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
       <div className="border-t border-[#0d2233]" />
       <CustomerCenter />
       <button onClick={() => setDonateOpen(true)}

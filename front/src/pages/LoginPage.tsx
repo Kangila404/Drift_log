@@ -21,6 +21,18 @@ export default function LoginPage() {
   const [version, setVersion] = useState('')
   const googleBtnRef = useRef<HTMLDivElement>(null);
 
+// 카카오 로그인 — 인가코드 요청 페이지로 리다이렉트
+const handleKakaoLogin = () => {
+  const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
+  const REDIRECT_URI = `${window.location.origin}/auth/kakao/callback`;
+  const kakaoAuthUrl =
+    `https://kauth.kakao.com/oauth/authorize` +
+    `?response_type=code` +
+    `&client_id=${KAKAO_CLIENT_ID}` +
+    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  window.location.href = kakaoAuthUrl;
+};
+
   const handleLogin = async () => {
     try {
       const result = await login({ email, password });
@@ -193,6 +205,20 @@ export default function LoginPage() {
 
           {/* 구글 로그인 버튼 (GIS가 컨테이너 폭에 맞춰 렌더) */}
           <div ref={googleBtnRef} className="w-full overflow-hidden" />
+
+          {/* 카카오 로그인 */}
+          <button
+            onClick={handleKakaoLogin}
+            className="w-full h-10 rounded bg-[#FEE500] flex items-center justify-center gap-2 hover:brightness-95 transition-all"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M9 1C4.58 1 1 3.86 1 7.38c0 2.29 1.5 4.3 3.76 5.42-.16.6-.6 2.17-.69 2.5-.1.42.15.41.32.3.13-.09 2.1-1.43 2.96-2.02.53.08 1.08.12 1.65.12 4.42 0 8-2.86 8-6.38S13.42 1 9 1z"
+                fill="#000000"
+              />
+            </svg>
+            <span className="text-[rgba(0,0,0,0.85)] text-sm font-medium">카카오 로그인</span>
+          </button>
 
           <p className="text-center text-[rgba(122,184,200,0.3)] text-xs">
             처음이신가요?{" "}

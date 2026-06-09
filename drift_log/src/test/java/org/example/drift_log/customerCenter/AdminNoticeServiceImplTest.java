@@ -52,7 +52,7 @@ public class AdminNoticeServiceImplTest {
     }
 
     private User 관리자(Long id, String userId) {
-        User user = User.createLocalUser("admin@test.com", "encoded", "관리자");
+        User user = User.createLocalUser("관리자");
         ReflectionTestUtils.setField(user, "id", id);
         ReflectionTestUtils.setField(user, "userId", userId);
         return user;

@@ -1,5 +1,6 @@
 package org.example.drift_log.user.application;
 
+import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -14,17 +15,20 @@ import org.example.drift_log.user.presentation.dto.res.TokenRefreshResponse;
 public interface AuthService {
 
     // 회원가입
-    public SignUpResponse signup(SignUpRequest request);
+    SignUpResponse signup(SignUpRequest request);
 
     // 로그인
-    public LoginResponse login(LoginRequest request);
+    LoginResponse login(LoginRequest request);
 
-    // 소셜 로그인
-    public SocialLoginResponse socialLogin(SocialLoginRequest request);
+    // 구글 로그인
+    SocialLoginResponse socialLogin(SocialLoginRequest request);
+
+    // 카카오 로그인
+    SocialLoginResponse kakaoLogin(KakaoLoginRequest request);
 
     // 로그아웃
-    public LogoutResponse logout(LogoutRequest request);
+    LogoutResponse logout(LogoutRequest request);
 
     // 리프레시 토큰으로 Access 토큰 재발급
-    public TokenRefreshResponse reissue(TokenRefreshRequest request);
+    TokenRefreshResponse reissue(TokenRefreshRequest request);
 }

@@ -10,14 +10,18 @@ import static org.mockito.Mockito.verify;
 import java.util.List;
 import java.util.Optional;
 import org.example.drift_log.admin.application.AdminServiceImpl;
+import org.example.drift_log.admin.domain.repository.AppVersionRepository;
 import org.example.drift_log.admin.exception.AdminErrorCode;
 import org.example.drift_log.admin.exception.AdminException;
 import org.example.drift_log.admin.presentation.dto.res.AdminDashboardResponse;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserDetailResponse;
+import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
 import org.example.drift_log.feedback.domain.model.EndingFeedback;
 import org.example.drift_log.feedback.domain.repository.EndingFeedBackRepository;
-import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
+import org.example.drift_log.user.domain.enums.AuthType;
+import org.example.drift_log.user.domain.model.AuthIdentity;
 import org.example.drift_log.user.domain.model.User;
+import org.example.drift_log.user.domain.repository.AuthIdentityRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageStatus;
 import org.example.drift_log.voyage.domain.enums.VoyageState;
@@ -38,38 +42,40 @@ public class AdminServiceImplTest {
     @InjectMocks private AdminServiceImpl adminService;
 
     @Mock private UserRepository userRepository;
+    @Mock private AuthIdentityRepository authIdentityRepository;
     @Mock private EndingFeedBackRepository endingFeedBackRepository;
     @Mock private VoyageStatusRepository voyageStatusRepository;
     @Mock private VoyageLogRepository voyageLogRepository;
+    @Mock private AppVersionRepository appVersionRepository;
 
     // ── 공통 픽스처 ──────────────────────────────────────────────
     private User 활성유저() {
-        User user = User.createLocalUser("test@test.com", "encoded", "테스터");
+        User user = User.createLocalUser("테스터");
         ReflectionTestUtils.setField(user, "id", 1L);
         return user;
     }
 
     private User 정지된유저() {
-        User user = User.createLocalUser("test@test.com", "encoded", "테스터");
+        User user = User.createLocalUser("테스터");
         ReflectionTestUtils.setField(user, "id", 1L);
         user.banUser();
         return user;
     }
 
+    private AuthIdentity 로컬인증수단(User user) {
+        AuthIdentity identity = AuthIdentity.ofLocal(user, "test@test.com", "encoded");
+        ReflectionTestUtils.setField(identity, "id", 100L);
+        return identity;
+    }
+
     private VoyageStatus 정박중인_항해상태() {
         return VoyageStatus.builder()
-            .userId(1L)
-            .voyageState(VoyageState.ANCHORED)
-            .isFamilyReunited(false)
-            .build();
+            .userId(1L).voyageState(VoyageState.ANCHORED).isFamilyReunited(false).build();
     }
 
     private VoyageStatus 스토리클리어한_항해상태() {
         return VoyageStatus.builder()
-            .userId(1L)
-            .voyageState(VoyageState.ANCHORED)
-            .isFamilyReunited(true) // 엔딩 봤음
-            .build();
+            .userId(1L).voyageState(VoyageState.ANCHORED).isFamilyReunited(true).build();
     }
 
     // ================================================================
@@ -82,16 +88,13 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_대시보드_정상_조회_성공")
         void 어드민_대시보드_정상_조회_성공() {
-            // given
             given(userRepository.count()).willReturn(100L);
             given(userRepository.countByLastLoginAtAfter(any())).willReturn(10L);
             given(voyageStatusRepository.countClearUser()).willReturn(5L);
             given(endingFeedBackRepository.findAll()).willReturn(List.of());
 
-            // when
             AdminDashboardResponse response = adminService.getDashboard();
 
-            // then
             assertThat(response).isNotNull();
         }
     }
@@ -106,13 +109,13 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저목록_정상_조회_성공")
         void 어드민_유저목록_정상_조회_성공() {
-            // given
-            given(userRepository.findAll()).willReturn(List.of(활성유저()));
+            User user = 활성유저();
+            given(userRepository.findAll()).willReturn(List.of(user));
+            given(authIdentityRepository.findFirstByUserId(1L))
+                .willReturn(Optional.of(로컬인증수단(user)));
 
-            // when
             List<AdminUserResponse> response = adminService.getUserList();
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response).hasSize(1);
         }
@@ -120,13 +123,10 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저목록_비어있을때_빈리스트_반환")
         void 어드민_유저목록_비어있을때_빈리스트_반환() {
-            // given
             given(userRepository.findAll()).willReturn(List.of());
 
-            // when
             List<AdminUserResponse> response = adminService.getUserList();
 
-            // then
             assertThat(response).isEmpty();
         }
     }
@@ -141,16 +141,15 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저상세_스토리미클리어_조회_성공")
         void 어드민_유저상세_스토리미클리어_조회_성공() {
-            // given
-            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(활성유저()));
+            User user = 활성유저();
+            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
+            given(authIdentityRepository.findFirstByUserId(1L)).willReturn(Optional.of(로컬인증수단(user)));
             given(voyageStatusRepository.findByUserId(anyLong())).willReturn(Optional.of(정박중인_항해상태()));
             given(endingFeedBackRepository.findByUserId(anyLong())).willReturn(Optional.empty());
             given(voyageLogRepository.findAllByUserId(anyLong())).willReturn(List.of());
 
-            // when
             AdminUserDetailResponse response = adminService.getUserDetail("uuid");
 
-            // then
             assertThat(response).isNotNull();
             assertThat(response.isStoryClear()).isFalse();
         }
@@ -158,43 +157,39 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저상세_스토리클리어_조회_성공")
         void 어드민_유저상세_스토리클리어_조회_성공() {
-            // given
-            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(활성유저()));
+            User user = 활성유저();
+            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
+            given(authIdentityRepository.findFirstByUserId(1L)).willReturn(Optional.of(로컬인증수단(user)));
             given(voyageStatusRepository.findByUserId(anyLong())).willReturn(Optional.of(스토리클리어한_항해상태()));
             given(endingFeedBackRepository.findByUserId(anyLong())).willReturn(Optional.empty());
             given(voyageLogRepository.findAllByUserId(anyLong())).willReturn(List.of());
 
-            // when
             AdminUserDetailResponse response = adminService.getUserDetail("uuid");
 
-            // then
             assertThat(response.isStoryClear()).isTrue();
         }
 
         @Test
         @DisplayName("어드민_유저상세_피드백있을때_조회_성공")
         void 어드민_유저상세_피드백있을때_조회_성공() {
-            // given
-            EndingFeedback feedback = EndingFeedback.create("좋았어요", 활성유저());
-            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(활성유저()));
+            User user = 활성유저();
+            EndingFeedback feedback = EndingFeedback.create("좋았어요", user);
+            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
+            given(authIdentityRepository.findFirstByUserId(1L)).willReturn(Optional.of(로컬인증수단(user)));
             given(voyageStatusRepository.findByUserId(anyLong())).willReturn(Optional.of(정박중인_항해상태()));
             given(endingFeedBackRepository.findByUserId(anyLong())).willReturn(Optional.of(feedback));
             given(voyageLogRepository.findAllByUserId(anyLong())).willReturn(List.of());
 
-            // when
             AdminUserDetailResponse response = adminService.getUserDetail("uuid");
 
-            // then
             assertThat(response.endingFeedback()).isEqualTo("좋았어요");
         }
 
         @Test
         @DisplayName("어드민_유저상세_존재하지않는유저_예외")
         void 어드민_유저상세_존재하지않는유저_예외() {
-            // given
             given(userRepository.findByUserId("ghost")).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> adminService.getUserDetail("ghost"))
                 .isInstanceOf(AdminException.class)
                 .satisfies(e -> assertThat(((AdminException) e).getErrorCode())
@@ -204,11 +199,11 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저상세_항해상태없을때_예외")
         void 어드민_유저상세_항해상태없을때_예외() {
-            // given
-            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(활성유저()));
+            User user = 활성유저();
+            given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
+            given(authIdentityRepository.findFirstByUserId(1L)).willReturn(Optional.of(로컬인증수단(user)));
             given(voyageStatusRepository.findByUserId(anyLong())).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> adminService.getUserDetail("uuid"))
                 .isInstanceOf(AdminException.class)
                 .satisfies(e -> assertThat(((AdminException) e).getErrorCode())
@@ -217,7 +212,7 @@ public class AdminServiceImplTest {
     }
 
     // ================================================================
-    // 유저 정지
+    // 유저 정지 / 활성화
     // ================================================================
     @Nested
     @DisplayName("유저정지")
@@ -226,24 +221,19 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저정지_성공")
         void 어드민_유저정지_성공() {
-            // given
             User user = 활성유저();
             given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
 
-            // when
             adminService.banUser("uuid");
 
-            // then - banUser() 호출 후 save 됐는지 검증
             verify(userRepository).save(user);
         }
 
         @Test
         @DisplayName("어드민_유저정지_존재하지않는유저_예외")
         void 어드민_유저정지_존재하지않는유저_예외() {
-            // given
             given(userRepository.findByUserId("ghost")).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> adminService.banUser("ghost"))
                 .isInstanceOf(AdminException.class)
                 .satisfies(e -> assertThat(((AdminException) e).getErrorCode())
@@ -251,9 +241,6 @@ public class AdminServiceImplTest {
         }
     }
 
-    // ================================================================
-    // 유저 활성화
-    // ================================================================
     @Nested
     @DisplayName("유저활성화")
     class 유저활성화 {
@@ -261,24 +248,19 @@ public class AdminServiceImplTest {
         @Test
         @DisplayName("어드민_유저활성화_성공")
         void 어드민_유저활성화_성공() {
-            // given
             User user = 정지된유저();
             given(userRepository.findByUserId("uuid")).willReturn(Optional.of(user));
 
-            // when
             adminService.activateUser("uuid");
 
-            // then
             verify(userRepository).save(user);
         }
 
         @Test
         @DisplayName("어드민_유저활성화_존재하지않는유저_예외")
         void 어드민_유저활성화_존재하지않는유저_예외() {
-            // given
             given(userRepository.findByUserId("ghost")).willReturn(Optional.empty());
 
-            // when & then
             assertThatThrownBy(() -> adminService.activateUser("ghost"))
                 .isInstanceOf(AdminException.class)
                 .satisfies(e -> assertThat(((AdminException) e).getErrorCode())

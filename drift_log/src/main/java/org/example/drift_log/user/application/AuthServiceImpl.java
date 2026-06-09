@@ -15,14 +15,18 @@ import org.example.drift_log.trace.exception.TraceErrorCode;
 import org.example.drift_log.trace.exception.TraceException;
 import org.example.drift_log.user.domain.enums.AuthType;
 import org.example.drift_log.user.domain.enums.UserStatus;
+import org.example.drift_log.user.domain.model.AuthIdentity;
 import org.example.drift_log.user.domain.model.RefreshToken;
 import org.example.drift_log.user.domain.model.User;
+import org.example.drift_log.user.domain.repository.AuthIdentityRepository;
 import org.example.drift_log.user.domain.repository.RefreshTokenRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.user.exception.UserErrorCode;
 import org.example.drift_log.user.exception.UserException;
 import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
 import org.example.drift_log.user.infrastructure.oauth.GoogleTokenVerifier;
+import org.example.drift_log.user.infrastructure.oauth.KakaoClient;
+import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -42,11 +46,12 @@ import org.springframework.stereotype.Service;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class AuthServiceImpl implements AuthService{
+public class AuthServiceImpl implements AuthService {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final KakaoClient kakaoClient;
 
     private final VoyageStatusRepository voyageStatusRepository;
     private final UserRepository userRepository;
@@ -54,35 +59,37 @@ public class AuthServiceImpl implements AuthService{
     private final DiscoveredTraceRepository discoveredTraceRepository;
     private final TraceRepository traceRepository;
     private final CityRepository cityRepository;
+    private final AuthIdentityRepository authIdentityRepository;
 
     @Override
     public SignUpResponse signup(SignUpRequest request) {
-        // 입력 데이터 정합성 검증
+        // 입력 정합성 검증
         validateEmailNotDuplicated(request.email());
         validatePasswordConfirm(request.password(), request.passwordConfirm());
 
-        // 비밀번호 인코딩
         String encodedPassword = passwordEncoder.encode(request.password());
 
-        User user = User.createLocalUser(request.email(), encodedPassword, request.name());
-
-        // 회원가입 완료
+        // 1) 사람 정보(User) 생성
+        User user = User.createLocalUser(request.name());
         userRepository.save(user);
 
-        // 초기 VoyageStatus 생성(서울 시작)
-        VoyageStatus voyageStatus = VoyageStatus.builder()
+        // 2) 로컬 인증수단(AuthIdentity) 생성 — providerId = email
+        authIdentityRepository.save(
+            AuthIdentity.ofLocal(user, request.email(), encodedPassword)
+        );
+
+        // 3) 초기 항해 상태
+        voyageStatusRepository.save(VoyageStatus.builder()
             .userId(user.getId())
             .voyageState(VoyageState.ANCHORED)
-            .currentCityId(1L)  // 서울 시작
+            .currentCityId(1L)
             .progress(0.0f)
             .isFamilyReunited(false)
-            .build();
-        voyageStatusRepository.save(voyageStatus);
+            .build());
 
-        // 첫 가족 흔적 초기화
+        // 4) 서울 흔적
         registerSeoulTrace(user.getId());
 
-        // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
         String refreshToken = saveRefreshToken(user.getId());
 
@@ -91,18 +98,22 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        User user = findUserOrThrowByEmail(request.email());
+        // 1) 로컬 인증수단 조회 (providerId = email)
+        AuthIdentity identity = authIdentityRepository
+            .findByProviderAndProviderId(AuthType.LOCAL, request.email())
+            .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+
+        // 2) 비밀번호 검증
+        validatePassword(request.password(), identity.getPassword());
+
+        // 3) 사람(User) 조회 + 상태 검증
+        User user = findUserByIdOrThrow(identity.getUser().getId());
         validateUserStatus(user.getUserStatus());
 
-        validateLocalUser(user);
-        validatePassword(request.password(), user.getPassword());
-
-        // Jwt 토큰 발급
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
         String refreshToken = saveRefreshToken(user.getId());
 
         user.updateLastLoginAt();
-
         userRepository.save(user);
 
         return LoginResponse.from(user, accessToken, refreshToken);
@@ -110,36 +121,65 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public SocialLoginResponse socialLogin(SocialLoginRequest request) {
-        // 1. 구글 idToken 검증
-        GoogleTokenVerifier.GoogleUserInfo googleUser =googleTokenVerifier.verify(request.idToken());
+        GoogleTokenVerifier.GoogleUserInfo googleUser = googleTokenVerifier.verify(request.idToken());
 
-        // 2. 기존 유저 조회
-        User user = userRepository.findByEmail(googleUser.email())
-            .orElseGet(()->{
-                User newUser = User.createSocialUser(googleUser.email(), googleUser.name(), request.authType());
-                userRepository.save(newUser);
+        AuthType provider = AuthType.GOOGLE;
+        String providerId = googleUser.sub();
 
-                voyageStatusRepository.save(VoyageStatus.builder()
-                    .userId(newUser.getId())
-                    .voyageState(VoyageState.ANCHORED)
-                    .currentCityId(1L)
-                    .progress(0.0f)
-                    .isFamilyReunited(false)
-                    .build());
+        AuthIdentity identity = authIdentityRepository
+            .findByProviderAndProviderId(provider, providerId)
+            .orElse(null);
 
-                registerSeoulTrace(newUser.getId());
+        User user;
+        if (identity != null) {
+            user = findUserByIdOrThrow(identity.getUser().getId());
+        } else {
+            // sub로 못 찾음 → 백필된 임시 email 행 교정 시도
+            AuthIdentity legacy = (googleUser.email() != null)
+                ? authIdentityRepository.findByProviderAndProviderId(provider, googleUser.email()).orElse(null)
+                : null;
 
-                return newUser;
-            });
+            if (legacy != null) {
+                legacy.updateProviderId(providerId);
+                authIdentityRepository.save(legacy);
+                user = findUserByIdOrThrow(legacy.getUser().getId());
+            } else {
+                user = registerSocialUser(provider, providerId, googleUser.email(), googleUser.name());
+            }
+        }
 
-
-        // 3. 상태 검증
         validateUserStatus(user.getUserStatus());
 
-        // 4. 소셜 유저 검증
-        validateSocialUser(user);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
+        String refreshToken = saveRefreshToken(user.getId());
 
-        // 4. jwt 발급
+        user.updateLastLoginAt();
+        userRepository.save(user);
+
+        return SocialLoginResponse.from(user, accessToken, refreshToken);
+    }
+
+    @Override
+    public SocialLoginResponse kakaoLogin(KakaoLoginRequest request) {
+        String kakaoAccessToken = kakaoClient.getAccessToken(request.code());
+        KakaoClient.KakaoUserInfo kakaoUser = kakaoClient.getUserInfo(kakaoAccessToken);
+
+        AuthType provider = AuthType.KAKAO;
+        String providerId = kakaoUser.kakaoId();
+
+        AuthIdentity identity = authIdentityRepository
+            .findByProviderAndProviderId(provider, providerId)
+            .orElse(null);
+
+        User user;
+        if (identity != null) {
+            user = findUserByIdOrThrow(identity.getUser().getId());
+        } else {
+            user = registerSocialUser(provider, providerId, kakaoUser.email(), kakaoUser.nickname());
+        }
+
+        validateUserStatus(user.getUserStatus());
+
         String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
         String refreshToken = saveRefreshToken(user.getId());
 
@@ -151,22 +191,17 @@ public class AuthServiceImpl implements AuthService{
 
     @Override
     public LogoutResponse logout(LogoutRequest request) {
-
         findRefreshTokenOrThrow(request.refreshToken());
-
-            refreshTokenRepository.deleteByToken(request.refreshToken());
-
+        refreshTokenRepository.deleteByToken(request.refreshToken());
         return new LogoutResponse(true);
     }
 
     @Override
     public TokenRefreshResponse reissue(TokenRefreshRequest request) {
-        // 리프레시 토큰을 받음 -> 어세스 발급 ,리프레시 토큰 업데이트
         RefreshToken refreshToken = findRefreshTokenOrThrow(request.refreshToken());
         validateRefreshTokenExpired(refreshToken);
 
         User user = findUserByIdOrThrow(refreshToken.getUserId());
-
         validateUserStatus(user.getUserStatus());
 
         String issuedRefreshToken = saveRefreshToken(user.getId());
@@ -175,34 +210,26 @@ public class AuthServiceImpl implements AuthService{
         return TokenRefreshResponse.from(issuedRefreshToken, accessToken);
     }
 
-
-    // ============ 회원가입 정합성 검증  ============ //
-    // 1. 이메일 중복 체크
+    // ============ 회원가입 정합성 검증 ============ //
+    // 이메일 중복 체크 — auth_identities(LOCAL, email) 기준
     private void validateEmailNotDuplicated(String email){
-        if(userRepository.existsByEmail(email)){
+        if (authIdentityRepository.findByProviderAndProviderId(AuthType.LOCAL, email).isPresent()) {
             throw new UserException(UserErrorCode.EMAIL_ALREADY_EXISTS);
-
         }
     }
 
-    // 2. 비밀번호 = 비밀번호 확인 검증
     private void validatePasswordConfirm(String password, String passwordConfirm){
-        if(!password.equals(passwordConfirm)){
+        if (!password.equals(passwordConfirm)) {
             throw new UserException(UserErrorCode.PASSWORD_NOT_MATCHED);
         }
     }
 
-    // ============ Jwt 관련 함수 ============ //
-    // 1. Jwt RefreshToken 생성 및 저장
+    // ============ Jwt 관련 ============ //
     private String saveRefreshToken(Long userId){
-        // 1) 리프레시 토큰 생성
         String refreshToken = jwtTokenProvider.createRefreshToken(userId);
-        // 2) 현재 리프레시 토큰이 있는지 조회
-        RefreshToken savedToken = refreshTokenRepository.findByUserId(userId)
-            .orElse(null);
+        RefreshToken savedToken = refreshTokenRepository.findByUserId(userId).orElse(null);
 
-        // 3-1) 리프레시 토큰이 없다면
-        if(savedToken == null){
+        if (savedToken == null) {
             refreshTokenRepository.save(
                 RefreshToken.builder()
                     .userId(userId)
@@ -210,79 +237,46 @@ public class AuthServiceImpl implements AuthService{
                     .expirationAt(LocalDateTime.now().plusDays(7))
                     .build()
             );
-        }
-        // 3-2) 있다면
-        else {
+        } else {
             savedToken.updateToken(refreshToken, LocalDateTime.now().plusDays(7));
         }
-
         return refreshToken;
     }
 
-    // 2. 리프레시 토큰 찾거나 없으면 버리기
     private RefreshToken findRefreshTokenOrThrow(String refreshToken){
         return refreshTokenRepository.findByToken(refreshToken)
-            .orElseThrow(()-> new UserException(UserErrorCode.INVALID_REFRESH_TOKEN));
+            .orElseThrow(() -> new UserException(UserErrorCode.INVALID_REFRESH_TOKEN));
     }
 
-    // 3. 리프레시 토큰 만료 여부 확인
     private void validateRefreshTokenExpired(RefreshToken refreshToken){
-        if(refreshToken.isExpired()){
+        if (refreshToken.isExpired()) {
             throw new UserException(UserErrorCode.EXPIRED_REFRESH_TOKEN);
         }
     }
 
-    // ============ 로그인 관련 함수 ============ //
-    // 1. 이메일 -> 유저 조회
-    private User findUserOrThrowByEmail(String email){
-        return userRepository.findByEmail(email)
-            .orElseThrow(()->new UserException(UserErrorCode.USER_NOT_FOUND));
-    }
-
-    // 2. 리프레시 토큰에 담긴 userId(long) -> User 찾기
+    // ============ 공통 ============ //
     User findUserByIdOrThrow(Long id){
         return userRepository.findById(id)
-            .orElseThrow(()->new UserException((UserErrorCode.USER_NOT_FOUND_BY_ID)));
+            .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND_BY_ID));
     }
 
-
-    // 3. 유저 상태 확인
     private void validateUserStatus(UserStatus userStatus){
-        if(userStatus.equals(UserStatus.SUSPENDED)){
+        if (userStatus.equals(UserStatus.SUSPENDED)) {
             throw new UserException(UserErrorCode.USER_SUSPENDED);
         }
     }
 
-    // 4. 유저 정보 = 패스워드 맞는지 확인
     private void validatePassword(String rawPassword, String encodedPassword){
-        if(!passwordEncoder.matches(rawPassword, encodedPassword)){
+        if (!passwordEncoder.matches(rawPassword, encodedPassword)) {
             throw new UserException(UserErrorCode.INVALID_PASSWORD);
         }
     }
 
-    // 5. 소셜(구글) 유저 검증
-    private void validateSocialUser(User user){
-
-        if(!user.getAuthType().equals(AuthType.GOOGLE)){
-            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
-        }
-    }
-
-    // 6. 로컬 유저 검증
-    private void validateLocalUser(User user){
-        if(!user.getAuthType().equals(AuthType.LOCAL)){
-            throw new UserException(UserErrorCode.INVALID_AUTHTYPE);
-        }
-    }
-
-    // 서울(시작 도시) 흔적 자동 발견 — 가입 시
+    // 서울 흔적 자동 발견
     private void registerSeoulTrace(Long userId) {
-        Long seoulTraceId = 5L;
-        Long seoulCityId = 1L;
-
-        Trace trace = traceRepository.findById(seoulTraceId)
+        Trace trace = traceRepository.findById(5L)
             .orElseThrow(() -> new TraceException(TraceErrorCode.TRACE_NOT_FOUND));
-        City city = cityRepository.findById(seoulCityId)
+        City city = cityRepository.findById(1L)
             .orElseThrow(() -> new CityException(CityErrorCode.CITY_NOT_FOUND));
 
         discoveredTraceRepository.save(
@@ -293,5 +287,26 @@ public class AuthServiceImpl implements AuthService{
                 .discoveredAt(LocalDateTime.now())
                 .build()
         );
+    }
+
+    // 소셜 유저 생성 — User(사람) + AuthIdentity(인증수단)
+    private User registerSocialUser(AuthType provider, String providerId, String email, String name) {
+        User user = User.createLocalUser(name);
+        userRepository.save(user);
+
+        authIdentityRepository.save(
+            AuthIdentity.ofSocial(user, provider, providerId, email)
+        );
+
+        voyageStatusRepository.save(VoyageStatus.builder()
+            .userId(user.getId())
+            .voyageState(VoyageState.ANCHORED)
+            .currentCityId(1L)
+            .progress(0.0f)
+            .isFamilyReunited(false)
+            .build());
+
+        registerSeoulTrace(user.getId());
+        return user;
     }
 }

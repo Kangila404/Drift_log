@@ -42,23 +42,22 @@ public record AdminUserDetailResponse(
 
     public static AdminUserDetailResponse of(
         User user,
+        String email,
+        String authType,
         boolean isStoryClear,
         String endingFeedback,
         List<VoyageLog> voyageLogList){
         return new AdminUserDetailResponse(
             user.getUserId(),
-            user.getEmail(),
+            email,
             user.getName(),
-            user.getAuthType().name(),
+            authType,
             user.getUserRole().name(),
             user.getUserStatus().name(),
             user.getLastLoginAt() != null ? user.getLastLoginAt().toString() : null,
             isStoryClear,
             endingFeedback,
-            voyageLogList
-                .stream()
-                .map(VoyageLogInfo::from)
-                .toList()
+            voyageLogList.stream().map(VoyageLogInfo::from).toList()
         );
     }
 
