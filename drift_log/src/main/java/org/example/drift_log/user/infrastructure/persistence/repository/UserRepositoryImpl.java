@@ -20,17 +20,6 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public boolean existsByEmail(String email) {
-        return userJpaRepository.existsByEmail(email);
-
-    }
-
-    @Override
-    public Optional<User> findByEmail(String email) {
-        return userJpaRepository.findByEmail(email);
-    }
-
-    @Override
     public Optional<User> findById(Long id) {
         return userJpaRepository.findById(id);
     }
@@ -59,6 +48,4 @@ public class UserRepositoryImpl implements UserRepository {
     public List<User> findAllById(List<Long> userIds) {
         return userJpaRepository.findAllById(userIds);
     }
-
-
 }

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.application.AuthService;
+import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -35,10 +36,18 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // 소셜 로그인
-    @PostMapping("/social-login")
-    public ResponseEntity<SocialLoginResponse> socialLogin(@Valid @RequestBody SocialLoginRequest request){
+    // ================ 소셜 로그인 ================ //
+    // 1. google
+    @PostMapping("/google")
+    public ResponseEntity<SocialLoginResponse> googleLogin(@Valid @RequestBody SocialLoginRequest request){
         SocialLoginResponse response = authService.socialLogin(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 2. kakao
+    @PostMapping("/kakao")
+    public ResponseEntity<SocialLoginResponse> kakaoLogin(@Valid @RequestBody KakaoLoginRequest request){
+        SocialLoginResponse response = authService.kakaoLogin(request);
         return ResponseEntity.ok(response);
     }
 

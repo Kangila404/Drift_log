@@ -34,21 +34,11 @@ public class User extends BaseEntity {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", unique = true)
     private String userId;
-
-    @Column(name = "email", nullable = false, unique = true)
-    private String email;
-
-    @Column(name = "password", nullable = true)
-    private String password;
 
     @Column(name = "name", nullable = false)
     private String name;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "auth_type", nullable = false)
-    private AuthType authType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "user_role", nullable = false)
@@ -64,27 +54,10 @@ public class User extends BaseEntity {
     // 비즈니스 로직
 
     // 1. 회원가입
-    public static User createLocalUser(String email, String password, String name){
+    public static User createLocalUser(String name){
         return User.builder()
             .userId(UUID.randomUUID().toString())
-            .email(email)
-            .password(password)
             .name(name)
-            .authType(AuthType.LOCAL)
-            .userRole(UserRole.USER)
-            .userStatus(UserStatus.ACTIVE)
-            .lastLoginAt(LocalDateTime.now())
-            .build();
-    }
-
-    // 2.소셜 로그인
-    public static User createSocialUser(String email, String name, AuthType authType){
-        return User.builder()
-            .userId(UUID.randomUUID().toString())
-            .email(email)
-            .password(null)
-            .name(name)
-            .authType(authType)
             .userRole(UserRole.USER)
             .userStatus(UserStatus.ACTIVE)
             .lastLoginAt(LocalDateTime.now())
@@ -111,8 +84,5 @@ public class User extends BaseEntity {
         this.name = name;
     }
 
-    // 7. 비밀번호 변경
-    public void updatePassword(String encodedPassword){
-        this.password = encodedPassword;
-    }
+
 }

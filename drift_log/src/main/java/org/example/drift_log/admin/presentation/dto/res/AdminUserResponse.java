@@ -1,6 +1,5 @@
 package org.example.drift_log.admin.presentation.dto.res;
 
-
 import org.example.drift_log.user.domain.model.User;
 
 public record AdminUserResponse(
@@ -10,10 +9,10 @@ public record AdminUserResponse(
     String userRole,
     String userStatus
 ) {
-    public static AdminUserResponse from(User user){
+    public static AdminUserResponse from(User user, String email){
         return new AdminUserResponse(
             user.getUserId(),
-            user.getEmail(),
+            email,
             user.getName(),
             user.getUserRole().name(),
             user.getUserStatus().name()

@@ -6,6 +6,7 @@ import ModeSelectPage from './pages/ModeSelectPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import AdminPage from './pages/AdminPage'
+import KakaoCallback from "./pages/KakaoCallback";
 
 import { WeatherProvider } from "./contexts/WeatherContext";
 import ProtectedRoute from './routes/ProtectedRoute'
@@ -42,6 +43,7 @@ function App() {
 
         <Route path="/login" element={<LoginPage/>}/>
         <Route path="/signup" element={<SignupPage/>}/>
+        <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
 
         <Route path='/admin' element={
           <ProtectedRoute>

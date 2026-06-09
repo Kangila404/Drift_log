@@ -26,20 +26,21 @@ public class GoogleTokenVerifier {
         // payload에서 email, name 추출
         var payload = jwt.getPayload();
 
+        String sub = (String) payload.get("sub");
         String email = (String)payload.get("email");
         Object nameObj = payload.get("name");
         String name = nameObj != null ? nameObj.toString() : email.split("@")[0];
 
-        if(email == null){
+        if(sub == null){
             throw new UserException(UserErrorCode.INVALID_SOCIAL_TOKEN);
         }
 
-        return new GoogleUserInfo(email, name);
+        return new GoogleUserInfo(sub, email, name);
     } catch (Exception e) {
         throw new UserException(UserErrorCode.INVALID_SOCIAL_TOKEN);
         }
     }
 
-    public record GoogleUserInfo(String email, String name){}
+    public record GoogleUserInfo(String sub, String email, String name){}
 
 }

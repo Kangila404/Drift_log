@@ -18,7 +18,9 @@ import org.example.drift_log.admin.presentation.dto.res.VersionResponse;
 import org.example.drift_log.feedback.domain.model.EndingFeedback;
 import org.example.drift_log.feedback.domain.repository.EndingFeedBackRepository;
 import org.example.drift_log.admin.presentation.dto.res.AdminUserResponse;
+import org.example.drift_log.user.domain.model.AuthIdentity;
 import org.example.drift_log.user.domain.model.User;
+import org.example.drift_log.user.domain.repository.AuthIdentityRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.voyage.domain.entity.VoyageLog;
 import org.example.drift_log.voyage.domain.entity.VoyageStatus;
@@ -38,6 +40,7 @@ public class AdminServiceImpl implements AdminService{
     private final VoyageStatusRepository voyageStatusRepository;
     private final VoyageLogRepository voyageLogRepository;
     private final AppVersionRepository appVersionRepository;
+    private final AuthIdentityRepository authIdentityRepository;
 
     // 디폴트 버전
     private static final String DEFAULT_VERSION = "v1.0.0";
@@ -62,30 +65,37 @@ public class AdminServiceImpl implements AdminService{
     public List<AdminUserResponse> getUserList() {
         return userRepository.findAll()
             .stream()
-            .map(AdminUserResponse::from)
+            .map(user -> {
+                String email = authIdentityRepository.findFirstByUserId(user.getId())
+                    .map(AuthIdentity::getEmail)
+                    .orElse(null);
+                return AdminUserResponse.from(user, email);
+            })
             .toList();
     }
 
     @Override
     public AdminUserDetailResponse getUserDetail(String userId) {
-        // 유저 정보
         User user = findUserByUserIdOrThrow(userId);
+
+        AuthIdentity identity = authIdentityRepository.findFirstByUserId(user.getId())
+            .orElseThrow(() -> new AdminException(AdminErrorCode.ADMIN_USER_NOT_FOUND));
 
         VoyageStatus voyageStatus = voyageStatusRepository.findByUserId(user.getId())
             .orElseThrow(() -> new AdminException(AdminErrorCode.VOYAGE_STATUS_NOT_FOUND));
-        // 스토리 클리어 유무
         boolean isStoryClear = voyageStatus.isFamilyReunited();
 
-        // 엔딩 피드백
-        EndingFeedback feedback = endingFeedBackRepository.findByUserId(user.getId())
-            .orElse(null);
-
+        EndingFeedback feedback = endingFeedBackRepository.findByUserId(user.getId()).orElse(null);
         String feedbackContent = feedback != null ? feedback.getContent() : null;
 
-        // 항해일지
         List<VoyageLog> voyageLogList = voyageLogRepository.findAllByUserId(user.getId());
 
-        return AdminUserDetailResponse.of(user, isStoryClear, feedbackContent, voyageLogList);
+        return AdminUserDetailResponse.of(
+            user,
+            identity.getEmail(),
+            identity.getProvider().name(),
+            isStoryClear, feedbackContent, voyageLogList
+        );
     }
 
     @Override

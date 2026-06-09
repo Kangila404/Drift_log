@@ -32,9 +32,16 @@ export const login = async (data: LoginRequest) => {
 }
 
 export async function socialLogin(idToken:string) {
-    const {data} = await apiClient.post("/auth/social-login", {
+    const {data} = await apiClient.post("/auth/google", {
         idToken,
         authType: "GOOGLE",
+    });
+    return data;
+}
+
+export async function kakaoLogin(code: string) {
+    const { data } = await apiClient.post("/auth/kakao", {
+        code,
     });
     return data;
 }
