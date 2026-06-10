@@ -51,8 +51,20 @@ jobs:
           host: ${{secrets.EC2_HOST}}
           username: ${{secrets.EC2_USER}}
           key: ${{secrets.EC2_SSH_KEY}}
+          envs: KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,KAKAO_REDIRECT_URI,GOOGLE_CLIENT_ID,DB_NAME,DB_USERNAME,DB_PASSWORD,DB_ROOT_PASSWORD,GRAFANA_PASSWORD
           script: |
             cd ~/driftlog
+            cat > .env <<EOF
+            KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+            KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+            KAKAO_REDIRECT_URI=${KAKAO_REDIRECT_URI}
+            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+            DB_NAME=${DB_NAME}
+            DB_USERNAME=${DB_USERNAME}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+            GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
+            EOF
             sudo docker compose -f docker-compose.prod.yml pull
             sudo docker compose -f docker-compose.prod.yml up -d
             sudo docker image prune -f
