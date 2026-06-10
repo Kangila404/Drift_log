@@ -663,7 +663,10 @@ export default function Boat({ preset, forceSailing, fireActive = false }: BoatP
 
   // 로그인 후 1회: 서버에 저장된 보트 색 불러오기
   useEffect(() => {
-    useBoatStore.getState().loadFromServer()
+    const hasToken = !!localStorage.getItem('accessToken')   // ← 토큰 저장 키에 맞게 수정
+    if (hasToken) {
+      useBoatStore.getState().loadFromServer()
+    }
   }, [])
 
   // 시각용 rust — store rust를 lerp로 부드럽게 추적 (청소 시 스르륵 빠짐)

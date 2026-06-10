@@ -137,8 +137,12 @@ export default function ProfilePanel() {
   }
 
   const handleLogout = async () => {
-    if (loggingOut) return
-    if (!window.confirm('로그아웃 하시겠습니까?')) return
+    const hasActiveStudy = !!localStorage.getItem('studyStartAt')
+    const msg = hasActiveStudy
+      ? '진행 중인 공부 기록이 저장되지 않고 사라집니다. 로그아웃 하시겠습니까?'
+      : '로그아웃 하시겠습니까?'
+    if (!window.confirm(msg)) return
+
     setLoggingOut(true)
     // 진행 중 공부 세션도 함께 폐기 (study 모드에서 로그아웃 시 부활 방지)
     localStorage.removeItem('studyStartAt')
