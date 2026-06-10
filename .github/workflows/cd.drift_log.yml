@@ -33,6 +33,7 @@ jobs:
           tags: ${{secrets.DOCKERHUB_USERNAME}}/driftlog-frontend:latest
           build-args: |
             VITE_GOOGLE_CLIENT_ID=${{secrets.GOOGLE_CLIENT_ID}}
+            VITE_KAKAO_CLIENT_ID=${{secrets.KAKAO_CLIENT_ID}}
 
       - name: 5. EC2로 배포 파일 복사 (compose, nginx)
         uses: appleboy/scp-action@v0.1.7
