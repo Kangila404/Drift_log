@@ -12,21 +12,24 @@ public record UserMeResponse(
     long visitedCities,
     List<Long> visitedCityIds,
     boolean isFamilyReunited,
-    String userRole
+    String userRole,
+    String authType
 ) {
 
-
-
-    public static UserMeResponse of(User user, long totalVoyages, long visitedCities, List<Long> visitedCityIds, boolean isFamilyReunited){
+    public static UserMeResponse of(
+        User user, String email, String authType,
+        long totalVoyages, long visitedCities,
+        List<Long> visitedCityIds, boolean isFamilyReunited){
         return new UserMeResponse(
             user.getName(),
-            user.getEmail(),
+            email,
             user.getCreatedAt(),
             totalVoyages,
             visitedCities,
             visitedCityIds,
             isFamilyReunited,
-            user.getUserRole().name()
+            user.getUserRole().name(),
+            authType
         );
     }
 }

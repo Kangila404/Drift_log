@@ -40,7 +40,7 @@ public class NoticeServiceImplTest {
     }
 
     private User 유저(Long id, String name) {
-        User user = User.createLocalUser("admin@test.com", "encoded", name);
+        User user = User.createLocalUser(name);
         ReflectionTestUtils.setField(user, "id", id);
         return user;
     }

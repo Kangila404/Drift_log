@@ -16,3 +16,11 @@ springdoc:
 google:
   client-id:
     ${GOOGLE_CLIENT_ID:dummy-client-id}
+
+kakao:
+  client-id:
+    ${KAKAO_CLIENT_ID:dummy-client-id}
+  client-secret:
+    ${KAKAO_CLIENT_SECRET:dummy-client-secret}
+  redirect-uri:
+    ${KAKAO_REDIRECT_URI:http://localhost:30001/auth/kakao/callback}

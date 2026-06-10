@@ -2,7 +2,10 @@ package org.example.drift_log.user.application;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.user.domain.enums.AuthType;
+import org.example.drift_log.user.domain.model.AuthIdentity;
 import org.example.drift_log.user.domain.model.User;
+import org.example.drift_log.user.domain.repository.AuthIdentityRepository;
 import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.user.exception.UserErrorCode;
 import org.example.drift_log.user.exception.UserException;
@@ -19,9 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Service
 @Transactional
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final AuthIdentityRepository authIdentityRepository;
     private final PasswordEncoder passwordEncoder;
     private final VoyageLogRepository voyageLogRepository;
     private final VoyageStatusRepository voyageStatusRepository;
@@ -31,6 +35,11 @@ public class UserServiceImpl implements UserService{
     public UserMeResponse getMe(String userId) {
         User user = findUserByUserIdOrThrow(userId);
 
+        // 인증수단 조회 (email, 가입방식)
+        AuthIdentity identity = authIdentityRepository
+            .findFirstByUserId(user.getId())
+            .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+
         List<Long> visitedCityIds = voyageLogRepository.findDistinctToCityIdsByUserId(user.getId());
         long totalVoyages = voyageLogRepository.countByUserId(user.getId());
         long visitedCities = visitedCityIds.size();
@@ -39,7 +48,12 @@ public class UserServiceImpl implements UserService{
             .map(VoyageStatus::isFamilyReunited)
             .orElse(false);
 
-        return UserMeResponse.of(user, totalVoyages, visitedCities, visitedCityIds, isFamilyReunited);
+        return UserMeResponse.of(
+            user,
+            identity.getEmail(),
+            identity.getProvider().name(),
+            totalVoyages, visitedCities, visitedCityIds, isFamilyReunited
+        );
     }
 
     @Override
@@ -53,18 +67,21 @@ public class UserServiceImpl implements UserService{
     public void updatePassword(String userId, UpdatePasswordRequest request) {
         User user = findUserByUserIdOrThrow(userId);
 
-        if(!passwordEncoder.matches(request.currentPassword(), user.getPassword())){
+        AuthIdentity identity = authIdentityRepository
+            .findByUserIdAndProvider(user.getId(), AuthType.LOCAL)
+            .orElseThrow(() -> new UserException(UserErrorCode.INVALID_AUTHTYPE));
+
+        if (!passwordEncoder.matches(request.currentPassword(), identity.getPassword())) {
             throw new UserException(UserErrorCode.INVALID_PASSWORD);
         }
 
-        if(!request.newPassword().equals(request.newPasswordConfirm())){
+        if (!request.newPassword().equals(request.newPasswordConfirm())) {
             throw new UserException(UserErrorCode.PASSWORD_NOT_MATCHED);
         }
 
-        user.updatePassword(passwordEncoder.encode(request.newPassword()));
-        userRepository.save(user);
+        identity.updatePassword(passwordEncoder.encode(request.newPassword()));
+        authIdentityRepository.save(identity);
     }
-
 
     // =========== 메서드 ========== //
     private User findUserByUserIdOrThrow(String userId){
@@ -72,4 +89,3 @@ public class UserServiceImpl implements UserService{
             .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
     }
 }
-

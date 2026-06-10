@@ -55,7 +55,7 @@ public class InquiryServiceImplTest {
     }
 
     private User 유저(Long id, String userId, String name) {
-        User user = User.createLocalUser("user@test.com", "encoded", name);
+        User user = User.createLocalUser(name);
         ReflectionTestUtils.setField(user, "id", id);
         ReflectionTestUtils.setField(user, "userId", userId);
         return user;

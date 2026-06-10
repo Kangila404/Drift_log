@@ -2,14 +2,15 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import OceanWater from '../components/r3f/OceanWater'
 import OceanSky from '../components/r3f/OceanSky'
-import Boat from '../components/r3f/Boat'          // ← Wake import 제거
+import Boat from '../components/r3f/Boat'
+import Rain from '../components/r3f/Rain'
 import StudyHUD from '../components/ui/StudyHUD'
 import { useViewport } from '../hooks/useViewport'
 import { useWeather } from '../contexts/WeatherContext'
 import { useTimeOfDay } from '../hooks/useTimeOfDay'
 import { useEclipse } from '../hooks/useEclipse'
 import { resolveScene } from '../constants/scenePreset'
-import { noise } from '../audio/noiseManager'
+import { noise, type NoiseKey } from '../audio/noiseManager'
 import { useEffect, useState } from 'react'
 
 const START_KEY = 'studyStartAt'
@@ -20,6 +21,7 @@ export default function StudyPage() {
   const timeOfDay = useTimeOfDay()
 
   const [studying, setStudying] = useState(() => !!localStorage.getItem(START_KEY))
+  const [activeNoise, setActiveNoise] = useState<NoiseKey | null>(() => noise.getCurrent())
 
   useEffect(() => {
     const sync = () => setStudying(!!localStorage.getItem(START_KEY))
@@ -29,6 +31,12 @@ export default function StudyPage() {
       window.removeEventListener('study-change', sync)
       window.removeEventListener('storage', sync)
     }
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setActiveNoise(noise.getCurrent())
+    window.addEventListener('noise-change', sync)
+    return () => window.removeEventListener('noise-change', sync)
   }, [])
 
   const eclipseActive = abnormalType === 'ECLIPSE' && timeOfDay === 'day'
@@ -63,7 +71,10 @@ export default function StudyPage() {
         <pointLight position={[0, 3.2, -3.5]} intensity={0.75 * (1 - coverage * 0.9)} color="#9ed8ff" />
         <OceanSky preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} />
         <OceanWater preset={preset} />
-        <Boat preset={preset} forceSailing={studying} />   {/* ← 공부 중이면 항적 */}
+        <Boat preset={preset} forceSailing={studying} fireActive={activeNoise === 'fire'} />
+
+        {/* 비는 월드 공간 — 배 따라 안 흔들림 */}
+        <Rain active={activeNoise === 'rain'} />
       </Canvas>
 
       {eclipseActive && (
