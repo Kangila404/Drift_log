@@ -1,5 +1,5 @@
 services:
-  # 바깥 Nginx — 외부 80 입구, 경로 분배 (/ → frontend, /api → backend)
+  # 바깥 Nginx — 외부 80/443 입구, 경로 분배
   nginx:
     image: nginx:alpine
     container_name: nginxf
@@ -15,13 +15,13 @@ services:
       - backend
     restart: unless-stopped
 
-  # 프론트 — React 정적 서빙 (내부 nginx, 외부 노출 안 함)
+  # 프론트 — React 정적 서빙
   frontend:
     image: kangila/driftlog-frontend:latest
     container_name: frontend
     restart: unless-stopped
 
-  # 백엔드 — Spring Boot (prod 프로파일)
+  # 백엔드 — Spring Boot (prod)
   backend:
     image: kangila/driftlog-backend:latest
     container_name: backend
@@ -34,10 +34,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # MySQL — DB (외부 노출 안 함, 백엔드만 접근)
+  # MySQL
   mysql:
     image: mysql:8.0
     container_name: mysql
+    env_file:
+      - .env
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USERNAME}
@@ -60,7 +62,7 @@ services:
       - loki-data:/loki
     restart: unless-stopped
 
-  # Prometheus — 메트릭 수집 (backend:8080 긁음)
+  # Prometheus — 메트릭 수집
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: prometheus
@@ -71,7 +73,7 @@ services:
         target: /etc/prometheus/prometheus.yml
     restart: unless-stopped
 
-  # Grafana — 시각화 대시보드
+  # Grafana
   grafana:
     image: grafana/grafana:11.2.0
     container_name: grafana

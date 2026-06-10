@@ -44,25 +44,38 @@ jobs:
           source: "docker-compose.prod.yml,Nginx/nginx.conf"
           target: "~/driftlog"
 
-
       - name: 6. EC2 SSH 접속 -> 배포
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          DB_NAME: ${{secrets.DB_NAME}}
+          DB_USERNAME: ${{secrets.DB_USERNAME}}
+          DB_PASSWORD: ${{secrets.DB_PASSWORD}}
+          DB_ROOT_PASSWORD: ${{secrets.DB_ROOT_PASSWORD}}
+          JWT_SECRET: ${{secrets.JWT_SECRET}}
+          WEATHER_API_KEY: ${{secrets.WEATHER_API_KEY}}
+          GOOGLE_CLIENT_ID: ${{secrets.GOOGLE_CLIENT_ID}}
+          KAKAO_CLIENT_ID: ${{secrets.KAKAO_CLIENT_ID}}
+          KAKAO_CLIENT_SECRET: ${{secrets.KAKAO_CLIENT_SECRET}}
+          KAKAO_REDIRECT_URI: ${{secrets.KAKAO_REDIRECT_URI}}
+          GRAFANA_PASSWORD: ${{secrets.GRAFANA_PASSWORD}}
         with:
           host: ${{secrets.EC2_HOST}}
           username: ${{secrets.EC2_USER}}
           key: ${{secrets.EC2_SSH_KEY}}
-          envs: KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,KAKAO_REDIRECT_URI,GOOGLE_CLIENT_ID,DB_NAME,DB_USERNAME,DB_PASSWORD,DB_ROOT_PASSWORD,GRAFANA_PASSWORD
+          envs: DB_NAME,DB_USERNAME,DB_PASSWORD,DB_ROOT_PASSWORD,JWT_SECRET,WEATHER_API_KEY,GOOGLE_CLIENT_ID,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,KAKAO_REDIRECT_URI,GRAFANA_PASSWORD
           script: |
             cd ~/driftlog
             cat > .env <<EOF
-            KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
-            KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
-            KAKAO_REDIRECT_URI=${KAKAO_REDIRECT_URI}
-            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
             DB_NAME=${DB_NAME}
             DB_USERNAME=${DB_USERNAME}
             DB_PASSWORD=${DB_PASSWORD}
             DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+            JWT_SECRET=${JWT_SECRET}
+            WEATHER_API_KEY=${WEATHER_API_KEY}
+            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+            KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+            KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+            KAKAO_REDIRECT_URI=${KAKAO_REDIRECT_URI}
             GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
             EOF
             sudo docker compose -f docker-compose.prod.yml pull
