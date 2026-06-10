@@ -1,11 +1,11 @@
-// src/components/study/StudyHUD.tsx
+// src/components/ui/StudyHUD.tsx
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { saveStudyTime, getStudySummary, getStudyLogs, updateStudySubject, deleteStudyLog, type StudySummary, type StudyLog } from '../../api/study'
 import { noise, type NoiseKey } from '../../audio/noiseManager'
-import CustomerCenter from '../CustomerCenter'
+import ProfilePanel from './ProfilePanel'
 
 const PRESETS = [25, 50, 90]
 const START_KEY = 'studyStartAt'
@@ -13,6 +13,12 @@ const GOAL_KEY = 'studyGoalMin'
 const SUBJ_KEY = 'studySubject'
 
 const emitStudyChange = () => window.dispatchEvent(new Event('study-change'))
+
+const clearStudySession = () => {
+  localStorage.removeItem(START_KEY)
+  localStorage.removeItem(GOAL_KEY)
+  localStorage.removeItem(SUBJ_KEY)
+}
 
 const fmtClock = (sec: number) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60
@@ -42,6 +48,13 @@ const NOISES: { key: NoiseKey; label: string; icon: string }[] = [
   { key: 'fire', label: '장작', icon: '✺' },
 ]
 
+type StudyPanel = 'log' | 'profile'
+
+const PANEL_TABS: { id: StudyPanel; icon: string; label: string }[] = [
+  { id: 'log', icon: '≡', label: '일지' },
+  { id: 'profile', icon: '○', label: '나' },
+]
+
 export default function StudyHUD() {
   const nav = useNavigate()
   const [goalMin, setGoalMin] = useState(25)
@@ -52,8 +65,10 @@ export default function StudyHUD() {
   const [saving, setSaving] = useState(false)
   const [setupOpen, setSetupOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<StudyPanel>('log')
   const [soundOpen, setSoundOpen] = useState(false)
   const startAtRef = useRef<Date | null>(null)
+  const discardTimerRef = useRef<number | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {})
@@ -70,9 +85,7 @@ export default function StudyHUD() {
 
     // 목표시간을 이미 넘긴 채 방치된 세션은 복구하지 않고 폐기
     if (elapsedSec >= goal * 60) {
-      localStorage.removeItem(START_KEY)
-      localStorage.removeItem(GOAL_KEY)
-      localStorage.removeItem(SUBJ_KEY)
+      clearStudySession()
       return
     }
 
@@ -81,6 +94,23 @@ export default function StudyHUD() {
     setSubject(localStorage.getItem(SUBJ_KEY) || '')
     setElapsed(elapsedSec)
     setRunning(true)
+  }, [])
+
+  // 페이지 이동(SPA 네비게이션)으로 StudyHUD가 사라지면 진행 중 세션 폐기 → 타이머 멈춤.
+  // - 새로고침(F5)은 React cleanup이 실행되지 않으므로 localStorage가 남아 복구됨(의도된 동작).
+  // - dev StrictMode의 mount→unmount→mount 더블 인보크는 setTimeout(0) + 즉시 취소로 방어
+  //   (가짜 언마운트 직후 remount가 예약된 폐기를 취소 → 새로고침 복구가 깨지지 않음).
+  useEffect(() => {
+    if (discardTimerRef.current !== null) {
+      clearTimeout(discardTimerRef.current)
+      discardTimerRef.current = null
+    }
+    return () => {
+      discardTimerRef.current = window.setTimeout(() => {
+        clearStudySession()
+        emitStudyChange()
+      }, 0)
+    }
   }, [])
 
   // 파도 기본 — 첫 사용자 인터랙션에 확실히 재생 (자동재생 정책 회피)
@@ -138,9 +168,7 @@ export default function StudyHUD() {
     } catch (e) {
       console.error('공부 기록 저장 실패:', e)
     } finally {
-      localStorage.removeItem(START_KEY)
-      localStorage.removeItem(GOAL_KEY)
-      localStorage.removeItem(SUBJ_KEY)
+      clearStudySession()
       setElapsed(0)
       setSubject('')
       setSaving(false)
@@ -157,33 +185,8 @@ export default function StudyHUD() {
     if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 나가시겠습니까?')) return
     startAtRef.current = null
     setRunning(false)
-    localStorage.removeItem(START_KEY)
-    localStorage.removeItem(GOAL_KEY)
-    localStorage.removeItem(SUBJ_KEY)
+    clearStudySession()
     nav('/')
-  }
-
-  const handleLogout = async () => {
-    if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 로그아웃하시겠습니까?')) return
-    if (!window.confirm('로그아웃 하시겠습니까?')) return
-    // 진행 중 공부 세션 폐기
-    startAtRef.current = null
-    localStorage.removeItem(START_KEY)
-    localStorage.removeItem(GOAL_KEY)
-    localStorage.removeItem(SUBJ_KEY)
-    const refreshToken = localStorage.getItem('refreshToken')
-    try {
-      if (refreshToken) {
-        const { apiClient } = await import('../../api/client')
-        await apiClient.post('/auth/logout', { refreshToken })
-      }
-    } catch (e) {
-      console.error('로그아웃 요청 실패:', e)
-    } finally {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
-    }
   }
 
   const liveToday = summary.todaySeconds + (running ? elapsed : 0)
@@ -243,11 +246,11 @@ export default function StudyHUD() {
           className="flex items-center gap-1 pl-3 pr-4 py-5 bg-[#050e18]/70 border-r border-t border-b border-[#1a4a64]/50 rounded-r-lg hover:bg-[#071525]/90 hover:border-[#4a9abb]/50 transition-colors group"
           whileHover={{ x: 3 }} whileTap={{ scale: 0.96 }}>
           <span className="text-[18px] text-[#7eb8d4] group-hover:text-[#cce8f5] transition-colors">≡</span>
-          <span className="text-[10px] font-mono text-[#4a7a94] group-hover:text-[#7eb8d4] tracking-widest [writing-mode:vertical-rl] mt-1">일지</span>
+          <span className="text-[10px] font-mono text-[#4a7a94] group-hover:text-[#7eb8d4] tracking-widest [writing-mode:vertical-rl] mt-1">메뉴</span>
         </motion.button>
       </div>
 
-      {/* ── 좌측 슬라이드 패널 (공부일지만) ── */}
+      {/* ── 좌측 슬라이드 패널 (일지 / 나) ── */}
       <AnimatePresence>
         {panelOpen && (
           <>
@@ -261,24 +264,35 @@ export default function StudyHUD() {
               style={{ backdropFilter: 'blur(8px)' }}>
               {/* 헤더 — 제목 + 닫기 */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-[#0d2233]">
-                <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">공부일지</span>
+                <span className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase">메뉴</span>
                 <button onClick={() => setPanelOpen(false)}
                   className="flex items-center gap-1 text-[10px] font-mono text-[#3a6880] hover:text-[#cce8f5] tracking-widest uppercase transition-colors">
                   닫기 ›
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: 'none' }}>
-                <LogTab totalSeconds={summary.totalSeconds} onChanged={refreshSummary} />
+              {/* 탭 — 일지 / 나 */}
+              <div className="flex border-b border-[#0d2233]">
+                {PANEL_TABS.map(tab => (
+                  <button key={tab.id} onClick={() => setActivePanel(tab.id)}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-3 text-[9px] font-mono tracking-widest uppercase transition-colors duration-200 ${
+                      activePanel === tab.id ? 'text-[#7eb8d4] border-b border-[#4a9abb]' : 'text-[#1a3a50] hover:text-[#2a5a74]'
+                    }`}>
+                    <span className="text-[14px]">{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="p-4 flex flex-col gap-2">
-                <CustomerCenter />
-                <button onClick={handleLogout}
-                  className="w-full py-2.5 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-red-300 hover:border-red-500/50 tracking-widest transition-colors text-center">
-                  ⏻ 로그아웃
-                </button>
+              <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: 'none' }}>
+                <AnimatePresence mode="wait">
+                  <motion.div key={activePanel} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                    {activePanel === 'log' && <LogTab totalSeconds={summary.totalSeconds} onChanged={refreshSummary} />}
+                    {activePanel === 'profile' && <ProfilePanel />}
+                  </motion.div>
+                </AnimatePresence>
               </div>
+
               <button onClick={leaveStudy}
                 className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors text-center">
                 ‹ 모드 선택으로
