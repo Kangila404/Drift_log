@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiClient } from '../../api/client'
 import CustomerCenter from '../CustomerCenter'
+import { goModeSelect, notifyNativeLogout } from '../../lib/nativeBridge'
 
 type EditMode = 'nickname' | 'password'
 
@@ -156,7 +157,9 @@ export default function ProfilePanel() {
     } finally {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      if (!notifyNativeLogout()) {
+        window.location.href = '/login'
+      }
     }
   }
 
