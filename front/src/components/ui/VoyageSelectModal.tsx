@@ -13,7 +13,6 @@ interface City {
 }
 
 // DB ID 기준: 1:서울 2:인천 3:대전 4:강릉 5:부산 6:수원 7:광주 8:대구 9:포항 10:제주
-// 좌표(x, y)는 SVG 지도 렌더용 프론트 고유 데이터. 소요 시간은 서버에서 받는다.
 const CITIES: City[] = [
   { id: '1',  name: '서울', x: 45.5, y: 53.0, visited: true  },
   { id: '2',  name: '인천', x: 36.0, y: 55.0, visited: false },
@@ -49,7 +48,6 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
   const [durationMin, setDurationMin] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // 데스크탑 여부 — md(768px) 기준, 리사이즈 따라감 (isTall 판별과 동일 패턴)
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 768,
   )
@@ -59,10 +57,8 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // 최신 요청만 반영하기 위한 토큰 (도시 빠르게 전환 시 stale 응답 무시)
   const reqIdRef = useRef(0)
 
-  // 현재 도시 ID 기반으로 current 표시
   const citiesWithCurrent = CITIES.map(c => ({
     ...c,
     current: c.id === String(currentCity?.cityId),
@@ -71,7 +67,7 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
   const current = citiesWithCurrent.find(c => c.current)
 
   const resetSelection = () => {
-    reqIdRef.current++      // 진행 중인 요청 무효화
+    reqIdRef.current++
     setSelected(null)
     setDurationMin(null)
     setLoading(false)
@@ -79,7 +75,6 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
 
   const handleCityClick = async (city: City) => {
     if (city.current) return
-    // 같은 도시 다시 누르면 선택 해제
     if (selected?.id === city.id) {
       resetSelection()
       return
@@ -88,13 +83,12 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
     setDurationMin(null)
     setLoading(true)
 
-    const myReq = ++reqIdRef.current   // 이번 요청 고유 번호
+    const myReq = ++reqIdRef.current
     try {
-      // 현재 도시는 서버가 JWT로 식별 → 목적지(toCityId)만 전달
       const data = await getRouteDuration(city.id)
       if (myReq === reqIdRef.current) setDurationMin(data.durationTime)
     } catch {
-      if (myReq === reqIdRef.current) setDurationMin(null) // 실패해도 모달 유지, 시간만 비움
+      if (myReq === reqIdRef.current) setDurationMin(null)
     } finally {
       if (myReq === reqIdRef.current) setLoading(false)
     }
@@ -112,54 +106,77 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
     onClose()
   }
 
-  // ── 지도 SVG (데스크탑/모바일 공유) ──
-  const mapSvg = (
-    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-      <rect width="100" height="100" fill="#040d16" />
-      <defs>
-        <pattern id="grid2" width="5" height="5" patternUnits="userSpaceOnUse">
-          <path d="M 5 0 L 0 0 0 5" fill="none" stroke="#0a1f2e" strokeWidth="0.25" />
-        </pattern>
-        <filter id="glow2">
-          <feGaussianBlur stdDeviation="1.2" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      <rect width="100" height="100" fill="url(#grid2)" opacity="0.5" />
-
-      <g transform="translate(10 2) scale(0.78)">
-        <path d={KOREA_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.65" />
-        <path d={KOREA_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.22" opacity="0.5" filter="url(#glow2)" />
-        <path d={JEJU_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.45" />
-        <path d={JEJU_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.18" opacity="0.45" />
-
-        {selected && current && (
-          <line x1={current.x} y1={current.y} x2={selected.x} y2={selected.y} stroke="#4a9abb" strokeWidth="0.6" strokeDasharray="1.5,1.5" opacity="0.6" />
+  // ── 도시 점 + 라벨 (공유) ──
+  const cityNodes = citiesWithCurrent.map(city => {
+    const isCurrent = Boolean(city.current)
+    const isSelected = selected?.id === city.id
+    return (
+      <g key={city.id} style={{ cursor: isCurrent ? 'default' : 'pointer' }} onClick={() => handleCityClick(city)}>
+        {/* 투명 히트박스 — 점 근처만 눌러도 선택 */}
+        <circle cx={city.x} cy={city.y} r="4" fill="transparent" />
+        {isSelected && (
+          <circle cx={city.x} cy={city.y} r="3.5" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
+            <animate attributeName="r" values="2.5;5;2.5" dur="1.5s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.5;0;0.5" dur="1.5s" repeatCount="indefinite" />
+          </circle>
         )}
-
-        {citiesWithCurrent.map(city => {
-          const isCurrent = Boolean(city.current)
-          const isSelected = selected?.id === city.id
-          return (
-            <g key={city.id} style={{ cursor: isCurrent ? 'default' : 'pointer' }} onClick={() => handleCityClick(city)}>
-              {isSelected && (
-                <circle cx={city.x} cy={city.y} r="3.5" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
-                  <animate attributeName="r" values="2.5;5;2.5" dur="1.5s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.5;0;0.5" dur="1.5s" repeatCount="indefinite" />
-                </circle>
-              )}
-              {isCurrent && (
-                <circle cx={city.x} cy={city.y} r="3" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
-                  <animate attributeName="r" values="2;4.5;2" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
-                </circle>
-              )}
-              <circle cx={city.x} cy={city.y} r={isCurrent ? 1.4 : isSelected ? 1.6 : 1.0} fill={isCurrent ? '#7eb8d4' : isSelected ? '#a8d4e8' : city.visited ? '#2a5a74' : '#0d2233'} stroke={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#1a4a64' : '#1a3a50'} strokeWidth="0.4" />
-              <text x={city.x + 2} y={city.y + 0.8} fontSize="2.4" fill={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#3a6880' : '#1a3a50'} fontFamily="monospace">{city.name}</text>
-            </g>
-          )
-        })}
+        {isCurrent && (
+          <circle cx={city.x} cy={city.y} r="3" fill="none" stroke="#7eb8d4" strokeWidth="0.4" opacity="0.4">
+            <animate attributeName="r" values="2;4.5;2" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
+          </circle>
+        )}
+        <circle cx={city.x} cy={city.y} r={isCurrent ? 1.6 : isSelected ? 1.6 : 1.5} fill={isCurrent ? '#7eb8d4' : isSelected ? '#a8d4e8' : city.visited ? '#2a5a74' : '#0d2233'} stroke={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#1a4a64' : '#1a3a50'} strokeWidth="0.4" />
+        <text x={city.x + 2} y={city.y + 0.8} fontSize="3.6" fill={isCurrent ? '#a8d4e8' : isSelected ? '#cce8f5' : city.visited ? '#3a6880' : '#1a3a50'} fontFamily="monospace">{city.name}</text>
       </g>
+    )
+  })
+
+  // ── 지도 본체 path + 항로선 (공유) ──
+  const mapPaths = (
+    <>
+      <path d={KOREA_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.65" />
+      <path d={KOREA_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.22" opacity="0.5" filter="url(#glow2)" />
+      <path d={JEJU_PATH} fill="#071826" stroke="#1a3a50" strokeWidth="0.45" />
+      <path d={JEJU_PATH} fill="none" stroke="#4a9abb" strokeWidth="0.18" opacity="0.45" />
+      {selected && current && (
+        <line x1={current.x} y1={current.y} x2={selected.x} y2={selected.y} stroke="#4a9abb" strokeWidth="0.6" strokeDasharray="1.5,1.5" opacity="0.6" />
+      )}
+      {cityNodes}
+    </>
+  )
+
+  const mapDefs = (
+    <defs>
+      <pattern id="grid2" width="5" height="5" patternUnits="userSpaceOnUse">
+        <path d="M 5 0 L 0 0 0 5" fill="none" stroke="#0a1f2e" strokeWidth="0.25" />
+      </pattern>
+      <filter id="glow2">
+        <feGaussianBlur stdDeviation="1.2" result="blur" />
+        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+    </defs>
+  )
+
+  // ── 데스크탑 지도: 원래 크기 (viewBox 0 0 100 100) ──
+   const mapSvgDesktop = (
+    <svg viewBox="0 -2 100 88" style={{ width: '100%', height: '100%' }}>
+      <rect x="0" y="-2" width="100" height="88" fill="#040d16" />
+      {mapDefs}
+      <rect x="0" y="-2" width="100" height="88" fill="url(#grid2)" opacity="0.5" />
+      <g transform="translate(10 2) scale(0.78)">{mapPaths}</g>
+    </svg>
+  )
+
+  // ── 모바일 지도: 한반도 확대 ──
+  // viewBox 4숫자 "x y 너비 높이". 너비·높이 줄이면 확대. 배경 rect 2개도 동일 값.
+  const MV = { x: 8, y: 0, w: 78, h: 78 } // ← 여기 숫자로 모바일 지도 확대/위치 조절
+  const mapSvgMobile = (
+    <svg viewBox={`${MV.x} ${MV.y} ${MV.w} ${MV.h}`} style={{ width: '100%', height: '100%' }}>
+      <rect x={MV.x} y={MV.y} width={MV.w} height={MV.h} fill="#040d16" />
+      {mapDefs}
+      <rect x={MV.x} y={MV.y} width={MV.w} height={MV.h} fill="url(#grid2)" opacity="0.5" />
+      <g transform="translate(10 2) scale(0.78)">{mapPaths}</g>
     </svg>
   )
 
@@ -276,21 +293,18 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
             >
               {isDesktop ? (
                 <>
-                  {/* 닫기 — 모달 우상단 고정 */}
                   <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 2 }}>
                     {closeButton}
                   </div>
 
-                  {/* 왼쪽 — 헤더 + 큰 지도 */}
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2.2rem', gap: '1.5rem' }}>
                     {header}
                     <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
                     <div style={{ flex: 1, minHeight: 0, backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
-                      {mapSvg}
+                      {mapSvgDesktop}
                     </div>
                   </div>
 
-                  {/* 오른쪽 — 선택 정보 + 출항 */}
                   <div style={{
                     width: '340px', flexShrink: 0,
                     borderLeft: '1px solid rgba(100, 160, 200, 0.1)',
@@ -303,7 +317,6 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
                 </>
               ) : (
                 <>
-                  {/* 모바일 — 기존 세로 스택 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     {header}
                     {closeButton}
@@ -311,8 +324,9 @@ export default function VoyageSelectModal({ open, onClose, onConfirm }: VoyageSe
 
                   <div style={{ height: '1px', backgroundColor: 'rgba(100, 160, 200, 0.1)' }} />
 
-                  <div style={{ width: '100%', height: '320px', backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
-                    {mapSvg}
+                  {/* 모바일 지도 — 높이는 여기 height로 조절 */}
+                  <div style={{ width: '100%', height: '420px', backgroundColor: '#040d16', border: '1px solid #0d2233' }}>
+                    {mapSvgMobile}
                   </div>
 
                   {selectionInfo}

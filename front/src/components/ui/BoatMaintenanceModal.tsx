@@ -13,7 +13,6 @@ import {
 } from '../../stores/boatStore'
 import type { ScenePreset } from '../../constants/scenePreset'
 
-// 미리보기용: 달 분위기로 갑판등 켜고, 아주 약하게만 흔들리게
 const previewPreset = {
   celestialBody: 'moon',
   waveScale: 0.5,
@@ -25,7 +24,7 @@ function Swatch({ color, active, onClick }: { color: string; active: boolean; on
     <button
       onClick={onClick}
       aria-label={color}
-      className="relative h-8 w-8 shrink-0 rounded-full border border-white/15 transition-transform hover:scale-110"
+      className="relative h-8 w-8 shrink-0 rounded-full border border-white/15 transition-transform hover:scale-110 active:scale-95"
       style={{ backgroundColor: color }}
     >
       {active && <span className="pointer-events-none absolute -inset-[3px] rounded-full ring-2 ring-white/80" />}
@@ -45,7 +44,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const rustLabel = (r: number) =>
   r > 0.66 ? '많이 낡음' : r > 0.33 ? '녹슴' : r > 0.05 ? '살짝 녹슴' : '깨끗함'
 
-// 미리보기 위에 얹히는 청소 연출 (CSS wipe). 3D 안 건드림.
 function CleanOverlay({ playKey }: { playKey: number }) {
   if (playKey === 0) return null
   return (
@@ -102,6 +100,7 @@ export default function BoatMaintenanceModal({
     try {
       await useBoatStore.getState().saveToServer()
       setSaved(true)
+      setTimeout(() => onClose(), 700)   // 저장 성공 → 잠깐 "저장됨" 후 닫기
     } finally {
       setSaving(false)
     }
@@ -142,7 +141,7 @@ export default function BoatMaintenanceModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#040c1a]/30 p-4"
         >
           <motion.div
             initial={{ y: 24, opacity: 0, scale: 0.98 }}
@@ -150,7 +149,7 @@ export default function BoatMaintenanceModal({
             exit={{ y: 24, opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[88vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b1620] shadow-2xl"
+            className="flex max-h-[82vh] w-full max-w-[360px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b1620]/95 shadow-2xl backdrop-blur-md"
           >
             {/* 헤더 */}
             <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-3 pt-4">
@@ -163,14 +162,14 @@ export default function BoatMaintenanceModal({
               <button
                 onClick={onClose}
                 aria-label="닫기"
-                className="-mr-1 shrink-0 rounded-full px-2 py-0.5 text-lg text-white/40 transition-colors hover:text-white/80"
+                className="-mr-1 shrink-0 rounded-full px-2 py-0.5 text-lg text-white/40 transition-colors hover:text-white/80 active:scale-90"
               >
                 ✕
               </button>
             </div>
 
             {/* 3D 미리보기 + 청소 오버레이 */}
-            <div className="relative mx-5 h-[200px] shrink-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a141e]">
+            <div className="relative mx-5 h-[160px] shrink-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a141e]">
               <Canvas
                 camera={{ position: [0.7, 1.8, 4.0], fov: 45 }}
                 gl={{ antialias: true }}
@@ -219,7 +218,7 @@ export default function BoatMaintenanceModal({
                 <button
                   onClick={handleClean}
                   disabled={rust <= 0}
-                  className="w-full rounded-lg border border-white/15 px-4 py-2 text-xs text-white/70 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="w-full rounded-lg border border-white/15 px-4 py-2 text-xs text-white/70 transition-colors hover:bg-white/5 hover:text-white active:scale-[0.98] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
                 >
                   배 청소
                 </button>
@@ -233,7 +232,7 @@ export default function BoatMaintenanceModal({
                     key={key}
                     onClick={() => { applyPreset(key); markDirty() }}
                     className={[
-                      'rounded-full border px-3.5 py-1.5 text-xs transition-colors',
+                      'rounded-full border px-3.5 py-1.5 text-xs transition-colors active:scale-95',
                       activePreset === key
                         ? 'border-white/60 bg-white/10 text-white'
                         : 'border-white/15 text-white/55 hover:bg-white/5',
@@ -273,21 +272,21 @@ export default function BoatMaintenanceModal({
             </div>
 
             {/* 하단 저장 바 */}
-            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/8 px-5 py-3.5">
-              <span className="min-w-0 flex-1 text-[11px] leading-snug text-white/35">
+            <div className="flex shrink-0 flex-col gap-2.5 border-t border-white/8 px-5 py-4">
+              <span className="text-center text-[11px] leading-snug text-white/35">
                 {saved ? '저장되었습니다' : '저장을 눌러야 반영됩니다'}
               </span>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <button
                   onClick={onClose}
-                  className="rounded-lg border border-white/15 px-4 py-2 text-xs text-white/55 transition-colors hover:bg-white/5 hover:text-white/80"
+                  className="flex-1 rounded-xl border border-white/15 py-3 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white/80 active:scale-[0.97]"
                 >
                   닫기
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || saved}
-                  className="rounded-lg border border-white/30 bg-white/10 px-5 py-2 text-xs text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:hover:bg-white/10"
+                  className="flex-[1.6] rounded-xl border border-[#7eb8d4]/40 bg-[#7eb8d4]/15 py-3 text-sm font-medium text-[#cce8f5] transition-colors hover:bg-[#7eb8d4]/25 active:scale-[0.97] disabled:opacity-40 disabled:hover:bg-[#7eb8d4]/15"
                 >
                   {saving ? '저장 중…' : saved ? '저장됨' : '저장'}
                 </button>

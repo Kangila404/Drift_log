@@ -11,6 +11,7 @@ import { useTimeOfDay } from '../hooks/useTimeOfDay'
 import { useEclipse } from '../hooks/useEclipse'
 import { resolveScene } from '../constants/scenePreset'
 import { noise, type NoiseKey } from '../audio/noiseManager'
+import { isNativeApp } from '../lib/nativeBridge'
 import { useEffect, useState } from 'react'
 
 const START_KEY = 'studyStartAt'
@@ -23,6 +24,7 @@ export default function StudyPage() {
   const [studying, setStudying] = useState(() => !!localStorage.getItem(START_KEY))
   const [activeNoise, setActiveNoise] = useState<NoiseKey | null>(() => noise.getCurrent())
 
+  // ── 웹 단독: localStorage / noise 이벤트 동기화 ──
   useEffect(() => {
     const sync = () => setStudying(!!localStorage.getItem(START_KEY))
     window.addEventListener('study-change', sync)
@@ -37,6 +39,26 @@ export default function StudyPage() {
     const sync = () => setActiveNoise(noise.getCurrent())
     window.addEventListener('noise-change', sync)
     return () => window.removeEventListener('noise-change', sync)
+  }, [])
+
+  // ── 앱: 네이티브 HUD → 웹 3D 제어 (공부 중 = 배 움직임, 소리 = 비/장작 효과) ──
+  useEffect(() => {
+    if (!isNativeApp()) return
+    const onMsg = (e: MessageEvent) => {
+      let msg: any = {}
+      try { msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data } catch { return }
+      if (msg.type === 'study-state') {
+        setStudying(!!msg.studying)
+      } else if (msg.type === 'study-noise') {
+        setActiveNoise((msg.noise ?? null) as NoiseKey | null)
+      }
+    }
+    window.addEventListener('message', onMsg)
+    document.addEventListener('message', onMsg as any)   // 안드로이드 WebView
+    return () => {
+      window.removeEventListener('message', onMsg)
+      document.removeEventListener('message', onMsg as any)
+    }
   }, [])
 
   const eclipseActive = abnormalType === 'ECLIPSE' && timeOfDay === 'day'

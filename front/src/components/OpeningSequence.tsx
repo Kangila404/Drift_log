@@ -12,7 +12,7 @@ const SCENES: SceneT[] = [
     image: '/intro/introPage_1.png',
     bg: 'linear-gradient(to bottom, #2a1f3d 0%, #5a3a4a 45%, #c97a5a 82%, #e8a96a 100%)',
     lines: [
-        '2029년 여름',
+        '바람이 기분 좋게 불던 여름',
       '여느 날과 다름없는 저녁이었다.',
       '가족과 함께 한강의 노을을 바라보고 있었다.',
     ],

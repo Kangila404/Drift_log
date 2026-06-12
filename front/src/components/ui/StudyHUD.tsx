@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { saveStudyTime, getStudySummary, getStudyLogs, updateStudySubject, deleteStudyLog, type StudySummary, type StudyLog } from '../../api/study'
 import { noise, type NoiseKey } from '../../audio/noiseManager'
 import ProfilePanel from './ProfilePanel'
+import { isNativeApp } from '../../lib/nativeBridge' 
 
 const PRESETS = [25, 50, 90]
 const START_KEY = 'studyStartAt'
@@ -56,6 +57,7 @@ const PANEL_TABS: { id: StudyPanel; icon: string; label: string }[] = [
 ]
 
 export default function StudyHUD() {
+  if (isNativeApp()) return null
   const nav = useNavigate()
   const [goalMin, setGoalMin] = useState(25)
   const [subject, setSubject] = useState('')
