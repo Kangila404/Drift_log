@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
+import { persist, type PersistStorage } from "zustand/middleware";
 import type { AxiosInstance } from "axios";
 
 export interface BoatColors {

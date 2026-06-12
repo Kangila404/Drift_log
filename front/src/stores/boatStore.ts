@@ -4,7 +4,7 @@ import { apiClient } from "../api/client";
 
 export const useBoatStore = createBoatStore({
   apiClient,
-  storage: createJSONStorage(() => localStorage),
+  storage: createJSONStorage(() => localStorage)!,
 });
 
 // 기존 import 호환 (BoatColors 등 타입 재export)
