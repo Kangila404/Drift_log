@@ -8,6 +8,8 @@ import { bgm } from '../../audio/bgmManager'
 import { getDiscoveredTraces, type DiscoveredTrace } from '../../api/trace'
 import OpeningSequence from '../OpeningSequence'
 import CustomerCenter from '../CustomerCenter'
+import { goModeSelect, notifyNativeLogout, isNativeApp, sendVoyageState } from '../../lib/nativeBridge'
+
 
 type EventInfo = { name: string; text: string; imageUrl: string | null }
 type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
@@ -941,7 +943,9 @@ const openEdit = () => {
     } finally {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      if (!notifyNativeLogout()) {
+        window.location.href = '/login'
+      }
     }
   }
 
@@ -1155,7 +1159,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
   const { voyageState, progress, currentCity, destinationCityId, remainingSeconds } = useVoyageStore()
   const [panelOpen, setPanelOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<Panel>('map')
-  const [hudOpacity, setHudOpacity] = useState(0.35)
+  const [hudOpacity, setHudOpacity] = useState(isNativeApp() ? 1 : 0.35)
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [muted, setMuted] = useState(bgm.isMuted())
   const [replayIntro, setReplayIntro] = useState(false)
@@ -1185,6 +1189,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
   }, [voyageState])
 
   useEffect(() => {
+    if (isNativeApp()) { setHudOpacity(1); return }   // 앱: 항상 선명
     const resetIdle = () => {
       setHudOpacity(1)
       if (idleTimer.current) clearTimeout(idleTimer.current)
@@ -1230,6 +1235,29 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
       setPauseLoading(false)
     }
   }
+
+useEffect(() => {
+    if (!isNativeApp()) return
+    sendVoyageState({ voyageState, progress, fromName, toName, remainingSeconds, initReady })
+  }, [voyageState, progress, fromName, toName, remainingSeconds, initReady])
+
+  useEffect(() => {
+    if (!isNativeApp()) return
+    const handler = (e: MessageEvent) => {
+      let data: any
+      try { data = JSON.parse(e.data) } catch { return }
+      if (data?.type === 'voyage-control' && data.action === 'pause-resume') handlePauseResume()
+    }
+    window.addEventListener('message', handler)
+    document.addEventListener('message', handler as any)
+    return () => {
+      window.removeEventListener('message', handler)
+      document.removeEventListener('message', handler as any)
+    }
+  }, [])
+
+
+  if (isNativeApp()) return null
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10" style={{ transition: 'opacity 1.5s ease', opacity: hudOpacity }}>
@@ -1338,7 +1366,7 @@ export default function HUD({ isAnchored = false, initReady = true }: HUDProps) 
                 </motion.div>
               </AnimatePresence>
             </div>
-             <button onClick={() => { window.location.href = '/' }}
+             <button onClick={() => { goModeSelect(() => { window.location.href = '/' }) }}
               className="p-3.5 border-t border-[#0d2233] text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] tracking-widest uppercase transition-colors text-center">
               ‹ 모드 선택으로
             </button>

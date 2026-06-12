@@ -28,7 +28,8 @@ jobs:
       - name: 4. 프론트 이미지 build & push
         uses: docker/build-push-action@v6
         with:
-          context: ./front
+          context: .
+          file: ./front/Dockerfile
           push: true
           tags: ${{secrets.DOCKERHUB_USERNAME}}/driftlog-frontend:latest
           build-args: |

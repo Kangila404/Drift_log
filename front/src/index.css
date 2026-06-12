@@ -7,3 +7,36 @@ body {
     width: 100%;
     min-height: 100vh;
 }
+
+
+/* 앱(WebView) 모바일 대응 — 텍스트 선택/길게눌러 복사 방지, 탭 하이라이트 제거 */
+
+html.is-native-app,
+html.is-native-app * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    /* 길게 눌러 복사 메뉴 차단 */
+    -webkit-tap-highlight-color: transparent;
+    /* 탭 시 파란 하이라이트 제거 */
+}
+
+
+/* 입력 필드는 선택 가능해야 함 (예외) */
+
+html.is-native-app input,
+html.is-native-app textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+
+/* 앱에서 버튼 누르면 즉각 반응 (눌림 효과) */
+
+html.is-native-app button:active,
+html.is-native-app a:active,
+html.is-native-app [role="button"]:active {
+    opacity: 0.6;
+    transform: scale(0.96);
+    transition: opacity 0.04s ease, transform 0.04s ease;
+}

@@ -25,10 +25,19 @@ import CityArrivalSequence from '../components/CityArrivalSequence'
 import { bgm } from '../audio/bgmManager'
 import OpeningSequence from '../components/OpeningSequence'
 import { getDiscoveredTraces } from '../api/trace'
+import { sendBgmToNative } from '../lib/nativeBridge'
 
 type Scene = 'ocean' | 'arriving' | 'cityIntro' | 'city'
 
-
+// 앱이면 네이티브가 음악 관리, 웹이면 기존 Howler
+const playBgm = (track: 'voyage' | 'city' | 'ending' | 'stop', url?: string) => {
+  if (sendBgmToNative(track, url)) return   // 앱: 네이티브로 보냄
+  // 웹: Howler
+  if (track === 'voyage') bgm.playVoyage()
+  else if (track === 'city' && url) bgm.playCity(url)
+  else if (track === 'ending') bgm.playEnding()
+  else if (track === 'stop') bgm.stop()
+}
 
 export default function VoyagePage() {
   const { ready } = useVoyageInit()
@@ -48,9 +57,9 @@ export default function VoyagePage() {
   // ── BGM (항해/도시) ──
   useEffect(() => {
     if (voyageState === 'SAILING' || voyageState === 'PAUSED') {
-      bgm.playVoyage()
+      playBgm('voyage')
     } else if (voyageState === 'ANCHORED' && currentCity?.bgmUrl) {
-      bgm.playCity(currentCity.bgmUrl)
+      playBgm('city', currentCity.bgmUrl)
     }
   }, [voyageState, currentCity])
 
@@ -91,7 +100,7 @@ export default function VoyagePage() {
   }, [])
 
   useEffect(() => {
-    return () => bgm.stop()
+    return () => playBgm('stop')
   }, [])
 
   // ── 날씨/시간대 → preset ──
@@ -149,7 +158,7 @@ export default function VoyagePage() {
 
   // ── 엔딩 BGM ──
   useEffect(() => {
-    if (showEnding) bgm.playEnding()
+    if (showEnding) playBgm('ending')
   }, [showEnding])
 
   return (

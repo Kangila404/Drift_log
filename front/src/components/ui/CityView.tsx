@@ -16,6 +16,8 @@ import { useTimeOfDay } from '../../hooks/useTimeOfDay'
 import { useEclipse } from '../../hooks/useEclipse'
 import { resolveScene } from '../../constants/scenePreset'
 import { bgm } from '../../audio/bgmManager'
+import { haptic, notifyOverlay, isNativeApp } from '../../lib/nativeBridge'
+
 
 // 도시 SVG
 import Seoul from './cities/Seoul'
@@ -116,6 +118,12 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
   // 첫 방문 흔적 자동 오픈 — 한 번만
   const autoOpenedRef = useRef(false)
 
+    // 웹 모달 열림 → 네이티브 HUD 버튼 숨김
+  useEffect(() => {
+    const anyOpen = traceOpen || voyageOpen || maintOpen
+    notifyOverlay(anyOpen)
+  }, [traceOpen, voyageOpen, maintOpen])
+  
   useEffect(() => {
     const nameTimer = setTimeout(() => setNameVisible(false), 3000)
     const btnTimer = setTimeout(() => setButtonsVisible(true), 4000)
@@ -208,34 +216,36 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
         pointerEvents: 'none', zIndex: 6,
       }} />
 
-      {/* BGM 음소거 — 우상단 */}
-      <motion.button
-        initial={{ opacity: 0 }}
-        animate={{ opacity: buttonsVisible ? 1 : 0 }}
-        transition={{ duration: 1, ease: 'easeInOut' }}
-        onClick={() => setMuted(bgm.toggleMute())}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.92 }}
-        className="absolute top-8 right-8 z-20 w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all duration-300 bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/80 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70"
-        style={{ pointerEvents: buttonsVisible ? 'auto' : 'none' }}
-        aria-label={muted ? '소리 켜기' : '소리 끄기'}
-        title={muted ? '소리 켜기' : '소리 끄기'}
-      >
-        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
-          {muted ? (
-            <>
-              <line x1="22" y1="9" x2="16" y2="15" />
-              <line x1="16" y1="9" x2="22" y2="15" />
-            </>
-          ) : (
-            <>
-              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-              <path d="M18.5 5.5a9 9 0 0 1 0 13" />
-            </>
-          )}
-        </svg>
-      </motion.button>
+      {/* BGM 음소거 — 우상단 (웹 전용, 앱은 네이티브 버튼 사용) */}
+      {!isNativeApp() && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: buttonsVisible ? 1 : 0 }}
+          transition={{ duration: 1, ease: 'easeInOut' }}
+          onClick={() => { haptic('light'); setMuted(bgm.toggleMute()) }}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.92 }}
+          className="absolute top-8 right-8 z-20 w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all duration-300 bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/80 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70"
+          style={{ pointerEvents: buttonsVisible ? 'auto' : 'none' }}
+          aria-label={muted ? '소리 켜기' : '소리 끄기'}
+          title={muted ? '소리 켜기' : '소리 끄기'}
+        >
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+            {muted ? (
+              <>
+                <line x1="22" y1="9" x2="16" y2="15" />
+                <line x1="16" y1="9" x2="22" y2="15" />
+              </>
+            ) : (
+              <>
+                <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+              </>
+            )}
+          </svg>
+        </motion.button>
+      )}
 
       {/* 도시 이름 */}
       <div style={{
@@ -288,9 +298,9 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
           style={{ pointerEvents: buttonsVisible ? 'auto' : 'none' }}
         >
           {[
-            { label: '흔적 보기', onClick: () => setTraceOpen(true) },
-            { label: '배 정비', onClick: () => setMaintOpen(true) },
-            { label: '항해하기', onClick: () => setVoyageOpen(true) },
+            { label: '흔적 보기', onClick: () => { haptic('light'); setTraceOpen(true) } },
+            { label: '배 정비', onClick: () => { haptic('light'); setMaintOpen(true) } },
+            { label: '항해하기', onClick: () => { haptic('medium'); setVoyageOpen(true) } },
           ].map(btn => {
             const highlight = showHint && btn.label === '항해하기'
             return (
