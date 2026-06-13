@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.application.AuthService;
 import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
+import org.example.drift_log.user.presentation.dto.req.KakaoNativeLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -44,10 +45,17 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // 2. kakao
+    // 2. kakao (웹 - code 기반)
     @PostMapping("/kakao")
     public ResponseEntity<SocialLoginResponse> kakaoLogin(@Valid @RequestBody KakaoLoginRequest request){
         SocialLoginResponse response = authService.kakaoLogin(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 3. kakao native (앱 - access token 기반)
+    @PostMapping("/kakao/native")
+    public ResponseEntity<SocialLoginResponse> kakaoNativeLogin(@Valid @RequestBody KakaoNativeLoginRequest request){
+        SocialLoginResponse response = authService.kakaoNativeLogin(request);
         return ResponseEntity.ok(response);
     }
 
@@ -71,8 +79,5 @@ public class AuthController {
         TokenRefreshResponse response = authService.reissue(request);
         return ResponseEntity.ok(response);
     }
-
-
-
 
 }

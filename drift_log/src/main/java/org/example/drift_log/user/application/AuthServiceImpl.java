@@ -27,6 +27,7 @@ import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
 import org.example.drift_log.user.infrastructure.oauth.GoogleTokenVerifier;
 import org.example.drift_log.user.infrastructure.oauth.KakaoClient;
 import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
+import org.example.drift_log.user.presentation.dto.req.KakaoNativeLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LogoutRequest;
 import org.example.drift_log.user.presentation.dto.req.SignUpRequest;
@@ -163,6 +164,35 @@ public class AuthServiceImpl implements AuthService {
     public SocialLoginResponse kakaoLogin(KakaoLoginRequest request) {
         String kakaoAccessToken = kakaoClient.getAccessToken(request.code());
         KakaoClient.KakaoUserInfo kakaoUser = kakaoClient.getUserInfo(kakaoAccessToken);
+
+        AuthType provider = AuthType.KAKAO;
+        String providerId = kakaoUser.kakaoId();
+
+        AuthIdentity identity = authIdentityRepository
+            .findByProviderAndProviderId(provider, providerId)
+            .orElse(null);
+
+        User user;
+        if (identity != null) {
+            user = findUserByIdOrThrow(identity.getUser().getId());
+        } else {
+            user = registerSocialUser(provider, providerId, kakaoUser.email(), kakaoUser.nickname());
+        }
+
+        validateUserStatus(user.getUserStatus());
+
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
+        String refreshToken = saveRefreshToken(user.getId());
+
+        user.updateLastLoginAt();
+        userRepository.save(user);
+
+        return SocialLoginResponse.from(user, accessToken, refreshToken);
+    }
+
+    @Override
+    public SocialLoginResponse kakaoNativeLogin(KakaoNativeLoginRequest request) {
+        KakaoClient.KakaoUserInfo kakaoUser = kakaoClient.getUserInfo(request.accessToken());
 
         AuthType provider = AuthType.KAKAO;
         String providerId = kakaoUser.kakaoId();

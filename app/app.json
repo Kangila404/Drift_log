@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "app",
     "slug": "app",
@@ -52,7 +52,23 @@
           }
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "@react-native-kakao/core",
+        {
+          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://devrepo.kakao.com/nexus/content/groups/public/"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
