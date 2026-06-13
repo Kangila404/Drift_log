@@ -4,7 +4,7 @@
     "version": "0.0.0",
     "workspaces": ["app", "shared", "front"],
     "overrides": {
-        "react": "19.2.6",
-        "react-dom": "19.2.6"
+        "react": "19.1.0",
+        "react-dom": "19.1.0"
     }
 }

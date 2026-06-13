@@ -1,6 +1,7 @@
 export const ASSET_BASE = "https://driftlog.kro.kr:30001";
 
 
+
 export function assetUrl(path?: string | null): string | undefined {
   if (!path) return undefined;
   if (path.startsWith("http")) return path;

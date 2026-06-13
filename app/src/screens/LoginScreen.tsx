@@ -8,13 +8,18 @@ import {
   statusCodes,
   isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
-import { login, socialLogin } from "../api/auth";
+import { initializeKakaoSDK } from "@react-native-kakao/core";
+import { login as kakaoSDKLogin } from "@react-native-kakao/user";
+import { login, socialLogin, kakaoNativeLogin } from "../api/auth";
 
 // 구글 로그인 설정 — 모듈 로드 시 1회. webClientId는 idToken 발급에 필수(웹 OAuth 클라이언트 ID).
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   offlineAccess: false,
 });
+
+// 카카오 SDK 초기화 — 모듈 로드 시 1회. 네이티브 앱 키로 SDK 활성화.
+initializeKakaoSDK(process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY as string);
 
 type Mode = "select" | "email";
 
@@ -26,6 +31,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [kakaoLoading, setKakaoLoading] = useState(false);
 
   // 타이틀 타이핑 애니메이션 (웹 버전 이식)
   const fullText = "물에 잠긴 한국을 항해하다";
@@ -93,6 +99,37 @@ export default function LoginScreen() {
     }
   };
 
+  // 카카오 로그인 — SDK로 accessToken 받아 백엔드(kakaoNativeLogin)로 보내 우리 JWT 획득
+  const handleKakaoLogin = async () => {
+    if (kakaoLoading) return;
+    setKakaoLoading(true);
+    try {
+      // 카카오톡 설치 시 톡으로, 없으면 카카오계정(CustomTabs)으로 인증
+      const token = await kakaoSDKLogin();
+      const kakaoAccessToken = token.accessToken;
+      if (!kakaoAccessToken) {
+        Alert.alert("카카오 로그인 실패", "인증 토큰을 받지 못했어요.");
+        return;
+      }
+      console.log("[카카오] kakaoNativeLogin 호출 시작 → 백엔드로 accessToken 전송");
+      const result = await kakaoNativeLogin(kakaoAccessToken);
+      console.log("[카카오] kakaoNativeLogin 응답 받음:", JSON.stringify(result));
+      await AsyncStorage.setItem("accessToken", result.accessToken);
+      await AsyncStorage.setItem("refreshToken", result.refreshToken);
+      router.replace("/mode-select");
+    } catch (e: any) {
+      // 사용자가 로그인 취소한 경우 — 카카오 SDK는 에러로 던짐
+      const msg = String(e?.message ?? "");
+      if (msg.includes("cancel") || msg.includes("Cancel") || e?.code === "Cancelled") {
+        return;
+      }
+      console.error("카카오 로그인 실패:", e);
+      Alert.alert("카카오 로그인 실패", "잠시 후 다시 시도해주세요.");
+    } finally {
+      setKakaoLoading(false);
+    }
+  };
+
   const notReady = (label: string) =>
     Alert.alert("준비 중", `${label}은(는) 추후 지원될 예정이에요.`);
 
@@ -117,11 +154,14 @@ export default function LoginScreen() {
         <View className="w-full max-w-xs gap-3">
           {/* 카카오 */}
           <Pressable
-            onPress={() => notReady("카카오 로그인")}
+            onPress={handleKakaoLogin}
+            disabled={kakaoLoading}
             className="flex-row items-center justify-center gap-2 bg-[#FEE500] py-3.5 rounded-md active:opacity-80"
           >
             <KakaoGlyph />
-            <Text className="text-[#191600] text-sm font-medium tracking-[1px]">카카오로 로그인</Text>
+            <Text className="text-[#191600] text-sm font-medium tracking-[1px]">
+              {kakaoLoading ? "로그인 중..." : "카카오로 로그인"}
+            </Text>
           </Pressable>
 
           {/* 구글 */}
