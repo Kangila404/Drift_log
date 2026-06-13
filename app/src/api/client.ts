@@ -5,7 +5,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 //  - Android 에뮬레이터에서 PC localhost = http://10.0.2.2:8080/api
 //  - 실기기(Expo Go)에서 로컬 백엔드 = http://<PC LAN IP>:8080/api (예: http://192.168.0.8:8080/api)
 //  - 운영: https://driftlog.kro.kr/api
-const BASE_URL = "https://driftlog.kro.kr/api";
+// const BASE_URL = "https://driftlog.kro.kr/api";
+const BASE_URL = "http://10.0.2.2:8080/api";
+
+
+
 
 
 export const apiClient = createApiClient({
