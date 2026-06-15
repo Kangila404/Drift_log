@@ -17,6 +17,7 @@ import { getTodayWeather } from "../api/weather";
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   offlineAccess: false,
 });
 initializeKakaoSDK(process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY as string);
@@ -126,18 +127,18 @@ export default function LoginScreen() {
   return (
     <LinearGradient
       colors={["#0c1622", "#121a28", "#1e1a2a", "#281a28", "#331d28"]}
-locations={[0, 0.3, 0.55, 0.8, 1]}
+      locations={[0, 0.3, 0.55, 0.8, 1]}
       start={{ x: 0.3, y: 0 }}
       end={{ x: 0.7, y: 1 }}
       style={{ flex: 1 }}
     >
       <LinearGradient
-  colors={["rgba(74,154,187,0.13)", "rgba(74,154,187,0.06)", "rgba(74,154,187,0.02)", "transparent"]}
-  locations={[0, 0.4, 0.7, 1]}
-  style={st.topGlow}
-  start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-  pointerEvents="none"
-/>
+        colors={["rgba(74,154,187,0.13)", "rgba(74,154,187,0.06)", "rgba(74,154,187,0.02)", "transparent"]}
+        locations={[0, 0.4, 0.7, 1]}
+        style={st.topGlow}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        pointerEvents="none"
+      />
       {/* 하단 황혼 빛번짐 */}
       <LinearGradient
         colors={["transparent", "rgba(180,100,120,0.16)", "rgba(200,120,100,0.20)"]}
@@ -270,7 +271,7 @@ function MailGlyph() {
 }
 
 const st = StyleSheet.create({
- topGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 520 },
+  topGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 520 },
   duskGlow: { position: "absolute", bottom: 0, left: 0, right: 0, height: 480 },
 
   scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, paddingVertical: 60 },
@@ -284,7 +285,6 @@ const st = StyleSheet.create({
   socialBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 8 },
   socialText: { fontSize: 14, fontWeight: "500", letterSpacing: 1 },
 
-  // 황혼 배경이 비치도록 — 청록 단색 제거, 거의 투명한 중립 톤 + 옅은 보더
   emailBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: "rgba(220,200,205,0.18)", backgroundColor: "rgba(255,255,255,0.06)" },
   emailBtnText: { color: "rgba(225,210,215,0.9)", fontSize: 14, letterSpacing: 1 },
   signupLink: { textAlign: "center", color: "rgba(200,170,180,0.5)", fontSize: 12 },

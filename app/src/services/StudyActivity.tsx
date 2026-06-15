@@ -23,22 +23,9 @@ const StudyActivity = (props: StudyActivityProps, env: LiveActivityEnvironment) 
     // 잠금화면 / 알림센터 배너
     banner: (
       <VStack modifiers={[padding({ all: 14 })]}>
-        <HStack>
-          <Text modifiers={[font({ weight: "semibold", size: 15 }), foregroundStyle(TEAL)]}>
-            DriftLog · 항해 중
-          </Text>
-          <Spacer />
-          <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(TEXT)]}>
-            {props.elapsedLabel}
-          </Text>
-        </HStack>
-        <HStack modifiers={[padding({ top: 4 })]}>
-          <Text modifiers={[font({ size: 13 }), foregroundStyle(TEXT)]}>{label}</Text>
-          <Spacer />
-          <Text modifiers={[font({ size: 12 }), foregroundStyle(SUB)]}>
-            목표까지 {props.remainMin}분
-          </Text>
-        </HStack>
+        <Text modifiers={[font({ weight: "bold", size: 18 }), foregroundStyle("#ffffff")]}>
+          테스트123
+        </Text>
       </VStack>
     ),
 
