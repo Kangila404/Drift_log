@@ -2,94 +2,68 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
-// MARK: - Attributes (공부 세션 Live Activity 데이터 계약)
+// MARK: - Attributes
 struct WidgetAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
-        var subject: String       // 과목/집중 라벨
-        var elapsedLabel: String  // 경과 "12:34"
-        var goalLabel: String     // 목표 "05:00"
-        var remainMin: Int        // 목표까지 N분
-        var progress: Double      // 0.0 ~ 1.0
+        var subject: String
+        var startDate: Date     // 세션 시작 시각 — 위젯이 자동 카운트
+        var goalLabel: String
+        var remainMin: Int
+        var progress: Double
     }
     var name: String
 }
 
-// MARK: - 달빛 청록 팔레트
-private enum Palette {
-    static let teal      = Color(red: 0.494, green: 0.753, blue: 0.824) // #7ec0d2
-    static let tealBright = Color(red: 0.624, green: 0.863, blue: 0.910) // #9fdce8
-    static let text      = Color(red: 0.831, green: 0.933, blue: 0.961) // #d4eef5
-    static let sub       = Color(red: 0.624, green: 0.722, blue: 0.769) // #9fb8c4
-    static let bgTop     = Color(red: 0.039, green: 0.078, blue: 0.125) // #0a1420
-    static let bgBottom  = Color(red: 0.051, green: 0.133, blue: 0.200) // #0d2233
-}
-
-// MARK: - 잠금화면 / 배너 뷰
+// MARK: - 잠금화면 / 배너
 struct StudyLockScreenView: View {
     let state: WidgetAttributes.ContentState
 
     private var label: String {
-        let trimmed = state.subject.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? "집중하는 중" : trimmed
+        let t = state.subject.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? "집중 세션" : t
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            // 상단: 아이콘 + 라벨 + 경과시간
-            HStack(spacing: 10) {
-                Image(systemName: "sailboat.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Palette.teal)
+        HStack(spacing: 16) {
+            // 진행 링 + 아이콘
+            ZStack {
+                Circle()
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 5)
+                Circle()
+                    .trim(from: 0, to: max(0.001, state.progress))
+                    .stroke(
+                        Color.accentColor,
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: "book.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: 52, height: 52)
 
+            // 텍스트
+            VStack(alignment: .leading, spacing: 3) {
                 Text(label)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Palette.sub)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                Spacer()
-
-                Text(state.elapsedLabel)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                Text(state.startDate, style: .timer)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(.primary)
+
+                Text("목표 \(state.goalLabel) · \(state.remainMin)분 남음")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
-            // 진행 바
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(height: 5)
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Palette.teal, Palette.tealBright],
-                                startPoint: .leading, endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(6, geo.size.width * state.progress), height: 5)
-                }
-            }
-            .frame(height: 5)
-
-            // 하단: 목표 / 남은 시간
-            HStack {
-                Text("목표 \(state.goalLabel)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.sub)
-                Spacer()
-                Text("\(state.remainMin)분 남음")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Palette.teal)
-            }
+            Spacer(minLength: 0)
         }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [Palette.bgTop, Palette.bgBottom],
-                startPoint: .top, endPoint: .bottom
-            )
-        )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .activityBackgroundTint(nil)
     }
 }
 
@@ -98,76 +72,54 @@ struct WidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WidgetAttributes.self) { context in
             StudyLockScreenView(state: context.state)
-                .activitySystemActionForegroundColor(Palette.teal)
         } dynamicIsland: { context in
             DynamicIsland {
-                // 확장형 — 좌측: 아이콘 + 라벨
+                // 확장 — 좌: 아이콘 + 과목
                 DynamicIslandExpandedRegion(.leading) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Image(systemName: "sailboat.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Palette.teal)
+                    Label {
                         Text(context.state.subject.isEmpty ? "집중" : context.state.subject)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.sub)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
+                    } icon: {
+                        Image(systemName: "book.fill")
+                            .foregroundStyle(Color.accentColor)
                     }
-                    .padding(.leading, 4)
                 }
-                // 확장형 — 우측: 경과 / 목표
+                // 확장 — 우: 남은 시간
                 DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(context.state.elapsedLabel)
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(Palette.text)
-                        Text("/ \(context.state.goalLabel)")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.sub)
-                    }
-                    .padding(.trailing, 4)
+                    Text("\(context.state.remainMin)분 남음")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
-                // 확장형 — 하단: 진행 바 + 남은 시간
+                // 확장 — 하단: 타이머 + 진행바
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 6) {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.08))
-                                    .frame(height: 5)
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Palette.teal, Palette.tealBright],
-                                            startPoint: .leading, endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: max(6, geo.size.width * context.state.progress), height: 5)
-                            }
-                        }
-                        .frame(height: 5)
+                    VStack(spacing: 8) {
+                        Text(context.state.startDate, style: .timer)
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
 
-                        Text("목표까지 \(context.state.remainMin)분")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Palette.teal)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                        ProgressView(value: max(0.001, context.state.progress))
+                            .tint(Color.accentColor)
                     }
-                    .padding(.horizontal, 4)
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                Image(systemName: "sailboat.fill")
-                    .foregroundStyle(Palette.teal)
+                Image(systemName: "book.fill")
+                    .foregroundStyle(Color.accentColor)
             } compactTrailing: {
-                Text(context.state.elapsedLabel)
+                Text(context.state.startDate, style: .timer)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(Palette.text)
+                    .foregroundStyle(.primary)
+                    .frame(width: 44)
             } minimal: {
-                Image(systemName: "sailboat.fill")
-                    .foregroundStyle(Palette.teal)
+                Image(systemName: "book.fill")
+                    .foregroundStyle(Color.accentColor)
             }
-            .keylineTint(Palette.teal)
+            .keylineTint(Color.accentColor)
         }
     }
 }
@@ -182,8 +134,11 @@ extension WidgetAttributes {
 extension WidgetAttributes.ContentState {
     fileprivate static var sample: WidgetAttributes.ContentState {
         WidgetAttributes.ContentState(
-            subject: "수학", elapsedLabel: "12:34",
-            goalLabel: "50:00", remainMin: 37, progress: 0.25
+            subject: "수학",
+            startDate: Date().addingTimeInterval(-754),
+            goalLabel: "50:00",
+            remainMin: 37,
+            progress: 0.25
         )
     }
 }

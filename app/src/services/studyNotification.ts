@@ -16,6 +16,7 @@ const ACCENT = "#7ec0d2";
 
 let registered = false;
 let iosActive = false;
+let sessionStartEpoch = 0; // iOS Live Activity 시작 시각(ms)
 
 function ensureForegroundService() {
   if (registered) return;
@@ -80,14 +81,15 @@ export async function requestStudyNotifPermission() {
     if (settings.granted) return;
     await Notifications.requestPermissionsAsync();
   }
-  // iOS Live Activity는 별도 권한 팝업 없음 (설정에서 사용자가 끌 수 있음)
 }
 
 export async function startStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
-      const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
-      const id = await startStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
+      const { label, goalLabel, remainMin, progress } = buildParts(input);
+      // 현재 경과초를 기준으로 시작 시각 역산 (앱 진입 시점에 이미 흐른 시간 반영)
+      sessionStartEpoch = Date.now() - input.elapsedSec * 1000;
+      const id = await startStudyActivity(label, sessionStartEpoch, goalLabel, remainMin, progress);
       console.log("[StudyActivity] start 성공, id:", id);
       iosActive = true;
     } catch (e) {
@@ -96,7 +98,6 @@ export async function startStudyNotification(input: StudyNotifInput) {
     return;
   }
 
-  // Android
   await ensureChannel();
   ensureForegroundService();
   const { title, body, bigText, progress } = buildAndroid(input);
@@ -123,15 +124,15 @@ export async function updateStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
       if (!iosActive) return;
-      const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
-      await updateStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
+      const { label, goalLabel, remainMin, progress } = buildParts(input);
+      // startEpoch는 유지 (타이머 연속성). 진행률/남은시간만 갱신.
+      await updateStudyActivity(label, sessionStartEpoch, goalLabel, remainMin, progress);
     } catch (e) {
       console.error("[StudyActivity] update 실패:", e);
     }
     return;
   }
 
-  // Android
   const { title, body, bigText, progress } = buildAndroid(input);
   await notifee.displayNotification({
     id: NOTIF_ID,
@@ -163,7 +164,6 @@ export async function stopStudyNotification() {
     return;
   }
 
-  // Android
   try {
     await notifee.stopForegroundService();
   } catch {}

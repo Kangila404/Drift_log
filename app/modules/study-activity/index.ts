@@ -4,22 +4,22 @@ const StudyActivity = requireNativeModule("StudyActivity");
 
 export async function startStudyActivity(
   subject: string,
-  elapsedLabel: string,
+  startEpoch: number,
   goalLabel: string,
   remainMin: number,
   progress: number
 ): Promise<string> {
-  return await StudyActivity.start(subject, elapsedLabel, goalLabel, remainMin, progress);
+  return await StudyActivity.start(subject, startEpoch, goalLabel, remainMin, progress);
 }
 
 export async function updateStudyActivity(
   subject: string,
-  elapsedLabel: string,
+  startEpoch: number,
   goalLabel: string,
   remainMin: number,
   progress: number
 ): Promise<void> {
-  await StudyActivity.update(subject, elapsedLabel, goalLabel, remainMin, progress);
+  await StudyActivity.update(subject, startEpoch, goalLabel, remainMin, progress);
 }
 
 export async function endStudyActivity(): Promise<void> {
