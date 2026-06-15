@@ -1,8 +1,18 @@
 diff --git a/node_modules/expo-widgets/ios/ExpoWidgets.podspec b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
-index 1d2b971..fe54a74 100644
+index 1d2b971..f8c945a 100644
 --- a/node_modules/expo-widgets/ios/ExpoWidgets.podspec
 +++ b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
-@@ -56,7 +56,7 @@ Pod::Spec.new do |s|
+@@ -42,7 +42,8 @@ Pod::Spec.new do |s|
+     :script => %Q{
+       echo "Preparing ExpoWidgets.bundle..."
+       source="#{__dir__}/../bundle/build/ExpoWidgets.bundle"
+-      dest="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoWidgets.bundle"
++      dest="${TARGET_BUILD_DIR}/ExpoWidgets.bundle/ExpoWidgets.bundle"
++      mkdir -p "${TARGET_BUILD_DIR}/ExpoWidgets.bundle"
+       echo "Copying ${source} to ${dest}"
+       cp "${source}" "${dest}"
+     },
+@@ -56,7 +57,7 @@ Pod::Spec.new do |s|
    end
    s.script_phases = [build_bundle_script, copy_bundle_script]
    s.resource_bundles = {
@@ -11,41 +21,3 @@ index 1d2b971..fe54a74 100644
    }
  
  end
-diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-index 68ff52a..30ee40d 100644
---- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-+++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-@@ -12,11 +12,28 @@ func createWidgetContext(layout: String) -> JSContext? {
-     }
-   }
- 
--  // Inject ExpoUI bundle
--  guard let bundleURL = Bundle.main.url(forResource: "ExpoWidgets", withExtension: "bundle"),
--        let bundle = Bundle(url: bundleURL),
--        let url = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle"),
--        let bundleJS = try? String(contentsOf: url, encoding: .utf8) else {
-+  // Inject ExpoUI bundle — JS 런타임을 여러 위치/구조에서 탐색 (위젯 extension 호환)
-+  func loadWidgetBundleJS() -> String? {
-+    let bundles = Bundle.allBundles + Bundle.allFrameworks + [Bundle.main]
-+    for base in bundles {
-+      guard let topURL = base.url(forResource: "ExpoWidgets", withExtension: "bundle") else {
-+        continue
-+      }
-+      // 1) 평면 구조: ExpoWidgets.bundle 자체가 JS 파일
-+      if let js = try? String(contentsOf: topURL, encoding: .utf8), !js.isEmpty {
-+        return js
-+      }
-+      // 2) 중첩 구조: ExpoWidgets.bundle 디렉토리 안의 ExpoWidgets.bundle 파일
-+      if let nested = Bundle(url: topURL),
-+         let jsURL = nested.url(forResource: "ExpoWidgets", withExtension: "bundle"),
-+         let js = try? String(contentsOf: jsURL, encoding: .utf8), !js.isEmpty {
-+        return js
-+      }
-+    }
-+    return nil
-+  }
-+
-+  guard let bundleJS = loadWidgetBundleJS() else {
-     print("[ExpoWidgets] Missing ExpoWidgets.bundle")
-     return nil
-   }
