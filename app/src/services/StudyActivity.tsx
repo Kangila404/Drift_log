@@ -1,6 +1,6 @@
 import { Image, Text, VStack, HStack, Spacer } from "@expo/ui/swift-ui";
 import { font, foregroundStyle, padding } from "@expo/ui/swift-ui/modifiers";
-import { createLiveActivity, type LiveActivityEnvironment } from "expo-widgets";
+import { createLiveActivity } from "expo-widgets";
 
 export type StudyActivityProps = {
   subject: string;      // 과목
@@ -14,7 +14,7 @@ const TEAL = "#7ec0d2";
 const TEXT = "#d4eef5";
 const SUB = "#9fb8c4";
 
-const StudyActivity = (props: StudyActivityProps, env: LiveActivityEnvironment) => {
+const StudyActivity = (props: StudyActivityProps) => {
   "widget";
 
   const label = props.subject?.trim() ? props.subject.trim() : "집중하는 중";
@@ -23,9 +23,25 @@ const StudyActivity = (props: StudyActivityProps, env: LiveActivityEnvironment) 
     // 잠금화면 / 알림센터 배너
     banner: (
       <VStack modifiers={[padding({ all: 14 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 18 }), foregroundStyle("#ffffff")]}>
-          테스트123
-        </Text>
+        <HStack>
+          <Image systemName="sailboat.fill" color={TEAL} />
+          <Text modifiers={[font({ weight: "semibold", size: 14 }), foregroundStyle(SUB)]}>
+            {label}
+          </Text>
+          <Spacer />
+          <Text modifiers={[font({ weight: "bold", size: 16 }), foregroundStyle(TEXT)]}>
+            {props.elapsedLabel}
+          </Text>
+        </HStack>
+        <HStack modifiers={[padding({ top: 6 })]}>
+          <Text modifiers={[font({ size: 12 }), foregroundStyle(SUB)]}>
+            목표 {props.goalLabel}
+          </Text>
+          <Spacer />
+          <Text modifiers={[font({ size: 12 }), foregroundStyle(TEAL)]}>
+            {props.remainMin}분 남음
+          </Text>
+        </HStack>
       </VStack>
     ),
 

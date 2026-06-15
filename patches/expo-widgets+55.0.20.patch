@@ -21,3 +21,24 @@ index 1d2b971..f8c945a 100644
    }
  
  end
+diff --git a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
+index 7dd91dc..3ba7832 100644
+--- a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
++++ b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
+@@ -4,16 +4,6 @@ set -eo pipefail
+ 
+ EXPO_WIDGETS_PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+ 
+-# For classic main project build phases integration, will be no-op to prevent duplicated bundle creation.
+-#
+-# `$PROJECT_DIR` is passed by Xcode as the directory to the xcodeproj file.
+-# in classic main project setup it is something like /path/to/app/ios
+-# in new style pod project setup it is something like /path/to/app/ios/Pods
+-PROJECT_DIR_BASENAME=$(basename $PROJECT_DIR)
+-if [ "x$PROJECT_DIR_BASENAME" != "xPods" ]; then
+-  exit 0
+-fi
+-
+ # If PROJECT_ROOT is not specified, fallback to use Xcode PROJECT_DIR
+ PROJECT_ROOT=${PROJECT_ROOT:-"$PROJECT_DIR/../.."}
+ PROJECT_ROOT=${PROJECT_ROOT:-"$EXPO_WIDGETS_PACKAGE_DIR/../.."}

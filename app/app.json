@@ -64,6 +64,12 @@
         }
       ],
       [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.103198072151-18120mge0ohd78sbhljkdo07slo22smt"
+        }
+      ],
+      [
         "@react-native-kakao/core",
         {
           "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075",
@@ -72,6 +78,7 @@
           }
         }
       ],
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {
