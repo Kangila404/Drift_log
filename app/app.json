@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.kangila.driftlog",
+      "appleTeamId": "SS32PHC392",
       "supportsTablet": true,
       "entitlements": {
         "com.apple.security.application-groups": [
