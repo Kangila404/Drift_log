@@ -43,11 +43,48 @@ import org.example.drift_log.voyage.domain.enums.VoyageState;
 import org.example.drift_log.voyage.domain.repository.VoyageStatusRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.example.drift_log.user.infrastructure.oauth.AppleTokenVerifier;
+import org.example.drift_log.user.presentation.dto.req.AppleLoginRequest;
 
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    private final AppleTokenVerifier appleTokenVerifier;
+
+    @Override
+    public SocialLoginResponse appleLogin(AppleLoginRequest request) {
+        AppleTokenVerifier.AppleUserInfo appleUser = appleTokenVerifier.verify(request.identityToken());
+
+        AuthType provider = AuthType.APPLE;
+        String providerId = appleUser.sub();
+
+        AuthIdentity identity = authIdentityRepository
+            .findByProviderAndProviderId(provider, providerId)
+            .orElse(null);
+
+        User user;
+        if (identity != null) {
+            user = findUserByIdOrThrow(identity.getUser().getId());
+        } else {
+            // Apple은 최초 로그인 때만 이름 제공 → 없으면 email 앞부분 또는 기본값
+            String name = (request.name() != null && !request.name().isBlank())
+                ? request.name()
+                : (appleUser.email() != null ? appleUser.email().split("@")[0] : "DriftLog 여행자");
+            user = registerSocialUser(provider, providerId, appleUser.email(), name);
+        }
+
+        validateUserStatus(user.getUserStatus());
+
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId(), user.getUserRole().name());
+        String refreshToken = saveRefreshToken(user.getId());
+
+        user.updateLastLoginAt();
+        userRepository.save(user);
+
+        return SocialLoginResponse.from(user, accessToken, refreshToken);
+    }
 
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
