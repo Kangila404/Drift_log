@@ -35,6 +35,8 @@ jobs:
           build-args: |
             VITE_GOOGLE_CLIENT_ID=${{secrets.GOOGLE_CLIENT_ID}}
             VITE_KAKAO_CLIENT_ID=${{secrets.KAKAO_CLIENT_ID}}
+            VITE_APPLE_CLIENT_ID=com.kangila.driftlog.web
+            VITE_APPLE_REDIRECT_URI=https://driftlog.kro.kr
 
       - name: 5. EC2로 배포 파일 복사 (compose, nginx)
         uses: appleboy/scp-action@v0.1.7

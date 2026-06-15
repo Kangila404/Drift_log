@@ -90,7 +90,7 @@ export async function startStudyNotification(input: StudyNotifInput) {
       // 현재 경과초를 기준으로 시작 시각 역산 (앱 진입 시점에 이미 흐른 시간 반영)
       sessionStartEpoch = Date.now() - input.elapsedSec * 1000;
       const id = await startStudyActivity(label, sessionStartEpoch, goalLabel, remainMin, progress);
-      console.log("[StudyActivity] start 성공, id:", id);
+
       iosActive = true;
     } catch (e) {
       console.error("[StudyActivity] start 실패:", e);

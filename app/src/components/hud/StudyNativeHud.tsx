@@ -108,6 +108,13 @@ export default function StudyNativeHud({
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {});
   useEffect(() => { refreshSummary(); }, []);
 
+
+  useEffect(() => {
+    return () => {
+      stopStudyNotification().catch(() => {});
+    };
+  }, []);
+
   useEffect(() => {
     (async () => {
       const saved = await AsyncStorage.getItem(START_KEY);
