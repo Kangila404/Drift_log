@@ -1,13 +1,13 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
-import { assetUrl } from "./config";
+import { NOISE_AUDIO } from "../constants/assets";
 
 export type NoiseKey = "rain" | "wave" | "fire";
 
-// 음원 경로 — 웹 noiseManager와 동일 (/sound/)
-const NOISE_URL: Record<NoiseKey, string> = {
-  rain: "/sound/rain.mp3",
-  wave: "/sound/wave.mp3",
-  fire: "/sound/fire.mp3",
+// require된 오디오 모듈 매핑 (웹 /sound/ 와 동일 음원)
+const NOISE_SOURCE: Record<NoiseKey, any> = {
+  rain: NOISE_AUDIO.rain,
+  wave: NOISE_AUDIO.wave,
+  fire: NOISE_AUDIO.fire,
 };
 
 const VOLUME = 0.6;
@@ -48,17 +48,16 @@ export const nativeNoise = {
       notify();
       return;
     }
-    // 이미 같은 소리면 재생만 보장
     if (current === key && player) {
       if (!muted) { try { player.play(); } catch {} }
       return;
     }
     await ensureMode();
     killPlayer();
-    const url = assetUrl(NOISE_URL[key]);
-    if (!url) return;
+    const source = NOISE_SOURCE[key];
+    if (!source) return;
     try {
-      player = createAudioPlayer({ uri: url });
+      player = createAudioPlayer(source);
       player.loop = true;
       player.volume = muted ? 0 : VOLUME;
       player.play();

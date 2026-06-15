@@ -1,6 +1,6 @@
+import { CITY_IMAGES, CITY_BGM } from "../constants/assets";
+
 export const ASSET_BASE = "https://driftlog.kro.kr:30001";
-
-
 
 export function assetUrl(path?: string | null): string | undefined {
   if (!path) return undefined;
@@ -8,18 +8,20 @@ export function assetUrl(path?: string | null): string | undefined {
   return `${ASSET_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-
-export const CITY_META: Record<number, { name: string; img: string; bgm: string; desc: string }> = {
-  1: { name: "서울", img: "/city/seoul.png", bgm: "/city/seoul_bgm.mp3", desc: "물에 잠긴 고궁. 한때 가장 번화했던 도시가 수면 아래 남아 있다." },
-  2: { name: "인천", img: "/city/incheon.png", bgm: "/city/incheon_bgm.mp3", desc: "수몰된 인천 대교, 파도가 잔잔한 날이면 물 아래로 도시의 윤곽이 희미하게 보인다." },
-  3: { name: "대전", img: "/city/daejeon.png", bgm: "/city/daejeon_bgm.mp3", desc: "내륙 깊숙이 물이 차올랐다. 바람이 불면 도시였던 자리에서 이상한 소리가 들린다." },
-  4: { name: "강릉", img: "/city/gangneung.png", bgm: "/city/gangneung_bgm.mp3", desc: "산자락까지 물이 차올랐지만 높은 봉우리는 살아남았다. 안개가 자욱한 날이면 섬처럼 보이는 산봉우리들이 수평선 위로 떠오른다." },
-  5: { name: "부산", img: "/city/busan.png", bgm: "/city/busan_bgm.mp3", desc: "남쪽 끝 항구 도시. 수몰을 피한 사람들이 모여들었다는 소문이 있다. 멀리서 보면 불빛이 깜빡이는 것 같기도 하다." },
-  6: { name: "수원", img: "/city/suwon.png", bgm: "/city/suwon_bgm.mp3", desc: "화성의 성벽이 수면 위로 드러나 있다. 성곽을 따라 물이 차오른 모습이 낯설다. 성 안쪽 깊은 곳에서 가끔 빛이 흔들린다." },
-  7: { name: "광주", img: "/city/gwangju.png", bgm: "/city/gwangju_bgm.mp3", desc: "가장 낮은 고지의 있는 광주, 무등산 주상절리가 보인다." },
-  8: { name: "대구", img: "/city/daegu.png", bgm: "/city/daegu_bgm.mp3", desc: "분지였던 지형 탓에 물이 깊게 고였다." },
-  9: { name: "포항", img: "/city/pohang.png", bgm: "/city/pohang_bgm.mp3", desc: "가족과 함께 보았던 상생의 손이 보인다. 이젠 상생의 손마디인가." },
-  10: { name: "제주", img: "/city/jeju.png", bgm: "/city/jeju_bgm.mp3", desc: "한라산 중턱까지 물이 찼다. 백록담이 섬이 되었다." },
+export const CITY_META: Record<
+  number,
+  { name: string; img: any; bgm: any; desc: string }
+> = {
+  1: { name: "서울", img: CITY_IMAGES[1], bgm: CITY_BGM[1], desc: "물에 잠긴 고궁. 한때 가장 번화했던 도시가 수면 아래 남아 있다." },
+  2: { name: "인천", img: CITY_IMAGES[2], bgm: CITY_BGM[2], desc: "수몰된 인천 대교, 파도가 잔잔한 날이면 물 아래로 도시의 윤곽이 희미하게 보인다." },
+  3: { name: "대전", img: CITY_IMAGES[3], bgm: CITY_BGM[3], desc: "내륙 깊숙이 물이 차올랐다. 바람이 불면 도시였던 자리에서 이상한 소리가 들린다." },
+  4: { name: "강릉", img: CITY_IMAGES[4], bgm: CITY_BGM[4], desc: "산자락까지 물이 차올랐지만 높은 봉우리는 살아남았다. 안개가 자욱한 날이면 섬처럼 보이는 산봉우리들이 수평선 위로 떠오른다." },
+  5: { name: "부산", img: CITY_IMAGES[5], bgm: CITY_BGM[5], desc: "남쪽 끝 항구 도시. 수몰을 피한 사람들이 모여들었다는 소문이 있다. 멀리서 보면 불빛이 깜빡이는 것 같기도 하다." },
+  6: { name: "수원", img: CITY_IMAGES[6], bgm: CITY_BGM[6], desc: "화성의 성벽이 수면 위로 드러나 있다. 성곽을 따라 물이 차오른 모습이 낯설다. 성 안쪽 깊은 곳에서 가끔 빛이 흔들린다." },
+  7: { name: "광주", img: CITY_IMAGES[7], bgm: CITY_BGM[7], desc: "가장 낮은 고지의 있는 광주, 무등산 주상절리가 보인다." },
+  8: { name: "대구", img: CITY_IMAGES[8], bgm: CITY_BGM[8], desc: "분지였던 지형 탓에 물이 깊게 고였다." },
+  9: { name: "포항", img: CITY_IMAGES[9], bgm: CITY_BGM[9], desc: "가족과 함께 보았던 상생의 손이 보인다. 이젠 상생의 손마디인가." },
+  10: { name: "제주", img: CITY_IMAGES[10], bgm: CITY_BGM[10], desc: "한라산 중턱까지 물이 찼다. 백록담이 섬이 되었다." },
 };
 
 export const CITY_COORDS: Record<number, { x: number; y: number; name: string }> = {

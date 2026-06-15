@@ -2,9 +2,22 @@
     "name": "driftlog-monorepo",
     "private": true,
     "version": "0.0.0",
-    "workspaces": ["app", "shared", "front"],
+    "scripts": {
+        "postinstall": "patch-package"
+    },
+    "workspaces": [
+        "app",
+        "shared",
+        "front"
+    ],
     "overrides": {
-        "react": "19.1.0",
-        "react-dom": "19.1.0"
+        "react": "19.2.0",
+        "react-dom": "19.2.0"
+    },
+    "dependencies": {
+        "expo": "^55.0.26",
+        "patch-package": "^8.0.1",
+        "postinstall-postinstall": "^2.1.0",
+        "react-native": "^0.83.6"
     }
 }

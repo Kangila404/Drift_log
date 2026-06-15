@@ -1,5 +1,6 @@
 package org.example.drift_log.user.application;
 
+import org.example.drift_log.user.presentation.dto.req.AppleLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.KakaoNativeLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
@@ -29,6 +30,9 @@ public interface AuthService {
 
     // 카카오 앱 로그인
     SocialLoginResponse kakaoNativeLogin(KakaoNativeLoginRequest request);
+
+    // 애플 로그인 (앱·웹 공통 — identityToken 검증)
+    SocialLoginResponse appleLogin(AppleLoginRequest request);
 
     // 로그아웃
     LogoutResponse logout(LogoutRequest request);

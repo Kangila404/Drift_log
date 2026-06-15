@@ -1,13 +1,11 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { assetUrl } from "./config";
+import { BGM_AUDIO } from "../constants/assets";
 
 // 항해 BGM 트랙. 웹 bgmManager와 동일한 역할을 네이티브에서 수행.
-// 나중에 react-native-track-player로 교체 시 이 파일만 갈아끼우면 됨 (잠금화면/위젯 대응).
 
 type Track = "voyage" | "city" | "ending" | null;
 
-const VOYAGE_URL = assetUrl("/bgm/voyage.mp3")!;
-const ENDING_URL = assetUrl("/bgm/ending.mp3")!;
 const BASE_VOLUME = 0.5;
 
 let player: AudioPlayer | null = null;
@@ -38,7 +36,6 @@ async function ensureAudioMode() {
   }).catch(() => {});
 }
 
-// 현재 플레이어 완전 제거 (중첩 방지)
 function killPlayer() {
   if (player) {
     try { player.pause(); } catch {}
@@ -49,41 +46,44 @@ function killPlayer() {
   currentUrl = null;
 }
 
-function loadAndPlay(url: string, track: Track, loop: boolean) {
-  // 같은 트랙(도시는 url까지) 재생 중이면 무시
-  if (player && currentTrack === track && (track !== "city" || currentUrl === url)) return;
+// source: require된 모듈(number) 또는 {uri} 객체
+function loadAndPlay(source: any, track: Track, loop: boolean, key: string) {
+  if (player && currentTrack === track && (track !== "city" || currentUrl === key)) return;
 
   killPlayer();
 
   try {
-    const p = createAudioPlayer({ uri: url });
+    const p = createAudioPlayer(source);
     p.loop = loop;
     p.volume = effectiveVolume();
     p.play();
     player = p;
     currentTrack = track;
-    currentUrl = track === "city" ? url : null;
+    currentUrl = track === "city" ? key : null;
   } catch {}
 }
 
 export const nativeBgm = {
   async playVoyage() {
     await ensureAudioMode();
-    loadAndPlay(VOYAGE_URL, "voyage", true);
+    loadAndPlay(BGM_AUDIO.voyage, "voyage", true, "voyage");
   },
   async playCity(rawUrl: string) {
     if (!rawUrl) return;
     await ensureAudioMode();
-    const url = rawUrl.startsWith("http") ? rawUrl : assetUrl(rawUrl)!;
-    loadAndPlay(url, "city", true);
+    // 도시 BGM은 서버 URL로 올 수 있음 — 문자열이면 {uri}, 아니면 require 모듈
+    const source = typeof rawUrl === "string"
+      ? { uri: rawUrl.startsWith("http") ? rawUrl : assetUrl(rawUrl)! }
+      : rawUrl;
+    loadAndPlay(source, "city", true, String(rawUrl));
   },
   async playEnding() {
     await ensureAudioMode();
-    loadAndPlay(ENDING_URL, "ending", false);
+    loadAndPlay(BGM_AUDIO.ending, "ending", false, "ending");
   },
   stop() {
     killPlayer();
-    ducked = false;   // 덕킹 상태도 초기화 (음소거는 사용자 설정이라 유지)
+    ducked = false;
   },
   toggleMute() {
     muted = !muted;

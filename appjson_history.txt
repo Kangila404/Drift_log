@@ -1,0 +1,247 @@
+﻿commit e34af0bbea828d5440d79e36b89ffe55ca25d372
+Author: Kangila404 <ia3264666@gmail.com>
+Date:   Mon Jun 15 16:45:52 2026 +0900
+
+    fix: patch expo-widgets to inject JS bundle into widget extension
+
+diff --git a/app/app.json b/app/app.json
+index 0668a2e..e97166f 100644
+--- a/app/app.json
++++ b/app/app.json
+@@ -111,7 +111,7 @@
+     ],
+     "experiments": {
+       "typedRoutes": false,
+-      "reactCompiler": true
++      "reactCompiler": false
+     },
+     "extra": {
+       "router": {},
+
+commit ab3d47aff6734cc2b81bd491aca911ce2c371bd9
+Author: Kangila404 <ia3264666@gmail.com>
+Date:   Mon Jun 15 15:10:55 2026 +0900
+
+    fix: add expo-glass-effect + unify splash to navy tone
+
+diff --git a/app/app.json b/app/app.json
+index f65d48e..0668a2e 100644
+--- a/app/app.json
++++ b/app/app.json
+@@ -49,9 +49,9 @@
+           "image": "./assets/images/splash-icon.png",
+           "imageWidth": 200,
+           "resizeMode": "contain",
+-          "backgroundColor": "#241825",
++          "backgroundColor": "#0a1420",
+           "dark": {
+-            "backgroundColor": "#241825"
++            "backgroundColor": "#0a1420"
+           }
+         }
+       ],
+@@ -110,7 +110,7 @@
+       ]
+     ],
+     "experiments": {
+-      "typedRoutes": true,
++      "typedRoutes": false,
+       "reactCompiler": true
+     },
+     "extra": {
+
+commit fbb9804ceb2ab31d81565d84c88eebdf0c8246ee
+Author: Kangila404 <ia3264666@gmail.com>
+Date:   Mon Jun 15 14:39:17 2026 +0900
+
+    fix: modular_headers for GoogleUtilities/RecaptchaInterop/AppCheckCore
+
+diff --git a/app/app.json b/app/app.json
+index 13d0406..f65d48e 100644
+--- a/app/app.json
++++ b/app/app.json
+@@ -81,7 +81,12 @@
+             ]
+           },
+           "ios": {
+-            "deploymentTarget": "16.2"
++            "deploymentTarget": "16.2",
++            "extraPods": [
++              { "name": "GoogleUtilities", "modular_headers": true },
++              { "name": "RecaptchaInterop", "modular_headers": true },
++              { "name": "AppCheckCore", "modular_headers": true }
++            ]
+           }
+         }
+       ],
+
+commit 6488a6cdcdda55cf97ce15c122676b17ca540c40
+Author: Kangila404 <ia3264666@gmail.com>
+Date:   Mon Jun 15 14:32:58 2026 +0900
+
+    fix: add supportedFamilies, remove newArchEnabled for expo-widgets prebuild
+
+diff --git a/app/app.json b/app/app.json
+index c78ad7f..13d0406 100644
+--- a/app/app.json
++++ b/app/app.json
+@@ -7,7 +7,6 @@
+     "icon": "./assets/images/icon.png",
+     "scheme": "app",
+     "userInterfaceStyle": "automatic",
+-    "newArchEnabled": true,
+     "ios": {
+       "bundleIdentifier": "com.kangila.driftlog",
+       "supportsTablet": true,
+@@ -15,7 +14,8 @@
+         "UIBackgroundModes": [
+           "audio"
+         ],
+-        "ITSAppUsesNonExemptEncryption": false
++        "ITSAppUsesNonExemptEncryption": false,
++        "NSSupportsLiveActivities": true
+       }
+     },
+     "android": {
+@@ -93,7 +93,12 @@
+             {
+               "name": "StudyActivity",
+               "displayName": "怨듬? ??빐",
+-              "description": "怨듬? ?몄뀡 ??대㉧瑜??좉툑?붾㈃怨??ㅼ씠?섎? ?꾩씪?쒕뱶???쒖떆?⑸땲??"
++              "description": "怨듬? ?몄뀡 ??대㉧瑜??좉툑?붾㈃怨??ㅼ씠?섎? ?꾩씪?쒕뱶???쒖떆?⑸땲??",
++              "supportedFamilies": [
++                "accessoryRectangular",
++                "accessoryCircular",
++                "accessoryInline"
++              ]
+             }
+           ]
+         }
+@@ -106,7 +111,24 @@
+     "extra": {
+       "router": {},
+       "eas": {
+-        "projectId": "37982a1f-92e2-42ae-9e13-d990f69a1e0f"
++        "projectId": "37982a1f-92e2-42ae-9e13-d990f69a1e0f",
++        "build": {
++          "experimental": {
++            "ios": {
++              "appExtensions": [
++                {
++                  "targetName": "ExpoWidgetsTarget",
++                  "bundleIdentifier": "com.kangila.driftlog.ExpoWidgetsTarget",
++                  "entitlements": {
++                    "com.apple.security.application-groups": [
++                      "group.com.kangila.driftlog"
++                    ]
++                  }
++                }
++              ]
++            }
++          }
++        }
+       }
+     }
+   }
+
+commit b816fd1d762df886172182acd39215d9962a74c2
+Author: Kangila404 <ia3264666@gmail.com>
+Date:   Mon Jun 15 14:21:29 2026 +0900
+
+    fix: SDK 55 upgrade, sync lock file
+
+diff --git a/app/app.json b/app/app.json
+index b853dbf..c78ad7f 100644
+--- a/app/app.json
++++ b/app/app.json
+@@ -1,6 +1,6 @@
+-癤?
++{
+   "expo": {
+-    "name": "app",
++    "name": "DriftLog",
+     "slug": "app",
+     "version": "1.0.0",
+     "orientation": "portrait",
+@@ -14,13 +14,14 @@
+       "infoPlist": {
+         "UIBackgroundModes": [
+           "audio"
+-        ]
++        ],
++        "ITSAppUsesNonExemptEncryption": false
+       }
+     },
+     "android": {
+       "package": "com.kangila.driftlog",
+       "adaptiveIcon": {
+-        "backgroundColor": "#E6F4FE",
++        "backgroundColor": "#0a1a28",
+         "foregroundImage": "./assets/images/android-icon-foreground.png",
+         "backgroundImage": "./assets/images/android-icon-background.png",
+         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+@@ -29,6 +30,8 @@
+       "predictiveBackGestureEnabled": false,
+       "permissions": [
+         "FOREGROUND_SERVICE",
++        "FOREGROUND_SERVICE_SPECIAL_USE",
++        "POST_NOTIFICATIONS",
+         "WAKE_LOCK",
+         "android.permission.RECORD_AUDIO",
+         "android.permission.MODIFY_AUDIO_SETTINGS"
+@@ -46,17 +49,27 @@
+           "image": "./assets/images/splash-icon.png",
+           "imageWidth": 200,
+           "resizeMode": "contain",
+-          "backgroundColor": "#ffffff",
++          "backgroundColor": "#241825",
+           "dark": {
+-            "backgroundColor": "#000000"
++            "backgroundColor": "#241825"
+           }
+         }
+       ],
+       "expo-audio",
++      [
++        "expo-notifications",
++        {
++          "icon": "./assets/images/notification-icon.png",
++          "color": "#7ec0d2"
++        }
++      ],
+       [
+         "@react-native-kakao/core",
+         {
+-          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075"
++          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075",
++          "android": {
++            "authCodeHandlerActivity": true
++          }
+         }
+       ],
+       [
+@@ -66,8 +79,24 @@
+             "extraMavenRepos": [
+               "https://devrepo.kakao.com/nexus/content/groups/public/"
+             ]
++          },
++          "ios": {
++            "deploymentTarget": "16.2"
+           }
+         }
++      ],
++      [
++        "expo-widgets",
++        {
++          "groupIdentifier": "group.com.kangila.driftlog",
++          "widgets": [
++            {
++              "name": "StudyActivity",
++              "displayName": "怨듬? ??빐",
++              "description": "怨듬? ?몄뀡 ??대㉧瑜??좉툑?붾㈃怨??ㅼ씠?섎? ?꾩씪?쒕뱶???쒖떆?⑸땲??"
++            }
++          ]
++        }
+       ]
+     ],
+     "experiments": {

@@ -24,3 +24,6 @@ kakao:
     ${KAKAO_CLIENT_SECRET:dummy-client-secret}
   redirect-uri:
     ${KAKAO_REDIRECT_URI:http://localhost:30001/auth/kakao/callback}
+
+apple:
+  client-ids: com.kangila.driftlog

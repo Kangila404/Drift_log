@@ -1,0 +1,9 @@
+node_modules/
+android/
+ios/
+.gradle/
+**/.cxx/
+**/build/
+.expo/
+dist/
+*.log

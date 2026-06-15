@@ -39,6 +39,14 @@ export async function socialLogin(idToken:string) {
     return data;
 }
 
+export async function appleLogin(identityToken: string, name?: string) {
+    const { data } = await apiClient.post("/auth/apple", {
+        identityToken,
+        name,
+    });
+    return data;
+}
+
 export async function kakaoLogin(code: string) {
     const { data } = await apiClient.post("/auth/kakao", {
         code,
