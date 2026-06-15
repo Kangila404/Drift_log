@@ -4,7 +4,7 @@ import notifee, {
   AndroidVisibility,
 } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
-import StudyActivity, { type StudyActivityProps } from "./StudyActivity";
+import type { StudyActivityProps } from "./StudyActivity";
 import type { LiveActivity } from "expo-widgets";
 
 const CHANNEL_ID = "study-session-v2";
@@ -13,6 +13,11 @@ const ACCENT = "#7ec0d2";
 
 let registered = false;
 let iosActivity: LiveActivity<StudyActivityProps> | null = null;
+
+// iOS Live Activity 모듈을 실제 사용할 때만 로드 (@expo/ui 네이티브 로드를 앱 시작 시점에서 분리)
+function getStudyActivity() {
+  return require("./StudyActivity").default as typeof import("./StudyActivity").default;
+}
 
 function ensureForegroundService() {
   if (registered) return;
@@ -94,7 +99,7 @@ export async function requestStudyNotifPermission() {
 export async function startStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
-      iosActivity = StudyActivity.start(buildIos(input));
+      iosActivity = getStudyActivity().start(buildIos(input));
     } catch (e) {
       // Live Activity 미지원 기기/버전이면 조용히 무시
     }

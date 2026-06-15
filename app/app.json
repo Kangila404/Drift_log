@@ -49,9 +49,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#241825",
+          "backgroundColor": "#0a1420",
           "dark": {
-            "backgroundColor": "#241825"
+            "backgroundColor": "#0a1420"
           }
         }
       ],
@@ -110,7 +110,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
+      "typedRoutes": false,
       "reactCompiler": true
     },
     "extra": {
