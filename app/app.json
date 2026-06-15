@@ -10,6 +10,11 @@
     "ios": {
       "bundleIdentifier": "com.kangila.driftlog",
       "supportsTablet": true,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.kangila.driftlog"
+        ]
+      },
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
