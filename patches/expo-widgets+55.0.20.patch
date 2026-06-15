@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-widgets/ios/ExpoWidgets.podspec b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
-index 1d2b971..a2902a5 100644
+index 1d2b971..fe54a74 100644
 --- a/node_modules/expo-widgets/ios/ExpoWidgets.podspec
 +++ b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
 @@ -56,7 +56,7 @@ Pod::Spec.new do |s|
@@ -7,7 +7,7 @@ index 1d2b971..a2902a5 100644
    s.script_phases = [build_bundle_script, copy_bundle_script]
    s.resource_bundles = {
 -    'ExpoWidgets' => [],
-+    'ExpoWidgets' => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"],
++    'ExpoWidgets' => ["../bundle/build/ExpoWidgets.bundle"],
    }
  
  end
