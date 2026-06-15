@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import StudyNativeHud from "../components/hud/StudyNativeHud";
 import { nativeNoise } from "../api/nativeNoise";
 import { getUserProfile } from "../api/voyage";
+import { stopStudyNotification } from "../services/studyNotification";
 
 const WEB_URL = "https://driftlog.kro.kr/study";
 
@@ -61,6 +62,7 @@ export default function StudyScreen() {
     useCallback(() => {
       return () => {
         nativeNoise.stopAll();
+        stopStudyNotification();
         AsyncStorage.removeItem("studyStartAt");
         AsyncStorage.removeItem("studyGoalMin");
         AsyncStorage.removeItem("studySubject");

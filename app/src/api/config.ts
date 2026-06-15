@@ -2,8 +2,10 @@ import { CITY_IMAGES, CITY_BGM } from "../constants/assets";
 
 export const ASSET_BASE = "https://driftlog.kro.kr:30001";
 
-export function assetUrl(path?: string | null): string | undefined {
+export function assetUrl(path?: string | null): any {
   if (!path) return undefined;
+  // require된 에셋(number) 등 문자열이 아니면 그대로 반환
+  if (typeof path !== "string") return path;
   if (path.startsWith("http")) return path;
   return `${ASSET_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
 }
