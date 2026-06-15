@@ -4,20 +4,18 @@ import notifee, {
   AndroidVisibility,
 } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
-import type { StudyActivityProps } from "./StudyActivity";
-import type { LiveActivity } from "expo-widgets";
+import {
+  startStudyActivity,
+  updateStudyActivity,
+  endStudyActivity,
+} from "../../modules/study-activity";
 
 const CHANNEL_ID = "study-session-v2";
 const NOTIF_ID = "study-timer";
 const ACCENT = "#7ec0d2";
 
 let registered = false;
-let iosActivity: LiveActivity<StudyActivityProps> | null = null;
-
-// iOS Live Activity 모듈을 실제 사용할 때만 로드 (@expo/ui 네이티브 로드를 앱 시작 시점에서 분리)
-function getStudyActivity() {
-  return require("./StudyActivity").default as typeof import("./StudyActivity").default;
-}
+let iosActive = false;
 
 function ensureForegroundService() {
   if (registered) return;
@@ -76,17 +74,6 @@ function buildAndroid(input: StudyNotifInput) {
   };
 }
 
-function buildIos(input: StudyNotifInput): StudyActivityProps {
-  const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
-  return {
-    subject: label,
-    elapsedLabel,
-    goalLabel,
-    remainMin,
-    progress,
-  };
-}
-
 export async function requestStudyNotifPermission() {
   if (Platform.OS === "android") {
     const settings = await Notifications.getPermissionsAsync();
@@ -99,7 +86,9 @@ export async function requestStudyNotifPermission() {
 export async function startStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
-      iosActivity = getStudyActivity().start(buildIos(input));
+      const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
+      await startStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
+      iosActive = true;
     } catch (e) {
       // Live Activity 미지원 기기/버전이면 조용히 무시
     }
@@ -132,7 +121,9 @@ export async function startStudyNotification(input: StudyNotifInput) {
 export async function updateStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
-      await iosActivity?.update(buildIos(input));
+      if (!iosActive) return;
+      const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
+      await updateStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
     } catch (e) {}
     return;
   }
@@ -161,9 +152,9 @@ export async function updateStudyNotification(input: StudyNotifInput) {
 export async function stopStudyNotification() {
   if (Platform.OS === "ios") {
     try {
-      await iosActivity?.end("immediate");
+      await endStudyActivity();
     } catch (e) {}
-    iosActivity = null;
+    iosActive = false;
     return;
   }
 

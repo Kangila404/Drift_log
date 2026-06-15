@@ -102,24 +102,7 @@
           }
         }
       ],
-      [
-        "expo-widgets",
-        {
-          "groupIdentifier": "group.com.kangila.driftlog",
-          "widgets": [
-            {
-              "name": "StudyActivity",
-              "displayName": "공부 항해",
-              "description": "공부 세션 타이머를 잠금화면과 다이나믹 아일랜드에 표시합니다.",
-              "supportedFamilies": [
-                "accessoryRectangular",
-                "accessoryCircular",
-                "accessoryInline"
-              ]
-            }
-          ]
-        }
-      ]
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": false,
@@ -128,24 +111,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "37982a1f-92e2-42ae-9e13-d990f69a1e0f",
-        "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "targetName": "ExpoWidgetsTarget",
-                  "bundleIdentifier": "com.kangila.driftlog.ExpoWidgetsTarget",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.kangila.driftlog"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        }
+        "projectId": "37982a1f-92e2-42ae-9e13-d990f69a1e0f"
       }
     }
   }

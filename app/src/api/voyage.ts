@@ -1,8 +1,25 @@
 import { apiClient } from "./client";
 import { assetUrl } from "./config";
+import { TRACE_IMAGES, EVENT_IMAGES } from "../constants/assets";
+
+// 서버가 준 경로(/trace/seoul_sibling.png)에서 파일명(seoul_sibling)을 뽑아 로컬 require 모듈로 매핑.
+// 로컬에 없으면 서버 URL로 폴백.
+function resolveTraceImage(raw?: string | null): any {
+  if (!raw) return undefined;
+  const file = raw.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
+  if (TRACE_IMAGES[file]) return TRACE_IMAGES[file];
+  return assetUrl(raw) ? { uri: assetUrl(raw)! } : undefined;
+}
+
+function resolveEventImage(raw?: string | null): any {
+  if (!raw) return undefined;
+  const file = raw.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
+  if (EVENT_IMAGES[file]) return EVENT_IMAGES[file];
+  return assetUrl(raw) ? { uri: assetUrl(raw)! } : undefined;
+}
 
 // ─── 항해록 ───
-export type VoyageEvent = { name: string; text: string; imageUrl?: string };
+export type VoyageEvent = { name: string; text: string; imageUrl?: any };
 export type VoyageLog = {
   id: number;
   ts: number;
@@ -31,7 +48,7 @@ export async function getVoyageLogs(): Promise<VoyageLog[]> {
       autoText: l.autoText ?? "",
       events: (l.events ?? [])
         .filter((e: any) => e.imageUrl)
-        .map((e: any) => ({ name: e.name, text: e.text, imageUrl: assetUrl(e.imageUrl) })),
+        .map((e: any) => ({ name: e.name, text: e.text, imageUrl: resolveEventImage(e.imageUrl) })),
     };
   });
   return mapped.sort((a, b) => b.ts - a.ts);
@@ -87,7 +104,7 @@ export type Trace = {
   traceName: string;
   cityName: string;
   content: string;
-  imageUrl?: string;
+  imageUrl?: any;
   date: string;
 };
 
@@ -112,7 +129,7 @@ export async function getTraces(): Promise<Trace[]> {
       traceName: t.traceName ?? "",
       cityName: t.cityName ?? "",
       content: t.content ?? "",
-      imageUrl: assetUrl(t.imageUrl),
+      imageUrl: resolveTraceImage(t.imageUrl),
       date,
     };
   });
