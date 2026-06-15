@@ -128,7 +128,7 @@ export default function VoyageHud({ hideFab = false }: { hideFab?: boolean }) {
 
 const styles = StyleSheet.create({
   root: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
-  fabWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  fabWrap: { position: "absolute", left: 20, alignItems: "flex-start" },
   fab: {
     width: 56, height: 56, borderRadius: 28,
     alignItems: "center", justifyContent: "center",

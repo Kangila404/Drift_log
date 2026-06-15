@@ -59,18 +59,17 @@ export default function VoyageNativeHud({
     return () => clearTimeout(t);
   }, []);
 
-  // 가로 스와이프로 끄기 (오른쪽으로 밀면 dismiss)
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove: (_, g) => {
-        if (g.dx > 0) slideX.setValue(g.dx);
+        if (g.dx < 0) slideX.setValue(g.dx);
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dx > 70) {
-          // 끄기
+        if (g.dx < -70) {
+          // 끄기 (왼쪽으로 숨김)
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-          Animated.timing(slideX, { toValue: 420, duration: 220, easing: Easing.in(Easing.ease), useNativeDriver: true })
+          Animated.timing(slideX, { toValue: -420, duration: 220, easing: Easing.in(Easing.ease), useNativeDriver: true })
             .start(() => setDismissed(true));
         } else {
           // 복귀
@@ -83,7 +82,7 @@ export default function VoyageNativeHud({
   const restore = () => {
     Haptics.selectionAsync().catch(() => {});
     setDismissed(false);
-    slideX.setValue(60);
+    slideX.setValue(-60);
     Animated.spring(slideX, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
   };
 
@@ -104,13 +103,13 @@ export default function VoyageNativeHud({
   };
 
   // 끈 상태 — 우측 가장자리에 당김 손잡이 (타이머는 유지)
-  if (dismissed) {
+ if (dismissed) {
     return (
       <>
         <View style={[s.tabWrap, { top: insets.top + 14 }]} pointerEvents="box-none">
           <Pressable onPress={restore} style={s.pullTab}>
-            <View style={s.pullGrip} />
             <BoatGlyph color="#6aa8c8" />
+            <View style={s.pullGrip} />
           </Pressable>
         </View>
         <View style={[s.timerWrap, { bottom: insets.bottom + 28 }]} pointerEvents="none">
@@ -144,7 +143,7 @@ export default function VoyageNativeHud({
                 <View style={[s.statusLed, { backgroundColor: paused ? "#3a6a86" : "#5ab0d8" }]} />
                 <Text style={s.ticketNo}>{paused ? "PAUSED" : "BOARDING"}</Text>
               </View>
-              <Text style={s.tapHint}>{expanded ? "탭하여 접기 · 밀어서 숨김 ›" : "탭하여 펼치기 ›"}</Text>
+              <Text style={s.tapHint}>{expanded ? "‹ 밀어서 숨김 · 탭하여 접기" : "탭하여 펼치기 ›"}</Text>
             </View>
 
             {/* FROM → 배 → TO */}
@@ -312,15 +311,15 @@ const s = StyleSheet.create({
   ctrlIcon: { color: "#7eb8d4", fontSize: 16 },
   ctrlIconActive: { color: "#cce8f5" },
 
-  // 끈 상태 — 우측 가장자리 손잡이
-  tabWrap: { position: "absolute", right: 0 },
+  // 끈 상태 — 좌측 가장자리 손잡이
+  tabWrap: { position: "absolute", left: 0 },
   pullTab: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(8,20,32,0.9)",
     borderWidth: 1, borderColor: "rgba(40,90,120,0.45)",
-    borderRightWidth: 0,
-    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
-    paddingLeft: 12, paddingRight: 14, paddingVertical: 10,
+    borderLeftWidth: 0,
+    borderTopRightRadius: 18, borderBottomRightRadius: 18,
+    paddingLeft: 14, paddingRight: 12, paddingVertical: 10,
   },
   pullGrip: { width: 3, height: 18, borderRadius: 2, backgroundColor: "rgba(90,138,164,0.5)" },
 

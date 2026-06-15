@@ -1,15 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { login, socialLogin } from "../api/auth";
+import { login, socialLogin, appleLogin } from "../api/auth";
 import OceanBackground from "../components/OceanBackground";
 import { getTodayWeather } from "../api/weather";
 import { WEATHER_MAP } from "../constants/weather";
 import { getVersion } from "../api/version";
 
-// 구글 전역 객체 타입
+// 전역 객체 타입
 declare global {
   interface Window {
     google?: any;
+    AppleID?: any;
   }
 }
 
@@ -49,7 +50,7 @@ const handleKakaoLogin = () => {
   // 구글 로그인 콜백 — idToken 받아서 백엔드로
   const handleGoogleLogin = async (response: any) => {
     try {
-      const idToken = response.credential;  // 구글이 준 idToken
+      const idToken = response.credential;
       const result = await socialLogin(idToken);
       localStorage.setItem("accessToken", result.accessToken);
       localStorage.setItem("refreshToken", result.refreshToken);
@@ -61,26 +62,76 @@ const handleKakaoLogin = () => {
     }
   };
 
+  // 애플 로그인 — JS SDK 팝업으로 identityToken 받아서 백엔드로
+  const handleAppleLogin = async () => {
+    try {
+      if (!window.AppleID) {
+        alert("애플 로그인 SDK가 아직 로드되지 않았습니다.");
+        return;
+      }
+      const response = await window.AppleID.auth.signIn();
+      const identityToken = response.authorization.id_token;
+
+      // 애플은 최초 로그인 시에만 user.name 제공
+      let name: string | undefined;
+      if (response.user?.name) {
+        const { firstName, lastName } = response.user.name;
+        name = [lastName, firstName].filter(Boolean).join("") || undefined;
+      }
+
+      const result = await appleLogin(identityToken, name);
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
+      localStorage.setItem("justLoggedIn", "1");
+      navigate("/");
+    } catch (e: any) {
+      // 사용자가 팝업 닫으면 error: 'popup_closed_by_user' — 무시
+      if (e?.error === "popup_closed_by_user") return;
+      console.error("애플 로그인 실패:", e);
+      alert("애플 로그인에 실패했습니다.");
+    }
+  };
+
+  // Apple JS SDK 동적 로드 + 초기화
+  useEffect(() => {
+    const SCRIPT_ID = "apple-signin-sdk";
+    const init = () => {
+      if (!window.AppleID) return;
+      window.AppleID.auth.init({
+        clientId: import.meta.env.VITE_APPLE_CLIENT_ID,
+        scope: "name email",
+        redirectURI: import.meta.env.VITE_APPLE_REDIRECT_URI,
+        usePopup: true,
+      });
+    };
+
+    if (document.getElementById(SCRIPT_ID)) {
+      init();
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = SCRIPT_ID;
+    script.src =
+      "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+    script.async = true;
+    script.onload = init;
+    document.body.appendChild(script);
+  }, []);
+
   // 컨테이너 폭에 맞춰 구글 버튼 렌더 (width는 200~400px 숫자만 허용)
   useEffect(() => {
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let initialized = false;
-    let lastWidth = 0;   // 마지막으로 그린 폭 — 같으면 다시 안 그림 (무한 루프 차단)
+    let lastWidth = 0;
 
     const drawButton = () => {
       const el = googleBtnRef.current;
       if (!el) return;
-
-      // 컨테이너 실제 폭 측정 → 200~400 사이로 클램프
       const containerWidth = el.clientWidth || 256;
       const width = Math.min(Math.max(Math.round(containerWidth), 200), 400);
-
-      // 폭이 안 바뀌었으면 재렌더 안 함 → ResizeObserver 자가발화 루프 차단
       if (width === lastWidth) return;
       lastWidth = width;
-
-      // 재렌더 시 기존 버튼 제거 (renderButton 중복 누적 방지)
       el.innerHTML = "";
       window.google.accounts.id.renderButton(el, {
         theme: "outline",
@@ -94,7 +145,6 @@ const handleKakaoLogin = () => {
 
     const tryInit = () => {
       if (!window.google || !googleBtnRef.current) return false;
-
       if (!initialized) {
         window.google.accounts.id.initialize({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
@@ -102,10 +152,7 @@ const handleKakaoLogin = () => {
         });
         initialized = true;
       }
-
       drawButton();
-
-      // 폭 변할 때마다 다시 그림 (반응형 대응) — lastWidth 가드로 같은 폭이면 무시
       observer = new ResizeObserver(() => {
         if (!cancelled) drawButton();
       });
@@ -113,7 +160,6 @@ const handleKakaoLogin = () => {
       return true;
     };
 
-    // 1차 시도 — 이미 로드돼 있으면 즉시
     if (tryInit()) {
       return () => {
         cancelled = true;
@@ -121,7 +167,6 @@ const handleKakaoLogin = () => {
       };
     }
 
-    // 아직이면 100ms 간격 재시도, 최대 10초
     let attempts = 0;
     const timer = setInterval(() => {
       attempts++;
@@ -203,7 +248,7 @@ const handleKakaoLogin = () => {
             <div className="flex-1 h-px bg-[rgba(122,184,200,0.15)]" />
           </div>
 
-          {/* 구글 로그인 버튼 (GIS가 컨테이너 폭에 맞춰 렌더) */}
+          {/* 구글 로그인 버튼 */}
           <div ref={googleBtnRef} className="w-full overflow-hidden" />
 
           {/* 카카오 로그인 */}
@@ -218,6 +263,20 @@ const handleKakaoLogin = () => {
               />
             </svg>
             <span className="text-[rgba(0,0,0,0.85)] text-sm font-medium">카카오 로그인</span>
+          </button>
+
+          {/* 애플 로그인 */}
+          <button
+            onClick={handleAppleLogin}
+            className="w-full h-10 rounded bg-black flex items-center justify-center gap-2 hover:brightness-125 transition-all border border-[rgba(255,255,255,0.15)]"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M10.94 8.49c.02 1.86 1.63 2.48 1.65 2.49-.01.05-.26.88-.85 1.74-.51.75-1.04 1.49-1.88 1.5-.82.02-1.09-.48-2.03-.48-.94 0-1.23.47-2.01.5-.81.03-1.42-.81-1.94-1.55-1.05-1.52-1.86-4.3-.78-6.18.54-.93 1.5-1.52 2.54-1.54.79-.01 1.54.53 2.03.53.48 0 1.39-.66 2.35-.56.4.02 1.53.16 2.26 1.22-.06.04-1.35.79-1.33 2.35zM9.4 3.56c.43-.52.72-1.25.64-1.97-.62.02-1.37.41-1.82.93-.4.46-.75 1.2-.66 1.9.69.06 1.4-.35 1.84-.86z"
+                fill="#ffffff"
+              />
+            </svg>
+            <span className="text-white text-sm font-medium">Apple로 로그인</span>
           </button>
 
           <p className="text-center text-[rgba(122,184,200,0.3)] text-xs">

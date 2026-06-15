@@ -1,26 +1,33 @@
-﻿{
+{
   "expo": {
-    "name": "app",
+    "name": "DriftLog",
     "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "app",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.kangila.driftlog",
+      "appleTeamId": "SS32PHC392",
       "supportsTablet": true,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.kangila.driftlog"
+        ]
+      },
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSupportsLiveActivities": true
       }
     },
     "android": {
       "package": "com.kangila.driftlog",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0a1a28",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -29,6 +36,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE",
+        "POST_NOTIFICATIONS",
         "WAKE_LOCK",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
@@ -46,19 +55,36 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0a1420",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0a1420"
           }
         }
       ],
       "expo-audio",
       [
-        "@react-native-kakao/core",
+        "expo-notifications",
         {
-          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#7ec0d2"
         }
       ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.103198072151-18120mge0ohd78sbhljkdo07slo22smt"
+        }
+      ],
+      [
+        "@react-native-kakao/core",
+        {
+          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075",
+          "android": {
+            "authCodeHandlerActivity": true
+          }
+        }
+      ],
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {
@@ -66,13 +92,22 @@
             "extraMavenRepos": [
               "https://devrepo.kakao.com/nexus/content/groups/public/"
             ]
+          },
+          "ios": {
+            "deploymentTarget": "16.2",
+            "extraPods": [
+              { "name": "GoogleUtilities", "modular_headers": true },
+              { "name": "RecaptchaInterop", "modular_headers": true },
+              { "name": "AppCheckCore", "modular_headers": true }
+            ]
           }
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": false,
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

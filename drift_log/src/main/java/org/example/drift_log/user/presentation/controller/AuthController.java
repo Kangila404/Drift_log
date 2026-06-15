@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.drift_log.user.application.AuthService;
+import org.example.drift_log.user.presentation.dto.req.AppleLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.KakaoLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.KakaoNativeLoginRequest;
 import org.example.drift_log.user.presentation.dto.req.LoginRequest;
@@ -56,6 +57,13 @@ public class AuthController {
     @PostMapping("/kakao/native")
     public ResponseEntity<SocialLoginResponse> kakaoNativeLogin(@Valid @RequestBody KakaoNativeLoginRequest request){
         SocialLoginResponse response = authService.kakaoNativeLogin(request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 4. apple
+    @PostMapping("/apple")
+    public ResponseEntity<SocialLoginResponse> appleLogin(@Valid @RequestBody AppleLoginRequest request){
+        SocialLoginResponse response = authService.appleLogin(request);
         return ResponseEntity.ok(response);
     }
 

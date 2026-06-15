@@ -1,3 +1,9 @@
+import {
+  requestStudyNotifPermission,
+  startStudyNotification,
+  updateStudyNotification,
+  stopStudyNotification,
+} from "../../services/studyNotification";
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, Pressable, StyleSheet, Modal, TextInput,
@@ -69,7 +75,6 @@ export default function StudyNativeHud({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
 
-  // 바텀시트 (항해와 동일)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("log");
   const [mounted, setMounted] = useState<Record<Tab, boolean>>({ log: true, profile: false });
@@ -80,19 +85,16 @@ export default function StudyNativeHud({
 
   const startAtRef = useRef<Date | null>(null);
 
-  // ── 첫 진입 연출 (항해 HUD와 동일: 바가 아래서 떠오르며 까딱 + 진동) ──
-  const barEnter = useRef(new Animated.Value(0)).current;   // 0=숨김(아래), 1=정착
-  const barHint = useRef(new Animated.Value(0)).current;    // 살짝 까딱
+  const barEnter = useRef(new Animated.Value(0)).current;
+  const barHint = useRef(new Animated.Value(0)).current;
   const enteredRef = useRef(false);
   useEffect(() => {
     if (enteredRef.current) return;
     enteredRef.current = true;
-    // 1) 아래서 떠오름
     Animated.timing(barEnter, {
       toValue: 1, duration: 520, delay: 250,
       easing: Easing.out(Easing.cubic), useNativeDriver: true,
     }).start();
-    // 2) 정착하는 순간 진동 + 까딱 (서울→수원 세팅되는 느낌)
     const t = setTimeout(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       Animated.sequence([
@@ -106,7 +108,6 @@ export default function StudyNativeHud({
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {});
   useEffect(() => { refreshSummary(); }, []);
 
-  // 세션 복구 (목표 넘긴 방치 세션은 폐기)
   useEffect(() => {
     (async () => {
       const saved = await AsyncStorage.getItem(START_KEY);
@@ -121,18 +122,19 @@ export default function StudyNativeHud({
       setElapsed(elapsedSec);
       setRunning(true);
       onStudyingChange(true);
+      startStudyNotification({ subject: (await AsyncStorage.getItem(SUBJ_KEY)) || "", elapsedSec, goalMin: goal }).catch(() => {});
     })();
   }, []);
 
   useEffect(() => {
-    return nativeNoise.subscribe(() => {
+    const unsub = nativeNoise.subscribe(() => {
       setCurNoise(nativeNoise.getCurrent());
       setMuted(nativeNoise.isMuted());
       onNoiseChange(nativeNoise.getCurrent());
     });
+    return () => { unsub(); };
   }, []);
 
-  // 진입 시 기본 백색소음 = 파도 (한 번)
   const defaultNoiseSet = useRef(false);
   useEffect(() => {
     if (defaultNoiseSet.current) return;
@@ -146,10 +148,11 @@ export default function StudyNativeHud({
     const id = setInterval(() => {
       const e = Math.floor((Date.now() - startAtRef.current!.getTime()) / 1000);
       setElapsed(e);
+      updateStudyNotification({ subject, elapsedSec: e, goalMin }).catch(() => {});
       if (e >= goalMin * 60) { clearInterval(id); finish(); }
     }, 1000);
     return () => clearInterval(id);
-  }, [running, goalMin]);
+  }, [running, goalMin, subject]);
 
   const clearSession = () => {
     AsyncStorage.removeItem(START_KEY);
@@ -168,6 +171,9 @@ export default function StudyNativeHud({
     setRunning(true);
     setSetupOpen(false);
     onStudyingChange(true);
+
+    await requestStudyNotifPermission();
+    await startStudyNotification({ subject, elapsedSec: 0, goalMin });
   };
 
   const finish = async () => {
@@ -177,6 +183,7 @@ export default function StudyNativeHud({
     setRunning(false);
     onStudyingChange(false);
     setSaving(true);
+    await stopStudyNotification().catch(() => {});
     try {
       await saveStudyTime(start, new Date(), subject);
       await refreshSummary();
@@ -192,13 +199,13 @@ export default function StudyNativeHud({
 
   const confirmFinish = () => { setConfirmOpen(false); finish(); };
 
-  // 모드 선택으로 나가기 — 진행 중 세션 폐기 + 타이머 정지
   const leaveStudy = () => {
     startAtRef.current = null;
     setRunning(false);
     onStudyingChange(false);
     clearSession();
     setElapsed(0);
+    stopStudyNotification().catch(() => {});
     onLeave();
   };
 
@@ -209,7 +216,6 @@ export default function StudyNativeHud({
   const noiseOff = () => nativeNoise.select(null);
   const toggleMute = () => setMuted(nativeNoise.toggleMute());
 
-  // ── 바텀시트 (항해 VoyageHud 패턴 그대로) ──
   const animateTo = (toValue: number, cb?: () => void) => {
     Animated.timing(translateY, { toValue, duration: 220, useNativeDriver: true }).start(cb);
   };
@@ -240,7 +246,6 @@ export default function StudyNativeHud({
   const liveToday = summary.todaySeconds + (running ? elapsed : 0);
   const progress = running ? Math.min(1, elapsed / (goalMin * 60)) : 0;
 
-  // 바 등장: 아래서 떠오름(barEnter) + 정착 시 까딱(barHint)
   const barTranslateY = Animated.add(
     barEnter.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
     barHint.interpolate({ inputRange: [0, 1], outputRange: [0, -7] }),
@@ -248,12 +253,10 @@ export default function StudyNativeHud({
 
   return (
     <>
-      {/* 우상단 소리 버튼 */}
       <Pressable onPress={() => setSoundOpen(true)} style={[s.soundBtn, { top: insets.top + 10 }]}>
         <Text style={s.soundIcon}>♫</Text>
       </Pressable>
 
-      {/* 하단 바 — 오늘 공부량 + 타이머 + 시작/종료 (첫 진입 시 떠오르며 까딱) */}
       <Animated.View style={[s.bottomBar, { bottom: insets.bottom + 18, opacity: barEnter, transform: [{ translateY: barTranslateY }] }]}>
         <View style={s.barInner}>
           <View style={s.todayCol}>
@@ -284,16 +287,14 @@ export default function StudyNativeHud({
         </View>
       </Animated.View>
 
-      {/* ── 하단 중앙 ≡ FAB (항해와 동일 위치) ── */}
       {!sheetOpen && (
-        <View style={[s.fabWrap, { bottom: insets.bottom + 92 }]} pointerEvents="box-none">
+        <View style={[s.fabWrap, { top: insets.top + 10 }]} pointerEvents="box-none">
           <Pressable onPress={openSheet} style={s.fab}>
             <Text style={s.fabIcon}>≡</Text>
           </Pressable>
         </View>
       )}
 
-      {/* ── 바텀시트 (슬라이드업, 일지/나 탭) ── */}
       {sheetOpen && (
         <View style={s.sheetOverlay}>
           <Pressable style={s.backdrop} onPress={closeSheet} />
@@ -333,7 +334,6 @@ export default function StudyNativeHud({
         </View>
       )}
 
-      {/* ── 목표 설정 모달 (슬라이더) ── */}
       <Modal visible={setupOpen} transparent animationType="fade" onRequestClose={() => setSetupOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setSetupOpen(false)}>
           <Pressable style={s.modalCard} onPress={() => {}}>
@@ -370,7 +370,6 @@ export default function StudyNativeHud({
         </Pressable>
       </Modal>
 
-      {/* ── 종료 확인 ── */}
       <Modal visible={confirmOpen} transparent animationType="fade" onRequestClose={() => setConfirmOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setConfirmOpen(false)}>
           <Pressable style={[s.modalCard, { maxWidth: 320 }]} onPress={() => {}}>
@@ -385,7 +384,6 @@ export default function StudyNativeHud({
         </Pressable>
       </Modal>
 
-      {/* ── 소리 선택 ── */}
       <Modal visible={soundOpen} transparent animationType="fade" onRequestClose={() => setSoundOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setSoundOpen(false)}>
           <Pressable style={[s.modalCard, { maxWidth: 340 }]} onPress={() => {}}>
@@ -446,15 +444,13 @@ const s = StyleSheet.create({
   stopBtn: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: "rgba(26,74,100,0.6)" },
   stopText: { color: "#7eb8d4", fontSize: 13, letterSpacing: 1.5, fontFamily: "monospace" },
 
-  // ≡ FAB — 하단 중앙 (항해와 동일)
-  fabWrap: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 15 },
+  fabWrap: { position: "absolute", left: 16, alignItems: "flex-start", zIndex: 20 },
   fab: {
-    width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center",
+    width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(26,74,100,0.7)", backgroundColor: "rgba(10,24,40,0.9)",
   },
   fabIcon: { color: "#7eb8d4", fontSize: 22 },
 
-  // 바텀시트
   sheetOverlay: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, zIndex: 30 },
   backdrop: { flex: 1, backgroundColor: "rgba(2,6,14,0.35)" },
   sheet: {
@@ -478,7 +474,6 @@ const s = StyleSheet.create({
   leave: { borderTopWidth: 1, borderTopColor: "#0d2233", paddingTop: 14, alignItems: "center" },
   leaveText: { color: "#3a6880", fontSize: 11, letterSpacing: 2, fontFamily: "monospace" },
 
-  // 모달 공통
   overlay: { flex: 1, backgroundColor: "rgba(2,6,14,0.85)", alignItems: "center", justifyContent: "center", padding: 24 },
   modalCard: { width: "100%", maxWidth: 380, backgroundColor: "#050e18", borderWidth: 1, borderColor: "rgba(26,74,100,0.5)", borderRadius: 18, padding: 26, gap: 22 },
   modalTitle: { color: "#7eb8d4", fontSize: 12, letterSpacing: 4, fontFamily: "monospace", textAlign: "center" },

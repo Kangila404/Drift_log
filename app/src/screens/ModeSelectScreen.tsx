@@ -9,12 +9,12 @@ import Svg, { Path, Rect } from "react-native-svg";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { assetUrl } from "../api/config";
 import { getVersion } from "../api/version";
+import { MODE_IMAGES } from "../constants/assets";
 
 const MODES = [
-  { route: "voyage", title: "항해", en: "VOYAGE", desc: "물에 잠긴 도시를 항해하며 가족의 흔적을 찾습니다.", img: "/mode/voyage.png", locked: false },
-  { route: "study", title: "공부", en: "STUDY", desc: "항해 시간 동안 백색 소음을 들으며 집중하세요.", img: "/mode/study.png", locked: false },
+  { route: "voyage", title: "항해", en: "VOYAGE", desc: "물에 잠긴 도시를 항해하며 가족의 흔적을 찾습니다.", img: MODE_IMAGES.voyage, locked: false },
+  { route: "study", title: "공부", en: "STUDY", desc: "항해 시간 동안 백색 소음을 들으며 집중하세요.", img: MODE_IMAGES.study, locked: false },
 ];
 
 // ── 도미노 충격파 타이밍 (ms). 위에서 아래로 와르르 ──
@@ -69,7 +69,7 @@ function ModeCard({
   return (
     <Animated.View style={{ flex: 1, opacity: appear, transform: [{ translateY: pushY }, { scaleY }, { scale: pressScale }] }}>
       <Pressable onPress={onPress} onPressIn={onIn} onPressOut={onOut} style={s.card}>
-        <Image source={{ uri: assetUrl(mode.img)! }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
+        <Image source={mode.img} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
 
         <LinearGradient
           colors={["rgba(3,9,16,0.05)", "rgba(3,9,16,0.45)", "rgba(3,9,16,0.95)"]}
