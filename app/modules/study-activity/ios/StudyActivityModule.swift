@@ -1,9 +1,10 @@
 import ExpoModulesCore
 import ActivityKit
 
-// 위젯 타깃의 WidgetAttributes와 동일한 구조를 메인 앱에서도 정의해야
-// ActivityKit이 같은 Activity를 다룰 수 있다. (이름/필드 정확히 일치 필수)
-struct StudyWidgetAttributes: ActivityAttributes {
+// ⚠️ 위젯 타깃(WidgetLiveActivity.swift)의 WidgetAttributes와
+// 이름·필드가 정확히 일치해야 ActivityKit이 같은 Activity로 인식한다.
+// 위젯 타깃과 메인 앱은 코드를 공유하지 않으므로 동일 구조를 여기서도 선언한다.
+struct WidgetAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var subject: String
         var elapsedLabel: String
@@ -22,11 +23,11 @@ public class StudyActivityModule: Module {
         AsyncFunction("start") { (subject: String, elapsedLabel: String, goalLabel: String, remainMin: Int, progress: Double) -> String in
             if #available(iOS 16.2, *) {
                 // 중복 방지: 기존 활동 모두 종료
-                for activity in Activity<StudyWidgetAttributes>.activities {
+                for activity in Activity<WidgetAttributes>.activities {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
-                let attributes = StudyWidgetAttributes(name: "DriftLog")
-                let state = StudyWidgetAttributes.ContentState(
+                let attributes = WidgetAttributes(name: "DriftLog")
+                let state = WidgetAttributes.ContentState(
                     subject: subject, elapsedLabel: elapsedLabel,
                     goalLabel: goalLabel, remainMin: remainMin, progress: progress
                 )
@@ -46,11 +47,11 @@ public class StudyActivityModule: Module {
         // 업데이트
         AsyncFunction("update") { (subject: String, elapsedLabel: String, goalLabel: String, remainMin: Int, progress: Double) in
             if #available(iOS 16.2, *) {
-                let state = StudyWidgetAttributes.ContentState(
+                let state = WidgetAttributes.ContentState(
                     subject: subject, elapsedLabel: elapsedLabel,
                     goalLabel: goalLabel, remainMin: remainMin, progress: progress
                 )
-                for activity in Activity<StudyWidgetAttributes>.activities {
+                for activity in Activity<WidgetAttributes>.activities {
                     await activity.update(.init(state: state, staleDate: nil))
                 }
             }
@@ -59,7 +60,7 @@ public class StudyActivityModule: Module {
         // 종료
         AsyncFunction("end") {
             if #available(iOS 16.2, *) {
-                for activity in Activity<StudyWidgetAttributes>.activities {
+                for activity in Activity<WidgetAttributes>.activities {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             }

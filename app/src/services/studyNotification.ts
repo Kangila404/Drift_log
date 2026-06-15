@@ -87,10 +87,11 @@ export async function startStudyNotification(input: StudyNotifInput) {
   if (Platform.OS === "ios") {
     try {
       const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
-      await startStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
+      const id = await startStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
+      console.log("[StudyActivity] start 성공, id:", id);
       iosActive = true;
     } catch (e) {
-      // Live Activity 미지원 기기/버전이면 조용히 무시
+      console.error("[StudyActivity] start 실패:", e);
     }
     return;
   }
@@ -124,7 +125,9 @@ export async function updateStudyNotification(input: StudyNotifInput) {
       if (!iosActive) return;
       const { label, elapsedLabel, goalLabel, remainMin, progress } = buildParts(input);
       await updateStudyActivity(label, elapsedLabel, goalLabel, remainMin, progress);
-    } catch (e) {}
+    } catch (e) {
+      console.error("[StudyActivity] update 실패:", e);
+    }
     return;
   }
 
@@ -153,7 +156,9 @@ export async function stopStudyNotification() {
   if (Platform.OS === "ios") {
     try {
       await endStudyActivity();
-    } catch (e) {}
+    } catch (e) {
+      console.error("[StudyActivity] end 실패:", e);
+    }
     iosActive = false;
     return;
   }
