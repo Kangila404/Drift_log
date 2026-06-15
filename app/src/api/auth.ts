@@ -10,8 +10,22 @@ export type LoginResponse = {
   refreshToken: string;
 };
 
+export type SignupRequest = {
+  email: string;
+  name: string;
+  password: string;
+  passwordConfirm: string;
+};
+
 export const login = async (data: LoginRequest): Promise<LoginResponse> => {
   const response = await apiClient.post("/auth/login", data);
+  return response.data;
+};
+
+// 회원가입 — 성공 시 바로 로그인 상태가 되도록 토큰 반환
+// 백엔드: POST /api/auth/signup
+export const signup = async (data: SignupRequest): Promise<LoginResponse> => {
+  const response = await apiClient.post("/auth/signup", data);
   return response.data;
 };
 

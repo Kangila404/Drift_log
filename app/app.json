@@ -1,6 +1,6 @@
-﻿{
+{
   "expo": {
-    "name": "app",
+    "name": "DriftLog",
     "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,13 +14,14 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.kangila.driftlog",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0a1a28",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -29,6 +30,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE",
+        "POST_NOTIFICATIONS",
         "WAKE_LOCK",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
@@ -46,17 +49,27 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#241825",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#241825"
           }
         }
       ],
       "expo-audio",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#7ec0d2"
+        }
+      ],
+      [
         "@react-native-kakao/core",
         {
-          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075"
+          "nativeAppKey": "5a813fdcd4530b4ea7fb801fd7300075",
+          "android": {
+            "authCodeHandlerActivity": true
+          }
         }
       ],
       [
@@ -66,7 +79,23 @@
             "extraMavenRepos": [
               "https://devrepo.kakao.com/nexus/content/groups/public/"
             ]
+          },
+          "ios": {
+            "deploymentTarget": "16.2"
           }
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.com.kangila.driftlog",
+          "widgets": [
+            {
+              "name": "StudyActivity",
+              "displayName": "공부 항해",
+              "description": "공부 세션 타이머를 잠금화면과 다이나믹 아일랜드에 표시합니다."
+            }
+          ]
         }
       ]
     ],

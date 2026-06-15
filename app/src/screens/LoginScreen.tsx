@@ -1,27 +1,28 @@
-import { useEffect, useState } from "react";
-import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  View, Text, TextInput, Pressable, Alert, StyleSheet,
+  KeyboardAvoidingView, Platform, Animated, Easing, ScrollView,
+} from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  GoogleSignin,
-  statusCodes,
-  isErrorWithCode,
+  GoogleSignin, statusCodes, isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { login as kakaoSDKLogin } from "@react-native-kakao/user";
 import { login, socialLogin, kakaoNativeLogin } from "../api/auth";
+import { getTodayWeather } from "../api/weather";
 
-// 구글 로그인 설정 — 모듈 로드 시 1회. webClientId는 idToken 발급에 필수(웹 OAuth 클라이언트 ID).
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   offlineAccess: false,
 });
-
-// 카카오 SDK 초기화 — 모듈 로드 시 1회. 네이티브 앱 키로 SDK 활성화.
 initializeKakaoSDK(process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY as string);
 
 type Mode = "select" | "email";
+type Field = "email" | "password";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,25 +30,32 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [focused, setFocused] = useState<Field | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+  const [weather, setWeather] = useState<string | null>(null);
 
-  // 타이틀 타이핑 애니메이션 (웹 버전 이식)
   const fullText = "물에 잠긴 한국을 항해하다";
   const [displayText, setDisplayText] = useState("");
   useEffect(() => {
     let index = 0;
     const timer = setInterval(() => {
-      if (index < fullText.length) {
-        setDisplayText(fullText.slice(0, index + 1));
-        index++;
-      } else {
-        clearInterval(timer);
-      }
+      if (index < fullText.length) { setDisplayText(fullText.slice(0, index + 1)); index++; }
+      else clearInterval(timer);
     }, 80);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    getTodayWeather().then((w) => setWeather(w.label)).catch(() => {});
+  }, []);
+
+  const formFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    formFade.setValue(0);
+    Animated.timing(formFade, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [mode]);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -65,7 +73,6 @@ export default function LoginScreen() {
     }
   };
 
-  // 구글 로그인 — SDK로 idToken 받아 백엔드(socialLogin)로 보내 우리 JWT 획득
   const handleGoogleLogin = async () => {
     if (googleLoading) return;
     setGoogleLoading(true);
@@ -73,23 +80,17 @@ export default function LoginScreen() {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
       const idToken = response.data?.idToken;
-      if (!idToken) {
-        Alert.alert("구글 로그인 실패", "인증 토큰을 받지 못했어요.");
-        return;
-      }
-      console.log("[구글] socialLogin 호출 시작 → 백엔드로 idToken 전송");
+      if (!idToken) { Alert.alert("구글 로그인 실패", "인증 토큰을 받지 못했어요."); return; }
       const result = await socialLogin(idToken);
-      console.log("[구글] socialLogin 응답 받음:", JSON.stringify(result));
       await AsyncStorage.setItem("accessToken", result.accessToken);
       await AsyncStorage.setItem("refreshToken", result.refreshToken);
       router.replace("/mode-select");
     } catch (e) {
       if (isErrorWithCode(e)) {
-        if (e.code === statusCodes.SIGN_IN_CANCELLED) return; // 사용자가 취소
+        if (e.code === statusCodes.SIGN_IN_CANCELLED) return;
         if (e.code === statusCodes.IN_PROGRESS) return;
         if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-          Alert.alert("구글 로그인 불가", "이 기기에서 Google Play 서비스를 사용할 수 없어요.");
-          return;
+          Alert.alert("구글 로그인 불가", "이 기기에서 Google Play 서비스를 사용할 수 없어요."); return;
         }
       }
       console.error("구글 로그인 실패:", e);
@@ -99,30 +100,20 @@ export default function LoginScreen() {
     }
   };
 
-  // 카카오 로그인 — SDK로 accessToken 받아 백엔드(kakaoNativeLogin)로 보내 우리 JWT 획득
   const handleKakaoLogin = async () => {
     if (kakaoLoading) return;
     setKakaoLoading(true);
     try {
-      // 카카오톡 설치 시 톡으로, 없으면 카카오계정(CustomTabs)으로 인증
       const token = await kakaoSDKLogin();
       const kakaoAccessToken = token.accessToken;
-      if (!kakaoAccessToken) {
-        Alert.alert("카카오 로그인 실패", "인증 토큰을 받지 못했어요.");
-        return;
-      }
-      console.log("[카카오] kakaoNativeLogin 호출 시작 → 백엔드로 accessToken 전송");
+      if (!kakaoAccessToken) { Alert.alert("카카오 로그인 실패", "인증 토큰을 받지 못했어요."); return; }
       const result = await kakaoNativeLogin(kakaoAccessToken);
-      console.log("[카카오] kakaoNativeLogin 응답 받음:", JSON.stringify(result));
       await AsyncStorage.setItem("accessToken", result.accessToken);
       await AsyncStorage.setItem("refreshToken", result.refreshToken);
       router.replace("/mode-select");
     } catch (e: any) {
-      // 사용자가 로그인 취소한 경우 — 카카오 SDK는 에러로 던짐
       const msg = String(e?.message ?? "");
-      if (msg.includes("cancel") || msg.includes("Cancel") || e?.code === "Cancelled") {
-        return;
-      }
+      if (msg.includes("cancel") || msg.includes("Cancel") || e?.code === "Cancelled") return;
       console.error("카카오 로그인 실패:", e);
       Alert.alert("카카오 로그인 실패", "잠시 후 다시 시도해주세요.");
     } finally {
@@ -130,126 +121,135 @@ export default function LoginScreen() {
     }
   };
 
-  const notReady = (label: string) =>
-    Alert.alert("준비 중", `${label}은(는) 추후 지원될 예정이에요.`);
+  const borderFor = (f: Field) => (focused === f ? "#c88a7a" : "rgba(150,140,160,0.25)");
 
   return (
-    // TODO: OceanBackground → 3D 항해 씬 WebView 배경 (별도 단계). 지금은 단색
-    <View className="flex-1 items-center justify-center bg-[#07111d] px-6">
-      {/* 브랜드 헤더 — 스플래시 톤 */}
-      <View className="items-center mb-10">
-        <Text className="text-[#7ab8c8]/40 text-[10px] tracking-[3px] mb-2">
-          {displayText}
-        </Text>
-        <Text className="text-[#b4d2da]/90 text-4xl font-light tracking-[8px]">
-          DriftLog
-        </Text>
-        <Text className="text-[#7ab8c8]/40 text-[10px] tracking-[3px] mt-3">
-          가족을 찾아, 도시에서 도시로
-        </Text>
-      </View>
+    <LinearGradient
+      colors={["#0c1622", "#121a28", "#1e1a2a", "#281a28", "#331d28"]}
+locations={[0, 0.3, 0.55, 0.8, 1]}
+      start={{ x: 0.3, y: 0 }}
+      end={{ x: 0.7, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <LinearGradient
+  colors={["rgba(74,154,187,0.13)", "rgba(74,154,187,0.06)", "rgba(74,154,187,0.02)", "transparent"]}
+  locations={[0, 0.4, 0.7, 1]}
+  style={st.topGlow}
+  start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+  pointerEvents="none"
+/>
+      {/* 하단 황혼 빛번짐 */}
+      <LinearGradient
+        colors={["transparent", "rgba(180,100,120,0.16)", "rgba(200,120,100,0.20)"]}
+        locations={[0, 0.6, 1]}
+        style={st.duskGlow}
+        start={{ x: 0.15, y: 0 }} end={{ x: 0.85, y: 1 }}
+        pointerEvents="none"
+      />
 
-      {mode === "select" ? (
-        // ── 1단계: 로그인 방법 선택 ──
-        <View className="w-full max-w-xs gap-3">
-          {/* 카카오 */}
-          <Pressable
-            onPress={handleKakaoLogin}
-            disabled={kakaoLoading}
-            className="flex-row items-center justify-center gap-2 bg-[#FEE500] py-3.5 rounded-md active:opacity-80"
-          >
-            <KakaoGlyph />
-            <Text className="text-[#191600] text-sm font-medium tracking-[1px]">
-              {kakaoLoading ? "로그인 중..." : "카카오로 로그인"}
-            </Text>
-          </Pressable>
-
-          {/* 구글 */}
-          <Pressable
-            onPress={handleGoogleLogin}
-            disabled={googleLoading}
-            className="flex-row items-center justify-center gap-2 bg-white py-3.5 rounded-md active:opacity-80"
-          >
-            <GoogleGlyph />
-            <Text className="text-[#1f1f1f] text-sm font-medium tracking-[1px]">
-              {googleLoading ? "로그인 중..." : "Google로 로그인"}
-            </Text>
-          </Pressable>
-
-          {/* 이메일(로컬) 로그인 */}
-          <Pressable
-            onPress={() => setMode("email")}
-            className="flex-row items-center justify-center gap-2 border border-[#7ab8c8]/40 py-3.5 rounded-md active:bg-[#7ab8c8]/10"
-          >
-            <MailGlyph />
-            <Text className="text-[#b4d2da]/90 text-sm tracking-[1px]">이메일로 로그인</Text>
-          </Pressable>
-
-          {/* 회원가입 */}
-          <Pressable onPress={() => notReady("회원가입")} className="py-3 active:opacity-70">
-            <Text className="text-center text-[#7ab8c8]/40 text-xs">
-              처음이신가요? <Text className="text-[#7ab8c8]/70 underline">회원가입</Text>
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
-        // ── 2단계: 이메일 입력 폼 ──
-        <View className="w-full max-w-xs border border-[#7ab8c8]/20 bg-[#060e16]/85 p-7 gap-5">
-          <View className="gap-1">
-            <Text className="text-[#7ab8c8]/50 text-xs tracking-[2px]">이메일</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              className="bg-[#7ab8c8]/5 border border-[#7ab8c8]/20 text-[#b4d2da] px-3 py-2.5 text-sm"
-              placeholderTextColor="#7ab8c855"
-            />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={st.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* 헤더 */}
+          <View style={st.header}>
+            <Text style={st.headTyping}>{displayText}</Text>
+            <Text style={st.brand}>DriftLog</Text>
+            <Text style={st.headSub}>가족을 찾아, 도시에서 도시로</Text>
           </View>
 
-          <View className="gap-1">
-            <Text className="text-[#7ab8c8]/50 text-xs tracking-[2px]">비밀번호</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              className="bg-[#7ab8c8]/5 border border-[#7ab8c8]/20 text-[#b4d2da] px-3 py-2.5 text-sm"
-              placeholderTextColor="#7ab8c855"
-            />
-          </View>
+          {mode === "select" ? (
+            <Animated.View style={[st.formCol, { opacity: formFade }]}>
+              <Pressable onPress={handleKakaoLogin} disabled={kakaoLoading} style={[st.socialBtn, { backgroundColor: "#FEE500" }]}>
+                <KakaoGlyph />
+                <Text style={[st.socialText, { color: "#191600" }]}>
+                  {kakaoLoading ? "로그인 중..." : "카카오로 로그인"}
+                </Text>
+              </Pressable>
 
-          <Pressable
-            onPress={handleLogin}
-            disabled={loading}
-            className="border border-[#7ab8c8]/40 py-3 active:bg-[#7ab8c8]/10"
-          >
-            <Text className="text-[#b4d2da]/80 text-xs tracking-[2px] text-center">
-              {loading ? "..." : "출항"}
-            </Text>
-          </Pressable>
+              <Pressable onPress={handleGoogleLogin} disabled={googleLoading} style={[st.socialBtn, { backgroundColor: "#fff" }]}>
+                <GoogleGlyph />
+                <Text style={[st.socialText, { color: "#1f1f1f" }]}>
+                  {googleLoading ? "로그인 중..." : "Google로 로그인"}
+                </Text>
+              </Pressable>
 
-          {/* 뒤로 — 방법 선택으로 */}
-          <Pressable onPress={() => setMode("select")} className="active:opacity-70">
-            <Text className="text-center text-[#7ab8c8]/40 text-xs">‹ 다른 방법으로 로그인</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
+              <Pressable onPress={() => setMode("email")} style={st.emailBtn}>
+                <MailGlyph />
+                <Text style={st.emailBtnText}>이메일로 로그인</Text>
+              </Pressable>
+
+              <Pressable onPress={() => router.push("/signup")} style={{ paddingVertical: 12 }}>
+                <Text style={st.signupLink}>
+                  처음이신가요? <Text style={st.signupLinkAccent}>회원가입</Text>
+                </Text>
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <Animated.View style={[st.emailForm, { opacity: formFade }]}>
+              <View style={st.fieldWrap}>
+                <Text style={st.label}>이메일</Text>
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  onFocus={() => setFocused("email")}
+                  onBlur={() => setFocused(null)}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="you@example.com"
+                  placeholderTextColor="#5a4a52"
+                  style={[st.input, { borderColor: borderFor("email") }]}
+                />
+              </View>
+
+              <View style={st.fieldWrap}>
+                <Text style={st.label}>비밀번호</Text>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setFocused("password")}
+                  onBlur={() => setFocused(null)}
+                  secureTextEntry
+                  placeholder="비밀번호"
+                  placeholderTextColor="#5a4a52"
+                  style={[st.input, { borderColor: borderFor("password") }]}
+                />
+              </View>
+
+              <Pressable onPress={handleLogin} disabled={loading} style={st.submit}>
+                <Text style={st.submitText}>{loading ? "..." : "출항"}</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setMode("select")} style={{ paddingVertical: 4 }}>
+                <Text style={st.backLink}>‹ 다른 방법으로 로그인</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
+          {weather && (
+            <View style={st.weatherWrap}>
+              <Text style={st.weatherText}>오늘의 바다 · {weather}</Text>
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
-// ─── 아이콘 (단색 SVG) ───
 function KakaoGlyph() {
   return (
     <Svg width={17} height={17} viewBox="0 0 24 24">
-      <Path
-        d="M12 3C6.9 3 3 6.3 3 10.3c0 2.6 1.8 4.9 4.4 6.1-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.7-1.8 3.8-2.6.4 0 .8.1 1.2.1 5.1 0 9-3.3 9-7.3S17.1 3 12 3Z"
-        fill="#191600"
-      />
+      <Path d="M12 3C6.9 3 3 6.3 3 10.3c0 2.6 1.8 4.9 4.4 6.1-.2.7-.7 2.6-.8 3-.1.5.2.5.4.4.2-.1 2.7-1.8 3.8-2.6.4 0 .8.1 1.2.1 5.1 0 9-3.3 9-7.3S17.1 3 12 3Z" fill="#191600" />
     </Svg>
   );
 }
-
 function GoogleGlyph() {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24">
@@ -260,12 +260,44 @@ function GoogleGlyph() {
     </Svg>
   );
 }
-
 function MailGlyph() {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path d="M4 6h16v12H4z" stroke="#b4d2da" strokeWidth={1.5} strokeLinejoin="round" />
-      <Path d="m4 7 8 6 8-6" stroke="#b4d2da" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M4 6h16v12H4z" stroke="#c0b0b8" strokeWidth={1.5} strokeLinejoin="round" />
+      <Path d="m4 7 8 6 8-6" stroke="#c0b0b8" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
+
+const st = StyleSheet.create({
+ topGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 520 },
+  duskGlow: { position: "absolute", bottom: 0, left: 0, right: 0, height: 480 },
+
+  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, paddingVertical: 60 },
+
+  header: { alignItems: "center", marginBottom: 40 },
+  headTyping: { color: "rgba(200,170,180,0.5)", fontSize: 10, letterSpacing: 3, marginBottom: 8, fontFamily: "monospace" },
+  brand: { color: "rgba(225,210,215,0.92)", fontSize: 36, fontWeight: "300", letterSpacing: 8 },
+  headSub: { color: "rgba(200,170,180,0.5)", fontSize: 10, letterSpacing: 3, marginTop: 12, fontFamily: "monospace" },
+
+  formCol: { width: "100%", maxWidth: 320, gap: 12 },
+  socialBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 8 },
+  socialText: { fontSize: 14, fontWeight: "500", letterSpacing: 1 },
+
+  // 황혼 배경이 비치도록 — 청록 단색 제거, 거의 투명한 중립 톤 + 옅은 보더
+  emailBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: "rgba(220,200,205,0.18)", backgroundColor: "rgba(255,255,255,0.06)" },
+  emailBtnText: { color: "rgba(225,210,215,0.9)", fontSize: 14, letterSpacing: 1 },
+  signupLink: { textAlign: "center", color: "rgba(200,170,180,0.5)", fontSize: 12 },
+  signupLinkAccent: { color: "rgba(225,190,180,0.85)", textDecorationLine: "underline" },
+
+  emailForm: { width: "100%", maxWidth: 320, borderWidth: 1, borderColor: "rgba(200,150,160,0.22)", backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 26, gap: 18 },
+  fieldWrap: { gap: 6 },
+  label: { color: "rgba(200,170,180,0.55)", fontSize: 11, letterSpacing: 2, fontFamily: "monospace" },
+  input: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, color: "#e1d2d7", fontSize: 14 },
+  submit: { borderWidth: 1, borderColor: "rgba(200,150,160,0.4)", borderRadius: 8, paddingVertical: 13, alignItems: "center", backgroundColor: "rgba(255,255,255,0.04)" },
+  submitText: { color: "rgba(225,210,215,0.85)", fontSize: 12, letterSpacing: 2, fontFamily: "monospace" },
+  backLink: { textAlign: "center", color: "rgba(200,170,180,0.5)", fontSize: 12 },
+
+  weatherWrap: { alignItems: "center", marginTop: 36 },
+  weatherText: { color: "rgba(200,180,185,0.35)", fontSize: 10, letterSpacing: 3, fontFamily: "monospace" },
+});
