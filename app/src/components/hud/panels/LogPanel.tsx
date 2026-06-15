@@ -8,10 +8,13 @@ import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { getVoyageLogs, saveVoyageNote, getUserProfile, type VoyageLog, type VoyageEvent } from "../../../api/voyage";
-import { CITY_META, assetUrl } from "../../../api/config";
+import { CITY_META } from "../../../api/config";
 import { nativeBgm } from "../../../api/nativeBgm";
 
 const BLUR = "L03[?bof00ay~qj[ayj@00fQ_3fk";
+
+// require된 로컬 모듈(number)이면 prefetch/캐시 props 제외
+const isLocal = (src: any) => typeof src === "number";
 
 type MonthGroup = { key: string; label: string; logs: VoyageLog[] };
 
@@ -43,11 +46,6 @@ export default function LogPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    const urls = visitedIds.map((id) => assetUrl(CITY_META[id]?.img)).filter(Boolean) as string[];
-    if (urls.length) Image.prefetch(urls, { cachePolicy: "memory-disk" });
-  }, [visitedIds]);
-
   const visited = visitedIds.filter((id) => CITY_META[id]);
 
   const monthGroups: MonthGroup[] = (() => {
@@ -68,7 +66,6 @@ export default function LogPanel() {
   const toggleMonth = (key: string, idx: number) =>
     setCollapsed((p) => ({ ...p, [key]: !(p[key] ?? idx !== 0) }));
 
-  // 날짜(하루) 접기 — 기본 펼침
   const isDateCollapsed = (key: string) => collapsedDates[key] ?? false;
   const toggleDate = (key: string) =>
     setCollapsedDates((p) => ({ ...p, [key]: !(p[key] ?? false) }));
@@ -126,7 +123,11 @@ export default function LogPanel() {
                               {log.events.length > 0 && (
                                 <View style={s.thumbRow}>
                                   {log.events.map((ev, i) => (
-                                    <Image key={i} source={ev.imageUrl} style={s.thumb} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                                    isLocal(ev.imageUrl) ? (
+                                      <Image key={i} source={ev.imageUrl} style={s.thumb} contentFit="cover" transition={150} />
+                                    ) : (
+                                      <Image key={i} source={ev.imageUrl} style={s.thumb} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                                    )
                                   ))}
                                 </View>
                               )}
@@ -146,7 +147,6 @@ export default function LogPanel() {
         );
       })}
 
-      {/* 상세 모달 */}
       <LogDetailModal
         log={detail}
         onClose={() => setDetail(null)}
@@ -156,35 +156,26 @@ export default function LogPanel() {
         }}
       />
 
-      {/* 사진 모달 (그리드 + 풀스크린을 한 모달 안에서 전환 — 중첩 X) */}
       <PhotoModal visible={photoOpen} visited={visited} screenW={SCREEN_W} onClose={() => setPhotoOpen(false)} />
 
-      {/* 음악 모달 */}
       <MusicModal visible={musicOpen} visited={visited} onClose={() => setMusicOpen(false)} />
     </ScrollView>
   );
 }
 
-// ─── 사진 모달 (그리드 ↔ 풀스크린 단일 모달) ───
+// ─── 사진 모달 ───
 function PhotoModal({ visible, visited, screenW, onClose }: {
   visible: boolean; visited: number[]; screenW: number; onClose: () => void;
 }) {
   const [full, setFull] = useState<number | null>(null);
 
-  // 모달 닫힐 때 풀스크린 상태 초기화 (다음에 열 때 확대부터 뜨는 버그 방지)
   useEffect(() => { if (!visible) setFull(null); }, [visible]);
 
-  const close = () => {
-    if (full !== null) setFull(null);  // 풀스크린이면 그리드로 복귀
-    else onClose();
-  };
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => (full !== null ? setFull(null) : onClose())}>
       {full !== null && CITY_META[full] ? (
-        // ── 풀스크린 ──
         <Pressable style={s.fullWrap} onPress={() => setFull(null)}>
-          <Image source={assetUrl(CITY_META[full].img)} style={s.fullImg} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+          <Image source={CITY_META[full].img} style={s.fullImg} contentFit="cover" transition={150} />
           <View style={s.fullTextWrap} pointerEvents="none">
             <Text style={s.fullName}>{CITY_META[full].name}</Text>
             <Text style={s.fullDesc}>{CITY_META[full].desc}</Text>
@@ -192,7 +183,6 @@ function PhotoModal({ visible, visited, screenW, onClose }: {
           </View>
         </Pressable>
       ) : (
-        // ── 그리드 ──
         <View style={s.overlay}>
           <Text style={s.overlayTitle}>지나온 도시</Text>
           <ScrollView contentContainerStyle={s.grid} showsVerticalScrollIndicator={false}>
@@ -200,7 +190,7 @@ function PhotoModal({ visible, visited, screenW, onClose }: {
               const c = CITY_META[id];
               return (
                 <Pressable key={id} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setFull(id); }} style={[s.gridCell, { width: (screenW - 56) / 2 }]}>
-                  <Image source={assetUrl(c.img)} style={s.gridImg} contentFit="cover" cachePolicy="memory-disk" transition={200} placeholder={BLUR} />
+                  <Image source={c.img} style={s.gridImg} contentFit="cover" transition={200} />
                   <View style={s.gridLabelWrap}><Text style={s.gridLabel}>{c.name}</Text></View>
                 </Pressable>
               );
@@ -236,11 +226,16 @@ function LogDetailModal({ log, onClose, onSaved }: {
     <Modal visible={!!log} transparent animationType="fade" onRequestClose={onClose}>
       {log && (
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.detailOverlay}>
-          {/* 이벤트 상세를 같은 모달 안에서 전환 (중첩 X) */}
           {event ? (
             <Pressable style={s.eventFull} onPress={() => setEvent(null)}>
               <View style={s.eventCard}>
-                {event.imageUrl && <Image source={event.imageUrl} style={s.eventBig} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />}
+                {event.imageUrl && (
+                  isLocal(event.imageUrl) ? (
+                    <Image source={event.imageUrl} style={s.eventBig} contentFit="cover" transition={150} />
+                  ) : (
+                    <Image source={event.imageUrl} style={s.eventBig} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                  )
+                )}
                 <View style={{ padding: 20, gap: 10 }}>
                   <Text style={s.sectionLabel}>항해 중 마주친 것</Text>
                   <Text style={s.eventName}>{event.name}</Text>
@@ -275,7 +270,11 @@ function LogDetailModal({ log, onClose, onSaved }: {
                     <View style={s.eventRow}>
                       {log.events.map((ev, i) => (
                         <Pressable key={i} onPress={() => setEvent(ev)} style={s.eventThumb}>
-                          <Image source={ev.imageUrl} style={s.eventThumbImg} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                          {isLocal(ev.imageUrl) ? (
+                            <Image source={ev.imageUrl} style={s.eventThumbImg} contentFit="cover" transition={150} />
+                          ) : (
+                            <Image source={ev.imageUrl} style={s.eventThumbImg} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                          )}
                         </Pressable>
                       ))}
                     </View>
@@ -327,18 +326,15 @@ function MusicModal({ visible, visited, onClose }: {
   const [seeking, setSeeking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [rate, setRate] = useState(1);
-  // 재생 모드: off=한 곡 후 정지, one=한 곡 반복, all=목록 순환
   const [repeatMode, setRepeatMode] = useState<"off" | "one" | "all">("off");
   const player = useAudioPlayer();
   const durRef = useRef(0);
   durRef.current = dur;
 
-  // 곡 끝 감지용 ref (최신 값 클로저 회피)
   const playingIdRef = useRef<number | null>(null);
   playingIdRef.current = playingId;
   const repeatRef = useRef(repeatMode);
   repeatRef.current = repeatMode;
-  // 현재 배속 — replace로 곡 바꿀 때마다 재적용해야 해서 ref로 추적
   const rateRef = useRef(1);
   rateRef.current = rate;
 
@@ -346,17 +342,13 @@ function MusicModal({ visible, visited, onClose }: {
     setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: "doNotMix" }).catch(() => {});
   }, []);
 
-  // 배속 적용 헬퍼 — expo-audio 1.1.1: player.setPlaybackRate(rate, pitchCorrectionQuality)
-  // pitch 보정을 위해 shouldCorrectPitch도 같이 켠다. 소스 로드 직후엔 무시될 수 있어 약간 지연 재적용.
   const applyRate = (r: number) => {
     try { (player as any).shouldCorrectPitch = true; } catch {}
     try { player.setPlaybackRate(r, "high"); } catch {
-      // 혹시 시그니처가 다르면 프로퍼티로 폴백
       try { (player as any).playbackRate = r; } catch {}
     }
   };
 
-  // 재생 진행도 폴링 + 곡 끝 감지
   useEffect(() => {
     if (playingId === null) return;
     let ended = false;
@@ -367,7 +359,6 @@ function MusicModal({ visible, visited, onClose }: {
         const total = player.duration ?? 0;
         setPos(cur);
         setDur(total);
-        // 끝 감지: 총 길이 있고 거의 끝까지 도달
         if (!ended && total > 1 && cur >= total - 0.5) {
           ended = true;
           handleTrackEnd();
@@ -379,27 +370,23 @@ function MusicModal({ visible, visited, onClose }: {
     return () => clearInterval(t);
   }, [playingId, seeking]);
 
-  // 곡이 끝났을 때 — 모드에 따라
   const handleTrackEnd = () => {
     const id = playingIdRef.current;
     const mode = repeatRef.current;
     if (id === null) return;
 
     if (mode === "one") {
-      // 한 곡 반복 — 배속 유지
       try { player.seekTo(0); player.play(); } catch {}
       applyRate(rateRef.current);
       setPos(0); setPaused(false);
       return;
     }
     if (mode === "all") {
-      // 다음 곡 (목록 끝이면 처음으로) — 배속 유지
       const idx = visited.indexOf(id);
       const next = visited[(idx + 1) % visited.length];
       playTrack(next, true);
       return;
     }
-    // off — 한 곡 끝나면 정지
     stopAll();
   };
 
@@ -411,35 +398,30 @@ function MusicModal({ visible, visited, onClose }: {
   const stopAll = () => {
     try { player.pause(); } catch {}
     setPlayingId(null); setPaused(false); setPos(0); setDur(0);
-    nativeBgm.duck(false);  // 게임 BGM 복귀
+    nativeBgm.duck(false);
   };
 
-  // 특정 곡 재생 (내부 공용). keepRate=true면 현재 배속 유지, false면 1배속으로 초기화.
+  // 도시 BGM은 이제 require 모듈 — player.replace에 모듈 직접 전달
   const playTrack = (id: number, keepRate = false) => {
-    const url = assetUrl(CITY_META[id].bgm);
-    if (!url) return;
+    const src = CITY_META[id].bgm;
+    if (!src) return;
     nativeBgm.duck(true);
     const r = keepRate ? rateRef.current : 1;
-    // 화면 표시값과 ref를 먼저 동기화 (applyRate가 항상 최신 r을 쓰도록)
     if (!keepRate) { setRate(1); rateRef.current = 1; }
-    player.replace({ uri: url });
+    player.replace(src);
     player.play();
-    // replace로 새 소스가 로드되면 이전 곡의 배속이 player에 남아있을 수 있어,
-    // 표시값과 실제 재생속도가 어긋나지 않도록 r을 즉시 + 지연으로 강제 재적용.
     applyRate(r);
     setTimeout(() => applyRate(r), 120);
     setTimeout(() => applyRate(r), 350);
     setPlayingId(id); setPaused(false); setPos(0); setDur(0);
   };
 
-  // 리스트 행 탭: 다른 곡이면 새로 재생, 같은 곡이면 완전 정지
   const toggle = (id: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (playingId === id) { stopAll(); return; }
     playTrack(id);
   };
 
-  // 플레이어 바 버튼: 일시정지/재생만 (탭 안 닫힘)
   const togglePause = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
@@ -448,7 +430,6 @@ function MusicModal({ visible, visited, onClose }: {
     } catch {}
   };
 
-  // 10초 앞/뒤로
   const skip = (delta: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const target = Math.max(0, Math.min(durRef.current || 0, (player.currentTime ?? 0) + delta));
@@ -456,20 +437,18 @@ function MusicModal({ visible, visited, onClose }: {
     setPos(target);
   };
 
-  // 배속 순환 1 → 1.25 → 1.5 → 2 → 0.75 → 1
   const RATES = [1, 1.25, 1.5, 2, 0.75];
   const cycleRate = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const idx = RATES.indexOf(rate);
     const next = RATES[(idx + 1) % RATES.length];
     setRate(next);
-    rateRef.current = next;  // 즉시 동기화 (연타·곡전환 시 어긋남 방지)
+    rateRef.current = next;
     applyRate(next);
   };
 
   const close = () => { stopAll(); onClose(); };
 
-  // 모달 닫히면 BGM 복귀 보장
   useEffect(() => { if (!visible) { try { player.pause(); } catch {} setPlayingId(null); setPaused(false); nativeBgm.duck(false); } }, [visible]);
 
   const fmt = (sec: number) => {
@@ -481,7 +460,6 @@ function MusicModal({ visible, visited, onClose }: {
   const nowCity = playingId !== null ? CITY_META[playingId] : null;
   const pct = dur > 0 ? Math.min(100, (pos / dur) * 100) : 0;
 
-  // ── 시크바 드래그 (PanResponder, locationX 기반 — Expo Go 호환) ──
   const barWidth = useRef(0);
 
   const seekFromLocation = (locationX: number): number | null => {
@@ -526,7 +504,7 @@ function MusicModal({ visible, visited, onClose }: {
             const playing = playingId === id;
             return (
               <Pressable key={id} onPress={() => toggle(id)} style={[s.musicRow, playing && s.musicRowOn]}>
-                <Image source={assetUrl(c.img)} style={s.musicThumb} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                <Image source={c.img} style={s.musicThumb} contentFit="cover" transition={150} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.musicName}>{c.name}</Text>
                   <Text style={s.musicSub}>{playing ? "재생 중..." : "미리듣기"}</Text>
@@ -539,12 +517,10 @@ function MusicModal({ visible, visited, onClose }: {
           })}
         </ScrollView>
 
-        {/* 재생 중일 때만 플레이어 바 */}
         {nowCity && (
           <View style={s.playerBar}>
-            {/* 상단: 썸네일 + 제목 + 배속 */}
             <View style={s.playerTop}>
-              <Image source={assetUrl(nowCity.img)} style={s.playerThumb} contentFit="cover" cachePolicy="memory-disk" placeholder={BLUR} />
+              <Image source={nowCity.img} style={s.playerThumb} contentFit="cover" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.playerName} numberOfLines={1}>{nowCity.name}</Text>
                 <Text style={s.playerNowLabel}>NOW PLAYING</Text>
@@ -554,7 +530,6 @@ function MusicModal({ visible, visited, onClose }: {
               </Pressable>
             </View>
 
-            {/* 시크바 */}
             <View
               style={s.seekHit}
               {...pan.panHandlers}
@@ -568,13 +543,11 @@ function MusicModal({ visible, visited, onClose }: {
               </View>
             </View>
 
-            {/* 시간 */}
             <View style={s.timeRow}>
               <Text style={s.timeText}>{fmt(pos)}</Text>
               <Text style={s.timeText}>{fmt(dur)}</Text>
             </View>
 
-            {/* 컨트롤: 반복 / 10초뒤 / 재생 / 10초앞 */}
             <View style={s.controlRow}>
               <Pressable onPress={cycleRepeat} style={s.repeatBtn} hitSlop={8}>
                 <Text style={[s.repeatText, repeatMode !== "off" && s.repeatTextOn]}>

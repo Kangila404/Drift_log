@@ -26,4 +26,4 @@ kakao:
     ${KAKAO_REDIRECT_URI:http://localhost:30001/auth/kakao/callback}
 
 apple:
-  client-ids: com.kangila.driftlog
+  client-ids: com.kangila.driftlog,com.kangila.driftlog.web

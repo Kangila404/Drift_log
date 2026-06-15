@@ -11,6 +11,9 @@ import EndingSequence from "../../sequence/EndingSequence";
 
 const BLUR = "L03[?bof00ay~qj[ayj@00fQ_3fk";
 
+// require된 로컬 모듈(number)이면 prefetch/캐시 props 제외
+const isLocal = (src: any) => typeof src === "number";
+
 function LockGlyph({ color = "#5a8aa4" }: { color?: string }) {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -77,7 +80,11 @@ export default function TracePanel() {
             >
               <View style={s.cardRow}>
                 {t.imageUrl ? (
-                  <Image source={t.imageUrl} style={s.thumb} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                  isLocal(t.imageUrl) ? (
+                    <Image source={t.imageUrl} style={s.thumb} contentFit="cover" transition={150} />
+                  ) : (
+                    <Image source={t.imageUrl} style={s.thumb} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                  )
                 ) : (
                   <View style={[s.thumb, s.thumbEmpty]}><Text style={s.thumbEmptyText}>흔적</Text></View>
                 )}
@@ -147,7 +154,11 @@ export default function TracePanel() {
               <View style={s.detailInner}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {selected.imageUrl && (
-                    <Image source={selected.imageUrl} style={s.detailImg} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                    isLocal(selected.imageUrl) ? (
+                      <Image source={selected.imageUrl} style={s.detailImg} contentFit="cover" transition={150} />
+                    ) : (
+                      <Image source={selected.imageUrl} style={s.detailImg} contentFit="cover" cachePolicy="memory-disk" transition={150} placeholder={BLUR} />
+                    )
                   )}
                   <View style={s.detailBody}>
                     <View style={[s.familyBadge, { alignSelf: "flex-start", backgroundColor: colorOf(selected.familyLabel) + "22", borderColor: colorOf(selected.familyLabel) + "55" }]}>
