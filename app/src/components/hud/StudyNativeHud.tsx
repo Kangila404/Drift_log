@@ -25,7 +25,8 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: "profile", icon: "○", label: "나" },
 ];
 
-const PRESETS = [25, 50, 90];
+const PRESETS = [30, 60, 120];
+const SUBJECT_SUGGESTIONS = ["스터디", "독서", "영어", "전공", "암기", "자격증"];
 const START_KEY = "studyStartAt";
 const GOAL_KEY = "studyGoalMin";
 const SUBJ_KEY = "studySubject";
@@ -53,18 +54,19 @@ function NoiseGlyph({ k, color }: { k: NoiseKey; color: string }) {
 }
 
 export default function StudyNativeHud({
-  onStudyingChange, onNoiseChange, onLeave,
+  onStudyingChange, onNoiseChange, onLeave, onSheetChange,
 }: {
   onStudyingChange: (studying: boolean) => void;
   onNoiseChange: (key: string | null) => void;
   onLeave: () => void;
+  onSheetChange?: (open: boolean) => void;
 }) {
   const insets = useSafeAreaInsets();
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const TAB_W = SCREEN_W / 2;
   const SHEET_H = SCREEN_H * 0.85;
 
-  const [goalMin, setGoalMin] = useState(25);
+  const [goalMin, setGoalMin] = useState(30);
   const [subject, setSubject] = useState("");
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -74,6 +76,7 @@ export default function StudyNativeHud({
   const [setupOpen, setSetupOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);   // 공부 중 진행 상황 모달
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("log");
@@ -108,7 +111,7 @@ export default function StudyNativeHud({
   const refreshSummary = () => getStudySummary().then(setSummary).catch(() => {});
   useEffect(() => { refreshSummary(); }, []);
 
-
+  // 언마운트(화면 이탈 포함) 시 Live Activity/위젯 종료
   useEffect(() => {
     return () => {
       stopStudyNotification().catch(() => {});
@@ -120,7 +123,7 @@ export default function StudyNativeHud({
       const saved = await AsyncStorage.getItem(START_KEY);
       if (!saved) return;
       const start = new Date(saved);
-      const goal = Number(await AsyncStorage.getItem(GOAL_KEY)) || 25;
+      const goal = Number(await AsyncStorage.getItem(GOAL_KEY)) || 30;
       const elapsedSec = Math.floor((Date.now() - start.getTime()) / 1000);
       if (elapsedSec >= goal * 60) { clearSession(); return; }
       startAtRef.current = start;
@@ -189,6 +192,7 @@ export default function StudyNativeHud({
     startAtRef.current = null;
     setRunning(false);
     onStudyingChange(false);
+    setProgressOpen(false);
     setSaving(true);
     await stopStudyNotification().catch(() => {});
     try {
@@ -229,15 +233,24 @@ export default function StudyNativeHud({
   const openSheet = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setSheetOpen(true);
+    onSheetChange?.(true);
     translateY.setValue(SHEET_H);
     requestAnimationFrame(() => animateTo(0));
   };
-  const closeSheet = () => animateTo(SHEET_H, () => setSheetOpen(false));
+  const closeSheet = () => animateTo(SHEET_H, () => { setSheetOpen(false); onSheetChange?.(false); });
   const selectTab = (id: Tab) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setActiveTab(id);
     if (!mounted[id]) setMounted((m) => ({ ...m, [id]: true }));
   };
+
+  // 하단 바(타이머) 탭 — 공부 중이면 진행 상황 모달
+  const onBarPress = () => {
+    if (!running) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setProgressOpen(true);
+  };
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -250,8 +263,24 @@ export default function StudyNativeHud({
     })
   ).current;
 
+  const edgeGuard = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (e, g) => {
+        const fromLeftEdge = e.nativeEvent.pageX - g.dx < 24;
+        return fromLeftEdge && Math.abs(g.dx) > Math.abs(g.dy);
+      },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: () => {},
+      onPanResponderMove: () => {},
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
   const liveToday = summary.todaySeconds + (running ? elapsed : 0);
   const progress = running ? Math.min(1, elapsed / (goalMin * 60)) : 0;
+  const remainSec = running ? Math.max(0, goalMin * 60 - elapsed) : 0;
 
   const barTranslateY = Animated.add(
     barEnter.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
@@ -265,7 +294,7 @@ export default function StudyNativeHud({
       </Pressable>
 
       <Animated.View style={[s.bottomBar, { bottom: insets.bottom + 18, opacity: barEnter, transform: [{ translateY: barTranslateY }] }]}>
-        <View style={s.barInner}>
+        <Pressable onPress={onBarPress} style={s.barInner}>
           <View style={s.todayCol}>
             <Text style={s.todayVal}>{fmtSummary(liveToday)}</Text>
             <Text style={s.todayLabel}>오늘 공부량</Text>
@@ -291,7 +320,7 @@ export default function StudyNativeHud({
               <Text style={s.stopText}>{saving ? "저장 중" : "종료"}</Text>
             </Pressable>
           )}
-        </View>
+        </Pressable>
       </Animated.View>
 
       {!sheetOpen && (
@@ -303,7 +332,7 @@ export default function StudyNativeHud({
       )}
 
       {sheetOpen && (
-        <View style={s.sheetOverlay}>
+        <View style={s.sheetOverlay} {...edgeGuard.panHandlers}>
           <Pressable style={s.backdrop} onPress={closeSheet} />
           <Animated.View style={[s.sheet, { height: SHEET_H, transform: [{ translateY }] }]}>
             <View {...pan.panHandlers}>
@@ -341,6 +370,7 @@ export default function StudyNativeHud({
         </View>
       )}
 
+      {/* 공부 설정 모달 */}
       <Modal visible={setupOpen} transparent animationType="fade" onRequestClose={() => setSetupOpen(false)}>
         <Pressable style={s.overlay} onPress={() => setSetupOpen(false)}>
           <Pressable style={s.modalCard} onPress={() => {}}>
@@ -365,14 +395,64 @@ export default function StudyNativeHud({
                 ))}
               </View>
             </View>
-            <View style={{ gap: 8 }}>
+            <View style={{ gap: 10 }}>
               <Text style={s.fieldLabel}>무슨 공부 (선택)</Text>
               <TextInput value={subject} onChangeText={setSubject} maxLength={40}
-                placeholder="예: 알고리즘 복습" placeholderTextColor="#1a3a50" style={s.input} />
+                placeholder="직접 입력하거나 아래에서 선택" placeholderTextColor="#1a3a50" style={s.input} />
+              <View style={s.suggestRow}>
+                {SUBJECT_SUGGESTIONS.map((sug) => {
+                  const on = subject === sug;
+                  return (
+                    <Pressable
+                      key={sug}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setSubject(on ? "" : sug); }}
+                      style={[s.suggestChip, on && s.suggestChipOn]}
+                    >
+                      <Text style={[s.suggestText, on && s.suggestTextOn]}>{sug}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
             <Pressable onPress={startSession} style={s.modalStart}>
               <Text style={s.modalStartText}>시작하기</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 공부 중 진행 상황 모달 */}
+      <Modal visible={progressOpen} transparent animationType="fade" onRequestClose={() => setProgressOpen(false)}>
+        <Pressable style={s.overlay} onPress={() => setProgressOpen(false)}>
+          <Pressable style={[s.modalCard, { maxWidth: 340, alignItems: "center" }]} onPress={() => {}}>
+            <Text style={s.modalTitle}>공부 중</Text>
+            {!!subject && <Text style={s.progSubject}>{subject}</Text>}
+            <Text style={s.progClock}>{fmtClock(elapsed)}</Text>
+            <View style={s.progBarTrack}>
+              <View style={[s.progBarFill, { width: `${progress * 100}%` }]} />
+            </View>
+            <View style={s.progStatRow}>
+              <View style={s.progStat}>
+                <Text style={s.progStatVal}>{goalMin}분</Text>
+                <Text style={s.progStatLabel}>목표</Text>
+              </View>
+              <View style={s.progStat}>
+                <Text style={s.progStatVal}>{Math.round(progress * 100)}%</Text>
+                <Text style={s.progStatLabel}>진행</Text>
+              </View>
+              <View style={s.progStat}>
+                <Text style={s.progStatVal}>{fmtSummary(remainSec)}</Text>
+                <Text style={s.progStatLabel}>남음</Text>
+              </View>
+            </View>
+            <View style={s.progBtnRow}>
+              <Pressable onPress={() => setProgressOpen(false)} style={s.progClose}>
+                <Text style={s.progCloseText}>계속하기</Text>
+              </Pressable>
+              <Pressable onPress={() => { setProgressOpen(false); setConfirmOpen(true); }} style={s.progStop}>
+                <Text style={s.progStopText}>종료</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -499,8 +579,28 @@ const s = StyleSheet.create({
 
   fieldLabel: { color: "#2a5a74", fontSize: 9, letterSpacing: 1.5, fontFamily: "monospace" },
   input: { backgroundColor: "#040d16", borderWidth: 1, borderColor: "#1a3a50", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: "#cce8f5", fontSize: 14 },
+  suggestRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  suggestChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1, borderColor: "rgba(26,74,100,0.45)", backgroundColor: "rgba(7,24,38,0.4)" },
+  suggestChipOn: { borderColor: "rgba(74,154,187,0.7)", backgroundColor: "rgba(10,34,51,0.7)" },
+  suggestText: { color: "#5a8aa4", fontSize: 12 },
+  suggestTextOn: { color: "#cce8f5" },
   modalStart: { paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: "rgba(74,154,187,0.5)", alignItems: "center" },
   modalStartText: { color: "#4a9abb", fontSize: 13, letterSpacing: 3, fontFamily: "monospace" },
+
+  // 진행 상황 모달
+  progSubject: { color: "#a8d4e8", fontSize: 14, letterSpacing: 1, marginTop: -6 },
+  progClock: { color: "#cce8f5", fontSize: 44, fontFamily: "monospace", letterSpacing: 2 },
+  progBarTrack: { width: "100%", height: 6, borderRadius: 3, backgroundColor: "#0d2233", overflow: "hidden" },
+  progBarFill: { height: "100%", borderRadius: 3, backgroundColor: "#4a9abb" },
+  progStatRow: { flexDirection: "row", justifyContent: "space-around", width: "100%" },
+  progStat: { alignItems: "center", gap: 4 },
+  progStatVal: { color: "#a8d4e8", fontSize: 15, fontFamily: "monospace" },
+  progStatLabel: { color: "#2a5a74", fontSize: 9, letterSpacing: 1.5, fontFamily: "monospace" },
+  progBtnRow: { flexDirection: "row", gap: 10, width: "100%" },
+  progClose: { flex: 1, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: "rgba(74,154,187,0.5)", alignItems: "center" },
+  progCloseText: { color: "#4a9abb", fontSize: 12, letterSpacing: 2, fontFamily: "monospace" },
+  progStop: { paddingHorizontal: 22, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: "#1a3a50", alignItems: "center" },
+  progStopText: { color: "#7eb8d4", fontSize: 12, letterSpacing: 2, fontFamily: "monospace" },
 
   confirmTime: { color: "#cce8f5", fontSize: 30, fontFamily: "monospace", textAlign: "center" },
   confirmDesc: { color: "#4a7a94", fontSize: 12, fontFamily: "monospace", textAlign: "center" },

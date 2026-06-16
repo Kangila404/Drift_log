@@ -53,3 +53,16 @@ export const kakaoNativeLogin = async (
   const response = await apiClient.post("/auth/kakao/native", { accessToken });
   return response.data;
 };
+
+// 애플 로그인 — expo-apple-authentication이 준 identityToken을 백엔드로
+// 백엔드: POST /api/auth/apple (웹과 동일 엔드포인트, aud로 앱/웹 구분)
+export const appleLogin = async (
+  identityToken: string,
+  name?: string,
+): Promise<LoginResponse> => {
+  const response = await apiClient.post("/auth/apple", {
+    identityToken,
+    name,
+  });
+  return response.data;
+};

@@ -2,16 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { View, Text, Pressable, StyleSheet, Animated, Easing, ImageBackground, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
-import { assetUrl } from "../../api/config";
 import { nativeBgm } from "../../api/nativeBgm";
+import { ENDING_IMAGES, BGM_AUDIO } from "../../constants/assets";
 
-const ENDING_BGM = "/bgm/ending.mp3";
+const ENDING_BGM = BGM_AUDIO.ending;   // 엔딩 BGM (require 모듈)
 
-type Scene = { image: string; lines: string[] };
+type Scene = { image: any; lines: string[] };
 
 const SCENES: Scene[] = [
   {
-    image: "/ending/endingPage_1.png",
+    image: ENDING_IMAGES[1],
     lines: [
       "산 자락에 배를 정박시켰다.",
       "지금껏 마치 역마살이 낀 듯 떠돌아 이곳에 왔다.",
@@ -20,14 +20,14 @@ const SCENES: Scene[] = [
     ],
   },
   {
-    image: "/ending/endingPage_2.png",
+    image: ENDING_IMAGES[2],
     lines: [
       "산을 오름에도 힘이 부치지 않는다.",
       "너무 늦은 건 아닐까 생각이 들어 겁이 난다.",
     ],
   },
   {
-    image: "/ending/endingPage_3.png",
+    image: ENDING_IMAGES[3],
     lines: [
       "산 정상에 작은 천막이 보였다.",
       "어설픈 솜씨",
@@ -35,7 +35,7 @@ const SCENES: Scene[] = [
     ],
   },
   {
-    image: "/ending/endingPage_4.png",
+    image: ENDING_IMAGES[4],
     lines: [
       "어두운 밤이면 배의 조명 등불에 기대어 바다를 지나 왔다.",
       "옛 고전의 말처럼 스스로의 등불에 기대어 어둠을 밝히기엔 나는 어리석다.",
@@ -61,16 +61,14 @@ export default function EndingSequence({ onFinish }: { onFinish?: () => void }) 
   const hint = useRef(new Animated.Value(0.3)).current;
   const bgmRef = useRef<AudioPlayer | null>(null);
 
-  // 엔딩 전용 BGM
+  // 엔딩 전용 BGM (require 모듈)
   useEffect(() => {
     let p: AudioPlayer | null = null;
     nativeBgm.duck(true);   // 게임 BGM 죽임
     (async () => {
       try {
         await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false, interruptionMode: "doNotMix" });
-        const url = assetUrl(ENDING_BGM);
-        if (!url) return;
-        p = createAudioPlayer({ uri: url });
+        p = createAudioPlayer(ENDING_BGM);
         p.loop = true;
         p.volume = 0.5;
         p.play();
@@ -136,7 +134,7 @@ export default function EndingSequence({ onFinish }: { onFinish?: () => void }) 
         <Pressable style={StyleSheet.absoluteFill} onPress={handleNext}>
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: sceneOpacity }]}>
             {scene && (
-              <ImageBackground source={{ uri: assetUrl(scene.image)! }} style={{ width, height }} resizeMode="cover">
+              <ImageBackground source={scene.image} style={{ width, height }} resizeMode="cover">
                 <LinearGradient
                   colors={["transparent", "transparent", "rgba(2,6,14,0.85)"]}
                   locations={[0, 0.55, 1]}
