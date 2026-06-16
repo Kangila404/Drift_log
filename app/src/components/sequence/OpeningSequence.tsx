@@ -2,16 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { View, Text, Pressable, StyleSheet, Animated, Easing, ImageBackground, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
-import { assetUrl } from "../../api/config";
 import { nativeBgm } from "../../api/nativeBgm";
+import { INTRO_IMAGES, CITY_BGM } from "../../constants/assets";
 
-const INTRO_BGM = "/city/seoul_bgm.mp3";   // 인트로는 원래 서울 도시 BGM이 깔려 있었음
+const INTRO_BGM = CITY_BGM[1];   // 인트로는 서울 도시 BGM (require 모듈)
 
-type SceneT = { image: string; lines: string[] };
+type SceneT = { image: any; lines: string[] };
 
 const SCENES: SceneT[] = [
   {
-    image: "/intro/introPage_1.png",
+    image: INTRO_IMAGES[1],
     lines: [
       "바람이 기분 좋게 불던 여름",
       "여느 날과 다름없는 저녁이었다.",
@@ -19,7 +19,7 @@ const SCENES: SceneT[] = [
     ],
   },
   {
-    image: "/intro/introPage_2.png",
+    image: INTRO_IMAGES[2],
     lines: [
       "빗방울이 하나둘 떨어지기 시작했다.",
       "어린 동생이 혹여나 감기가 걸릴까 걱정 되어",
@@ -27,7 +27,7 @@ const SCENES: SceneT[] = [
     ],
   },
   {
-    image: "/intro/introPage_3.png",
+    image: INTRO_IMAGES[3],
     lines: [
       "비가 내렸다.",
       "아주 내렸다.",
@@ -37,7 +37,7 @@ const SCENES: SceneT[] = [
     ],
   },
   {
-    image: "/intro/introPage_4.png",
+    image: INTRO_IMAGES[4],
     lines: [
       "강가에 묶여 있던 낡은 돛단배 간신히 몸을 실었다.",
       "이젠 강가라고 할 수 있는 곳일까",
@@ -62,16 +62,14 @@ export default function OpeningSequence({ onFinish }: { onFinish?: () => void })
   const hint = useRef(new Animated.Value(0.3)).current;
   const bgmRef = useRef<AudioPlayer | null>(null);
 
-  // 인트로 전용 BGM
+  // 인트로 전용 BGM (서울 도시 BGM, require 모듈)
   useEffect(() => {
     let p: AudioPlayer | null = null;
     nativeBgm.duck(true);   // 게임 BGM 죽임
     (async () => {
       try {
         await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false, interruptionMode: "doNotMix" });
-        const url = assetUrl(INTRO_BGM);
-        if (!url) return;
-        p = createAudioPlayer({ uri: url });
+        p = createAudioPlayer(INTRO_BGM);
         p.loop = true;
         p.volume = 0.5;
         p.play();
@@ -129,7 +127,6 @@ export default function OpeningSequence({ onFinish }: { onFinish?: () => void })
     if (!isLastLine) {
       setLineIdx((i) => i + 1);
     } else if (!isLastScene) {
-      // 다음 장면 — 대사 페이드아웃 후 전환
       Animated.timing(lineOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
         setSceneIdx((i) => i + 1);
         setLineIdx(0);
@@ -145,7 +142,7 @@ export default function OpeningSequence({ onFinish }: { onFinish?: () => void })
         {/* 배경 이미지 */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: sceneOpacity }]}>
           {scene && (
-            <ImageBackground source={{ uri: assetUrl(scene.image)! }} style={{ width, height }} resizeMode="cover">
+            <ImageBackground source={scene.image} style={{ width, height }} resizeMode="cover">
               <LinearGradient
                 colors={["transparent", "transparent", "rgba(2,6,14,0.85)"]}
                 locations={[0, 0.55, 1]}

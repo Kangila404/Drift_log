@@ -16,13 +16,11 @@ const logSeconds = (l: StudyLog) => Math.max(0, Math.round((new Date(l.studyEndT
 
 // ─── 스와이프 삭제 행 (iOS식 — 밀면 삭제 버튼 고정 노출) ───
 const DELETE_W = 84;
-
 function SwipeLog({ log, onOpen, onDelete }: { log: StudyLog; onOpen: () => void; onDelete: (close: () => void) => void }) {
   const x = useRef(new Animated.Value(0)).current;
-  const openRef = useRef(false);          // 현재 열림 상태
-  const startX = useRef(0);               // 제스처 시작 시 x 값
+  const openRef = useRef(false);
   const moved = useRef(false);
-  const locked = useRef(false);           // Move 중 확정되면 잠금
+  const locked = useRef(false);
 
   const snapTo = (open: boolean) => {
     openRef.current = open;
@@ -34,39 +32,38 @@ function SwipeLog({ log, onOpen, onDelete }: { log: StudyLog; onOpen: () => void
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 4 && Math.abs(g.dx) > Math.abs(g.dy),
+      // 닫혀있을 때 왼쪽으로 미는 제스처만 잡음 (열렸을 땐 제스처 안 잡음 → 오른쪽 끌기 없음 → 뒤로가기 충돌 없음)
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (openRef.current) return false;            // 열림: 드래그 비활성 (탭으로만 닫음)
+        return g.dx < -4 && Math.abs(g.dx) > Math.abs(g.dy);  // 닫힘: 왼쪽으로만
+      },
       onPanResponderGrant: () => {
         moved.current = false;
         locked.current = false;
-        startX.current = openRef.current ? -DELETE_W : 0;
       },
       onPanResponderMove: (_, g) => {
-        moved.current = true;
         if (locked.current) return;
-        // 드래그 도중 임계점 넘으면 즉시 확정 (손 떼는 거 안 기다림 = 카톡 방식)
-        if (!openRef.current && g.dx < -12) { locked.current = true; snapTo(true); return; }
-        if (openRef.current && g.dx > 12) { locked.current = true; snapTo(false); return; }
-        const next = Math.min(0, Math.max(-DELETE_W, startX.current + g.dx));
+        if (Math.abs(g.dx) > 6) moved.current = true;
+        if (g.dx < -12) { locked.current = true; snapTo(true); return; }
+        const next = Math.min(0, Math.max(-DELETE_W, g.dx));
         x.setValue(next);
       },
       onPanResponderRelease: (_, g) => {
-        if (locked.current) return;       // 이미 확정됨
-        const cur = startX.current + g.dx;
-        snapTo(cur < -DELETE_W / 2);
+        if (locked.current) return;
+        snapTo(g.dx < -DELETE_W / 2);
       },
       onPanResponderTerminate: () => { if (!locked.current) snapTo(openRef.current); },
     })
   ).current;
 
   const handlePress = () => {
-    if (moved.current) return;
-    if (openRef.current) { snapTo(false); return; }   // 열려있으면 닫기
+    if (openRef.current) { snapTo(false); return; }   // 열려있으면 → 닫기 (moved 무시)
+    if (moved.current) return;                         // 닫힌 상태에서 방금 끈 거면 무시
     onOpen();
   };
 
   return (
     <View style={s.swipeWrap}>
-      {/* 뒤에 고정된 삭제 버튼 */}
       <View style={s.deleteBg}>
         <Pressable onPress={() => onDelete(() => snapTo(false))} style={s.deleteHit}>
           <Text style={s.deleteText}>삭제</Text>

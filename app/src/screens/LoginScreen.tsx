@@ -7,12 +7,13 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as AppleAuthentication from "expo-apple-authentication";
 import {
   GoogleSignin, statusCodes, isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
 import { initializeKakaoSDK } from "@react-native-kakao/core";
 import { login as kakaoSDKLogin } from "@react-native-kakao/user";
-import { login, socialLogin, kakaoNativeLogin } from "../api/auth";
+import { login, socialLogin, kakaoNativeLogin, appleLogin } from "../api/auth";
 import { getTodayWeather } from "../api/weather";
 
 GoogleSignin.configure({
@@ -35,6 +36,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [weather, setWeather] = useState<string | null>(null);
 
   const fullText = "물에 잠긴 한국을 항해하다";
@@ -50,6 +53,12 @@ export default function LoginScreen() {
 
   useEffect(() => {
     getTodayWeather().then((w) => setWeather(w.label)).catch(() => {});
+  }, []);
+
+  // iOS + Apple 로그인 사용 가능 여부 (지원 안 되면 버튼 숨김)
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
   }, []);
 
   const formFade = useRef(new Animated.Value(0)).current;
@@ -122,6 +131,39 @@ export default function LoginScreen() {
     }
   };
 
+  const handleAppleLogin = async () => {
+    if (appleLoading) return;
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const identityToken = credential.identityToken;
+      if (!identityToken) { Alert.alert("애플 로그인 실패", "인증 토큰을 받지 못했어요."); return; }
+
+      // 애플은 최초 로그인 시에만 이름 제공 (이후엔 null)
+      let name: string | undefined;
+      if (credential.fullName) {
+        const { familyName, givenName } = credential.fullName;
+        name = [familyName, givenName].filter(Boolean).join("") || undefined;
+      }
+
+      const result = await appleLogin(identityToken, name);
+      await AsyncStorage.setItem("accessToken", result.accessToken);
+      await AsyncStorage.setItem("refreshToken", result.refreshToken);
+      router.replace("/mode-select");
+    } catch (e: any) {
+      if (e?.code === "ERR_REQUEST_CANCELED") return;  // 사용자가 취소
+      console.error("애플 로그인 실패:", e);
+      Alert.alert("애플 로그인 실패", "잠시 후 다시 시도해주세요.");
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const borderFor = (f: Field) => (focused === f ? "#c88a7a" : "rgba(150,140,160,0.25)");
 
   return (
@@ -180,6 +222,15 @@ export default function LoginScreen() {
                   {googleLoading ? "로그인 중..." : "Google로 로그인"}
                 </Text>
               </Pressable>
+
+              {appleAvailable && (
+                <Pressable onPress={handleAppleLogin} disabled={appleLoading} style={[st.socialBtn, { backgroundColor: "#000", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" }]}>
+                  <AppleGlyph />
+                  <Text style={[st.socialText, { color: "#fff" }]}>
+                    {appleLoading ? "로그인 중..." : "Apple로 로그인"}
+                  </Text>
+                </Pressable>
+              )}
 
               <Pressable onPress={() => setMode("email")} style={st.emailBtn}>
                 <MailGlyph />
@@ -258,6 +309,13 @@ function GoogleGlyph() {
       <Path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z" fill="#34A853" />
       <Path d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2L6.4 14Z" fill="#FBBC05" />
       <Path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1Z" fill="#EA4335" />
+    </Svg>
+  );
+}
+function AppleGlyph() {
+  return (
+    <Svg width={17} height={17} viewBox="0 0 24 24">
+      <Path d="M16.4 12.7c0 2.8 2.5 3.7 2.5 3.8 0 .1-.4 1.3-1.3 2.6-.8 1.1-1.6 2.2-2.8 2.3-1.2 0-1.6-.7-3-.7s-1.8.7-3 .7c-1.2 0-2.1-1.2-2.9-2.3-1.6-2.3-2.8-6.5-1.2-9.3.8-1.4 2.2-2.3 3.8-2.3 1.2 0 2.3.8 3 .8.7 0 2.1-1 3.5-.8.6 0 2.3.2 3.4 1.8-.1.1-2 1.2-2 3.7zM14.1 5.4c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3z" fill="#fff" />
     </Svg>
   );
 }
