@@ -8,7 +8,7 @@ import SignupPage from './pages/SignupPage'
 import PrivacyPage from './pages/PrivacyPage'
 import AdminPage from './pages/AdminPage'
 import KakaoCallback from "./pages/KakaoCallback";
-
+import CityGalleryPage from './pages/CityGalleryPage'
 import { WeatherProvider } from "./contexts/WeatherContext";
 import ProtectedRoute from './routes/ProtectedRoute'
 import AdminRoute from './routes/AdminRoute'
@@ -46,6 +46,8 @@ function App() {
         <Route path="/signup" element={<SignupPage/>}/>
         <Route path="/privacy" element={<PrivacyPage/>}/>
         <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
+        <Route path="/gallery" element={<CityGalleryPage />} />
+
 
         <Route path='/admin' element={
           <ProtectedRoute>

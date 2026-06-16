@@ -56,9 +56,116 @@ const PANEL_TABS: { id: StudyPanel; icon: string; label: string }[] = [
   { id: 'profile', icon: '○', label: '나' },
 ]
 
+// ─── 공용 확인 모달 (window.confirm 대체) ───
+type ConfirmIcon = 'delete' | 'leave'
+type ConfirmOptions = {
+  title?: string
+  message?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  icon?: ConfirmIcon
+}
+
+function ConfirmIconSvg({ icon, color }: { icon: ConfirmIcon; color: string }) {
+  if (icon === 'leave') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    )
+  }
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  )
+}
+
+function ConfirmModal({ open, opts, onConfirm, onCancel }: {
+  open: boolean; opts: ConfirmOptions; onConfirm: () => void; onCancel: () => void
+}) {
+  const { title = '확인하시겠습니까?', message, confirmLabel = '확인', cancelLabel = '취소', danger = false, icon = 'delete' } = opts
+  const tint = danger ? 'rgba(229,115,115,' : 'rgba(126,192,210,'
+  const iconColor = danger ? '#f3a3a3' : '#a8d4e8'
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          onClick={onCancel}
+          className="fixed inset-0 z-[10000] flex items-center justify-center px-6 cursor-pointer"
+          style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(8px)' }}>
+          <motion.div onClick={e => e.stopPropagation()}
+            initial={{ y: 18, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 14, opacity: 0, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+            className="relative w-full max-w-xs bg-[#050e18] border border-[#1a4a64]/50 rounded-2xl px-7 pt-8 pb-6 flex flex-col items-center text-center cursor-default overflow-hidden"
+            style={{ boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(126,192,210,0.06)' }}>
+            {/* 상단 글로우 */}
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full pointer-events-none"
+              style={{ background: `radial-gradient(circle, ${tint}0.12) 0%, transparent 70%)` }} />
+
+            {/* 아이콘 배지 */}
+            <div className="relative flex items-center justify-center rounded-2xl mb-4"
+              style={{
+                width: '52px', height: '52px',
+                background: `linear-gradient(160deg, ${tint}0.16) 0%, ${tint}0.03) 100%)`,
+                border: `1px solid ${tint}0.24)`,
+                boxShadow: `inset 0 1px 0 ${tint}0.12)`,
+              }}>
+              <ConfirmIconSvg icon={icon} color={iconColor} />
+            </div>
+
+            <h3 className="relative text-[14px] font-mono text-[#cce8f5] tracking-[0.08em] leading-snug">{title}</h3>
+            {message && <p className="relative text-[11.5px] font-mono text-[#4a7a94] leading-relaxed mt-2 max-w-[230px]">{message}</p>}
+
+            <div className="relative flex gap-2 w-full mt-6">
+              <button onClick={onCancel}
+                className="flex-1 py-2.5 border border-[#1a3a50] rounded-lg text-[12px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#1a4a64] tracking-[0.2em] uppercase transition-colors">
+                {cancelLabel}
+              </button>
+              <button onClick={onConfirm}
+                className={`flex-1 py-2.5 rounded-lg text-[12px] font-mono tracking-[0.2em] uppercase transition-colors border ${
+                  danger
+                    ? 'border-red-500/40 bg-red-950/30 text-red-300 hover:text-red-200 hover:border-red-400/60'
+                    : 'border-[#4a9abb]/50 text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80'
+                }`}>
+                {confirmLabel}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
+
+function useConfirm() {
+  const [state, setState] = useState<{ open: boolean; opts: ConfirmOptions; resolve: ((v: boolean) => void) | null }>(
+    { open: false, opts: {}, resolve: null }
+  )
+  const confirm = (opts: ConfirmOptions) =>
+    new Promise<boolean>(resolve => setState({ open: true, opts, resolve }))
+  const settle = (v: boolean) => {
+    state.resolve?.(v)
+    setState(s => ({ ...s, open: false, resolve: null }))
+  }
+  const confirmModal = (
+    <ConfirmModal open={state.open} opts={state.opts} onConfirm={() => settle(true)} onCancel={() => settle(false)} />
+  )
+  return { confirm, confirmModal }
+}
+
 export default function StudyHUD() {
   if (isNativeApp()) return null
   const nav = useNavigate()
+  const { confirm, confirmModal } = useConfirm()
   const [goalMin, setGoalMin] = useState(25)
   const [subject, setSubject] = useState('')
   const [running, setRunning] = useState(false)
@@ -69,6 +176,7 @@ export default function StudyHUD() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [activePanel, setActivePanel] = useState<StudyPanel>('log')
   const [soundOpen, setSoundOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const startAtRef = useRef<Date | null>(null)
   const discardTimerRef = useRef<number | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -164,6 +272,7 @@ export default function StudyHUD() {
     const start = startAtRef.current
     startAtRef.current = null
     setRunning(false)
+    setProgressOpen(false)
     try {
       await saveStudyTime(start, new Date(), subject)
       await refreshSummary()
@@ -182,9 +291,22 @@ export default function StudyHUD() {
     finish()
   }
 
+  // 하단 바 탭 — 공부 중이면 진행 상황 모달
+  const onBarPress = () => {
+    if (!running) return
+    setProgressOpen(true)
+  }
+
   // 모드 선택으로 나가기 — 진행 중 세션 폐기(저장 안 함)
-  const leaveStudy = () => {
-    if (running && !window.confirm('진행 중인 공부가 저장되지 않습니다. 나가시겠습니까?')) return
+  const leaveStudy = async () => {
+    if (running && !(await confirm({
+      title: '공부를 멈추고 나갈까요?',
+      message: '진행 중인 공부는 저장되지 않습니다.',
+      confirmLabel: '나가기',
+      cancelLabel: '취소',
+      danger: true,
+      icon: 'leave',
+    }))) return
     startAtRef.current = null
     setRunning(false)
     clearStudySession()
@@ -193,6 +315,7 @@ export default function StudyHUD() {
 
   const liveToday = summary.todaySeconds + (running ? elapsed : 0)
   const progress = running ? Math.min(1, elapsed / (goalMin * 60)) : 0
+  const remainSec = running ? Math.max(0, goalMin * 60 - elapsed) : 0
 
   return (
     <>
@@ -206,8 +329,11 @@ export default function StudyHUD() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 px-6 py-3.5 rounded-2xl"
           style={{ background: 'rgba(5,14,24,0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(26,74,100,0.45)' }}>
 
-          {/* 위(모바일)/왼쪽(데스크탑): 오늘 공부량 + 타이머 */}
-          <div className="flex items-center gap-4 sm:gap-5 flex-1 min-w-0">
+          {/* 위(모바일)/왼쪽(데스크탑): 오늘 공부량 + 타이머 — 공부 중이면 눌러서 진행 현황 */}
+          <div
+            onClick={onBarPress}
+            role={running ? 'button' : undefined}
+            className={`flex items-center gap-4 sm:gap-5 flex-1 min-w-0 rounded-xl transition-colors ${running ? 'cursor-pointer hover:bg-[#0a2233]/30 -mx-2 px-2 py-1' : ''}`}>
             <div className="flex flex-col shrink-0">
               <p className="text-[14px] font-mono text-[#a8d4e8] tabular-nums leading-none">{fmtSummary(liveToday)}</p>
               <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.25em] uppercase mt-1">오늘 공부량</p>
@@ -351,6 +477,60 @@ export default function StudyHUD() {
         document.body
       )}
 
+      {/* ── 공부 중 진행 상황 모달 ── */}
+      {createPortal(
+        <AnimatePresence>
+          {progressOpen && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+              onClick={() => setProgressOpen(false)}
+              className="fixed inset-0 z-[9999] flex items-center justify-center px-6 cursor-pointer"
+              style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(8px)' }}>
+              <motion.div onClick={e => e.stopPropagation()}
+                initial={{ y: 18, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 14, opacity: 0, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+                className="w-full max-w-xs bg-[#050e18] border border-[#1a4a64]/50 rounded-2xl px-7 py-8 flex flex-col items-center text-center cursor-default"
+                style={{ boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(126,192,210,0.06)' }}>
+                <p className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase">공부 중</p>
+                {!!subject && <p className="text-[13px] font-mono text-[#a8d4e8] tracking-wide mt-2">{subject}</p>}
+                <p className="text-[40px] font-mono text-[#cce8f5] tabular-nums tracking-wider leading-none mt-3">{fmtClock(elapsed)}</p>
+
+                <div className="relative w-full h-1.5 bg-[#0d2233] rounded-full overflow-hidden mt-5">
+                  <motion.div className="absolute top-0 left-0 h-full bg-[#4a9abb] rounded-full"
+                    animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.6, ease: 'easeOut' }} />
+                </div>
+
+                <div className="flex justify-around w-full mt-5">
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-[15px] font-mono text-[#a8d4e8] tabular-nums">{goalMin}분</p>
+                    <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.2em] uppercase">목표</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-[15px] font-mono text-[#a8d4e8] tabular-nums">{Math.round(progress * 100)}%</p>
+                    <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.2em] uppercase">진행</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-[15px] font-mono text-[#a8d4e8] tabular-nums">{fmtSummary(remainSec)}</p>
+                    <p className="text-[8px] font-mono text-[#2a5a74] tracking-[0.2em] uppercase">남음</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 w-full mt-7">
+                  <button onClick={() => setProgressOpen(false)}
+                    className="flex-1 py-2.5 border border-[#4a9abb]/50 rounded-lg text-[12px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-[0.2em] uppercase transition-colors">
+                    계속하기
+                  </button>
+                  <button onClick={() => { setProgressOpen(false); setConfirmOpen(true) }}
+                    className="flex-1 py-2.5 border border-[#1a3a50] rounded-lg text-[12px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-[0.2em] uppercase transition-colors">
+                    종료
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
       {/* ── 종료 확인 모달 ── */}
       {createPortal(
         <AnimatePresence>
@@ -385,6 +565,9 @@ export default function StudyHUD() {
         </AnimatePresence>,
         document.body
       )}
+
+      {/* ── 공용 확인 모달 (모드 나가기) ── */}
+      {confirmModal}
     </>
   )
 }
@@ -459,6 +642,7 @@ function SoundButton({ open, setOpen }: { open: boolean; setOpen: (v: boolean) =
 
 // ─── 공부일지 탭 ───
 function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: () => void }) {
+  const { confirm, confirmModal } = useConfirm()
   const [logs, setLogs] = useState<StudyLog[]>([])
   const [loaded, setLoaded] = useState(false)
   const [selected, setSelected] = useState<StudyLog | null>(null)
@@ -487,9 +671,10 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
     finally { setBusy(false) }
   }
 
-  // 상세 모달용 삭제 (확인창)
+  // 상세 모달용 삭제 (확인 모달)
   const remove = async () => {
-    if (!selected || busy || !window.confirm('이 기록을 삭제할까요?')) return
+    if (!selected || busy) return
+    if (!(await confirm({ title: '이 기록을 삭제할까요?', message: '삭제하면 되돌릴 수 없습니다.', confirmLabel: '삭제', danger: true, icon: 'delete' }))) return
     setBusy(true)
     try {
       await deleteStudyLog(selected.id)
@@ -502,7 +687,7 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
 
   // 스와이프 삭제 — 확인 후 삭제(낙관적 업데이트). 취소 시 false 반환 → 항목 제자리 복귀
   const removeById = async (id: number): Promise<boolean> => {
-    if (!window.confirm('이 기록을 삭제할까요?')) return false
+    if (!(await confirm({ title: '이 기록을 삭제할까요?', message: '삭제하면 되돌릴 수 없습니다.', confirmLabel: '삭제', danger: true, icon: 'delete' }))) return false
     const target = logs.find(l => l.id === id)
     setLogs(prev => prev.filter(l => l.id !== id))
     onChanged()
@@ -681,6 +866,9 @@ function LogTab({ totalSeconds, onChanged }: { totalSeconds: number; onChanged: 
         </AnimatePresence>,
         document.body
       )}
+
+      {/* ── 공용 확인 모달 (기록 삭제) ── */}
+      {confirmModal}
     </div>
   )
 }
