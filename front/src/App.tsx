@@ -5,6 +5,7 @@ import StudyPage from './pages/StudyPage'
 import ModeSelectPage from './pages/ModeSelectPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+import PrivacyPage from './pages/PrivacyPage'
 import AdminPage from './pages/AdminPage'
 import KakaoCallback from "./pages/KakaoCallback";
 
@@ -43,6 +44,7 @@ function App() {
 
         <Route path="/login" element={<LoginPage/>}/>
         <Route path="/signup" element={<SignupPage/>}/>
+        <Route path="/privacy" element={<PrivacyPage/>}/>
         <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
 
         <Route path='/admin' element={

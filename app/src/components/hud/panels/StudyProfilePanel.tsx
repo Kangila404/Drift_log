@@ -11,6 +11,7 @@ import CustomerCenter from "./CustomerCenter";
 import AdminModal from "./AdminModal";
 
 const KAKAO_PAY_URL = "https://qr.kakaopay.com/FHjo39K0L";
+const PRIVACY_URL = "https://driftlog.kro.kr/privacy";
 type EditTab = "nickname" | "password";
 
 // 단색 시계 글리프 (이모지 대체 — 정렬 확실)
@@ -80,6 +81,10 @@ export default function StudyProfilePanel() {
 
       <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setDonateOpen(true); }} style={s.menuBtn}>
         <Text style={s.menuText}>개발자 후원하기</Text>
+      </Pressable>
+
+      <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); Linking.openURL(PRIVACY_URL); }} style={s.menuBtn}>
+        <Text style={s.menuText}>개인정보처리방침</Text>
       </Pressable>
 
       {isAdmin && (

@@ -9,6 +9,7 @@ import CustomerCenter from "./CustomerCenter";
 import AdminModal from "./AdminModal";
 
 const KAKAO_PAY_URL = "https://qr.kakaopay.com/FHjo39K0L";
+const PRIVACY_URL = "https://driftlog.kro.kr/privacy";
 type EditTab = "nickname" | "password";
 
 export default function ProfilePanel() {
@@ -59,6 +60,10 @@ export default function ProfilePanel() {
 
       <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setDonateOpen(true); }} style={s.menuBtn}>
         <Text style={s.menuText}>개발자 후원하기</Text>
+      </Pressable>
+
+      <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); Linking.openURL(PRIVACY_URL); }} style={s.menuBtn}>
+        <Text style={s.menuText}>개인정보처리방침</Text>
       </Pressable>
 
       {isAdmin && (
