@@ -10,6 +10,10 @@ import OpeningSequence from '../OpeningSequence'
 import CustomerCenter from '../CustomerCenter'
 import { goModeSelect, notifyNativeLogout, isNativeApp, sendVoyageState } from '../../lib/nativeBridge'
 
+// ─── 우상단 HUD 스타일 토글 ─────────────────────────────
+// true  = 앱처럼 티켓형 (VoyageTicket + CapsuleTimer)
+// false = 기존 진행바 + 카운트다운 다이얼
+const USE_TICKET = true
 
 type EventInfo = { name: string; text: string; imageUrl: string | null }
 type LogEntry = { id: number; ts: number; date: string; from: string; to: string; note: string; autoText: string; events: EventInfo[] }
@@ -39,6 +43,192 @@ const fmtTime = (sec: number) => {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// ─── 돛단배 글리프 (앱 BoatGlyph 이식) ───
+function BoatGlyph({ color, size = 20 }: { color: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M11.4 3 h1.2 v9 h-1.2 Z" fill={color} />
+      <path d="M12.6 4.5 L18 11 H12.6 Z" fill={color} />
+      <path d="M4 13 h16 l-2.4 4.6 a2 2 0 0 1 -1.78 1.05 H8.18 a2 2 0 0 1 -1.78 -1.05 Z" fill={color} />
+    </svg>
+  )
+}
+
+// ─── 캡슐 타이머 (앱 CapsuleTimer 이식) — 매초 카운트다운 + 펄스닷 ───
+function CapsuleTimer({ remainingSeconds, paused }: { remainingSeconds: number; paused: boolean }) {
+  const [sec, setSec] = useState(remainingSeconds)
+
+  useEffect(() => { setSec(remainingSeconds) }, [remainingSeconds])
+  useEffect(() => {
+    if (paused) return
+    const t = setInterval(() => setSec(x => Math.max(0, x - 1)), 1000)
+    return () => clearInterval(t)
+  }, [paused])
+
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s2 = sec % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const timeText = sec <= 0 ? '도착' : h > 0 ? `${h}:${pad(m)}:${pad(s2)}` : `${pad(m)}:${pad(s2)}`
+
+  return (
+    <div className="inline-flex items-center gap-2.5 rounded-full border border-[#285a78]/45 bg-[#07121e]/85 backdrop-blur-md pl-3.5 pr-4 py-2.5"
+      style={{ boxShadow: '0 8px 28px rgba(0,0,0,0.4)' }}>
+      <motion.span
+        className="w-[7px] h-[7px] rounded-full"
+        style={{ background: paused ? '#3a6a86' : '#7ee6ff' }}
+        animate={paused ? { opacity: 0.25 } : { opacity: [0.4, 1, 0.4] }}
+        transition={paused ? {} : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }} />
+      <span className="text-[clamp(15px,2.2vw,18px)] font-semibold text-[#cce8f5] tabular-nums tracking-wide leading-none">{timeText}</span>
+      <span className="text-[10px] text-[#4a7a94] tracking-wide leading-none">{paused ? '정지' : sec <= 0 ? '' : '남음'}</span>
+    </div>
+  )
+}
+
+// ─── 항해 티켓 (앱 VoyageNativeHud 티켓 이식) ───
+// 웹 대응: 스와이프 → 클릭(펼침/접힘) + ✕(숨김). 숨기면 우측 손잡이로 복귀.
+// 모바일: 풀폭 + 중앙정렬 / PC: 우측 정렬 + 약간 큰 카드
+function VoyageTicket({
+  fromName, toName, progress, paused, initReady, muted,
+  onPauseResume, onToggleMute,
+}: {
+  fromName: string; toName: string; progress: number; paused: boolean
+  initReady: boolean; muted: boolean
+  onPauseResume: () => void; onToggleMute: () => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const [hidden, setHidden] = useState(false)
+  const pct = Math.max(0, Math.min(1, progress))
+
+  // 숨김 상태 — 우측 가장자리 손잡이
+  if (hidden) {
+    return (
+      <div className="w-full flex justify-end">
+        <button
+          onClick={() => setHidden(false)}
+          className="flex items-center gap-1.5 rounded-l-2xl border border-r-0 border-[#285a78]/45 bg-[#08141e]/90 backdrop-blur-md pl-3 pr-3.5 py-2.5 hover:border-[#4a9abb]/60 transition-colors"
+          aria-label="항해 정보 펼치기">
+          <div className="w-[3px] h-[18px] rounded-full bg-[#5a8aa4]/50" />
+          <BoatGlyph color="#6aa8c8" size={18} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full flex flex-col items-stretch gap-2.5 sm:items-end">
+      {/* 티켓 본체 */}
+      <div
+        className="relative overflow-hidden rounded-2xl border border-[#285a78]/45 bg-[#08141e]/90 backdrop-blur-md px-5 py-3.5 sm:px-6 sm:py-4 w-full sm:w-auto"
+        style={{ boxShadow: '0 10px 36px rgba(0,0,0,0.4)' }}>
+        {/* 양옆 펀치홀 */}
+        <div className="absolute top-1/2 -mt-[9px] -left-[10px] w-[18px] h-[18px] rounded-full bg-[#0a1422] border border-[#285a78]/45" />
+        <div className="absolute top-1/2 -mt-[9px] -right-[10px] w-[18px] h-[18px] rounded-full bg-[#0a1422] border border-[#285a78]/45" />
+
+        {/* 헤더 */}
+        <div className="flex items-center justify-between">
+          <button onClick={() => setExpanded(v => !v)} className="flex items-center gap-1.5 group">
+            <span className="w-[5px] h-[5px] rounded-full" style={{ background: paused ? '#3a6a86' : '#5ab0d8' }} />
+            <span className="text-[9px] sm:text-[10px] font-mono text-[#5ab0d8] tracking-[0.25em]">{paused ? 'PAUSED' : 'BOARDING'}</span>
+            <span className="text-[9px] sm:text-[10px] font-mono text-[#3a6a86] tracking-wider ml-1.5 group-hover:text-[#5a8aa4] transition-colors">
+              {expanded ? '· 탭하여 접기' : '· 탭하여 펼치기'}
+            </span>
+          </button>
+          <button onClick={() => setHidden(true)}
+            className="w-6 h-6 -mr-1.5 flex items-center justify-center rounded-full text-[#3a6a86] hover:text-[#7eb8d4] transition-colors text-[13px]"
+            aria-label="숨기기">✕</button>
+        </div>
+
+        {/* FROM → 배 → TO */}
+        <button onClick={() => setExpanded(v => !v)}
+          className="w-full flex items-end justify-between mt-2.5 text-left sm:min-w-[420px]">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[8px] sm:text-[9px] font-mono text-[#3a6a86] tracking-[0.2em]">FROM</span>
+            <span className="text-[clamp(18px,5vw,22px)] font-semibold text-[#9ec8e0] tracking-wide leading-none">{fromName}</span>
+          </div>
+          <div className="flex-1 flex items-center justify-center gap-1.5 mx-3 pb-1">
+            <span className="w-1 h-1 rounded-full bg-[#3a6a86]" />
+            <span className="flex-1 h-px bg-[#285a78]/50" />
+            {paused ? <span className="text-[#6aa8c8] text-[15px]">॥</span> : <BoatGlyph color="#6aa8c8" size={20} />}
+            <span className="flex-1 h-px bg-[#285a78]/50" />
+            <span className="w-1 h-1 rounded-full bg-[#5ab0d8]" />
+          </div>
+          <div className="flex flex-col gap-0.5 items-end">
+            <span className="text-[8px] sm:text-[9px] font-mono text-[#3a6a86] tracking-[0.2em]">TO</span>
+            <span className="text-[clamp(18px,5vw,22px)] font-bold text-[#e0f0fb] tracking-wide leading-none">{toName}</span>
+          </div>
+        </button>
+
+        {/* 펼침 상세 */}
+        <AnimatePresence initial={false}>
+          {expanded ? (
+            <motion.div
+              key="exp"
+              initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }} className="overflow-hidden">
+              <div className="border-t border-dashed border-[#285a78]/40 mt-3 pt-3">
+                <div className="relative h-[5px] rounded-full bg-[#0d2233]/90 overflow-hidden">
+                  <motion.div
+                    className="absolute top-0 left-0 h-full rounded-full"
+                    style={{ background: paused ? '#3a6a86' : '#5ab0d8' }}
+                    initial={{ width: 0 }} animate={{ width: `${pct * 100}%` }}
+                    transition={{ duration: paused ? 0 : 1.2, ease: 'easeOut' }} />
+                </div>
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-[11px] sm:text-[12px]" style={{ color: paused ? '#7eb8d4' : '#6aa8c8' }}>
+                    {paused ? '항해 정지 중' : `${toName}로 항해 중`}
+                  </span>
+                  <span className="text-[12px] sm:text-[13px] font-semibold text-[#5a8aa4] tabular-nums">{Math.round(pct * 100)}%</span>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="h-[3px] rounded-full bg-[#0d2233]/90 overflow-hidden mt-2.5">
+              <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: paused ? '#3a6a86' : '#5ab0d8' }} />
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 펼침일 때만 컨트롤 행 — 모바일 중앙, PC 우측 */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2 }}
+            className="flex justify-center sm:justify-end gap-3">
+            <motion.button
+              onClick={onPauseResume} disabled={!initReady}
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}
+              className={`w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-colors ${
+                paused
+                  ? 'bg-[#5ab0d8]/15 border-[#5ab0d8]/60 text-[#cce8f5]'
+                  : 'bg-[#07121e]/80 border-[#285a78]/45 text-[#7eb8d4] hover:border-[#5ab0d8]/60'
+              } disabled:opacity-40`}
+              aria-label={paused ? '항해 재개' : '항해 일시정지'}>
+              <span className="text-[16px]">{paused ? '▶' : 'Ⅱ'}</span>
+            </motion.button>
+            <motion.button
+              onClick={onToggleMute}
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}
+              className="w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md bg-[#07121e]/80 border-[#285a78]/45 text-[#7eb8d4] hover:border-[#5ab0d8]/60 transition-colors"
+              aria-label={muted ? '소리 켜기' : '소리 끄기'} title={muted ? '소리 켜기' : '소리 끄기'}>
+              <svg viewBox="0 0 24 24" className="w-[19px] h-[19px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                {muted ? (
+                  <><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>
+                ) : (
+                  <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></>
+                )}
+              </svg>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }
 
 // ─── 남은 시간 카운트다운 다이얼 (progress 비례 원호 + 매초 시간) ───
@@ -98,8 +288,6 @@ function isMobileDevice() {
   if (typeof navigator === 'undefined') return false
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 }
-
-
 
 // ─── 진행바 ───────────────────────────────────────────────────────────────────
 function ProgressBar({ from, to, progress, voyageState }: {
@@ -398,6 +586,255 @@ function TracePanel({ onReplayIntro }: { onReplayIntro: () => void }) {
   )
 }
 
+// ─── 음악 모달 (앱 플레이어 이식: 시킹 드래그 / 일시정지 / ±10초 / 배속 / 반복) ───
+const RATES = [1, 1.25, 1.5, 2, 0.75]
+
+function MusicModal({ open, visited, onClose }: {
+  open: boolean; visited: number[]; onClose: () => void
+}) {
+  const [playingId, setPlayingId] = useState<number | null>(null)
+  const [pos, setPos] = useState(0)
+  const [dur, setDur] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [rate, setRate] = useState(1)
+  const [repeatMode, setRepeatMode] = useState<'off' | 'one' | 'all'>('off')
+  const [dragging, setDragging] = useState(false)
+
+  const playingRef = useRef<number | null>(null); playingRef.current = playingId
+  const repeatRef = useRef(repeatMode); repeatRef.current = repeatMode
+  const durRef = useRef(0); durRef.current = dur
+
+  const restoreBgm = () => {
+    const { voyageState, currentCity } = useVoyageStore.getState()
+    if (voyageState === 'SAILING' || voyageState === 'PAUSED') bgm.playVoyage()
+    else if (currentCity?.bgmUrl) bgm.playCity(currentCity.bgmUrl)
+  }
+
+  const stopAll = () => {
+    bgm.previewStop()
+    setPlayingId(null); setPaused(false); setPos(0); setDur(0); setRate(1)
+  }
+
+  const playTrack = (id: number, keepRate = false) => {
+    const url = CITY_BGM[id]
+    if (!url) return
+    const r = keepRate ? rate : 1
+    bgm.preview(url)
+    if (r !== 1) bgm.previewSetRate(r)
+    setPlayingId(id); setPaused(false); setPos(0); setDur(0)
+    if (!keepRate) setRate(1)
+  }
+
+  const toggle = (id: number) => {
+    if (playingId === id) { stopAll(); return }
+    playTrack(id)
+  }
+
+  const togglePause = () => {
+    if (paused) { bgm.previewResume(); setPaused(false) }
+    else { bgm.previewPause(); setPaused(true) }
+  }
+
+  const skip = (delta: number) => {
+    bgm.previewSeekBy(delta)
+    setPos(bgm.previewGetSeek())
+  }
+
+  const cycleRate = () => {
+    const idx = RATES.indexOf(rate)
+    const next = RATES[(idx + 1) % RATES.length]
+    setRate(next)
+    bgm.previewSetRate(next)
+  }
+
+  const cycleRepeat = () =>
+    setRepeatMode(m => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off'))
+
+  useEffect(() => {
+    if (playingId === null) return
+    let ended = false
+    const t = setInterval(() => {
+      if (dragging) return
+      const cur = bgm.previewGetSeek()
+      const total = bgm.previewDuration()
+      setPos(cur)
+      setDur(total)
+      if (!ended && total > 1 && cur >= total - 0.4) {
+        ended = true
+        handleEnd()
+      } else if (cur < total - 1) {
+        ended = false
+      }
+    }, 300)
+    return () => clearInterval(t)
+  }, [playingId, dragging])
+
+  const handleEnd = () => {
+    const id = playingRef.current
+    const mode = repeatRef.current
+    if (id === null) return
+    if (mode === 'one') {
+      bgm.previewSetSeek(0); bgm.previewResume()
+      setPos(0); setPaused(false)
+      return
+    }
+    if (mode === 'all') {
+      const idx = visited.indexOf(id)
+      const next = visited[(idx + 1) % visited.length]
+      playTrack(next, true)
+      return
+    }
+    stopAll()
+  }
+
+  const close = () => { stopAll(); restoreBgm(); onClose() }
+
+  useEffect(() => {
+    if (!open) { bgm.previewStop(); setPlayingId(null); setPaused(false) }
+  }, [open])
+
+  const fmt = (sec: number) => {
+    if (!sec || !isFinite(sec)) return '0:00'
+    const m = Math.floor(sec / 60); const s = Math.floor(sec % 60)
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  const nowCity = playingId !== null ? CITY_META[playingId] : null
+  const pct = dur > 0 ? Math.min(100, (pos / dur) * 100) : 0
+
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const seekFromClientX = (clientX: number) => {
+    const el = barRef.current
+    if (!el || durRef.current <= 0) return
+    const rect = el.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const target = ratio * durRef.current
+    setPos(target)
+    return target
+  }
+  const onBarDown = (e: React.PointerEvent) => {
+    setDragging(true)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    seekFromClientX(e.clientX)
+  }
+  const onBarMove = (e: React.PointerEvent) => {
+    if (!dragging) return
+    seekFromClientX(e.clientX)
+  }
+  const onBarUp = (e: React.PointerEvent) => {
+    if (!dragging) return
+    const target = seekFromClientX(e.clientX)
+    if (target != null) bgm.previewSetSeek(target)
+    setDragging(false)
+  }
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+          onClick={close}
+          className="fixed inset-0 z-[9998] flex flex-col items-center cursor-pointer pt-14 pb-8 px-6"
+          style={{ background: 'rgba(2,6,14,0.92)', backdropFilter: 'blur(6px)' }}>
+          <p className="text-[12px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase mb-6 pointer-events-none shrink-0">지나온 도시의 음악</p>
+
+          <div onClick={e => e.stopPropagation()}
+            className="cursor-default flex flex-col gap-2 overflow-y-auto min-h-0 w-full flex-1"
+            style={{ maxWidth: 'min(92vw, 420px)', scrollbarWidth: 'none' }}>
+            {visited.map(id => {
+              const c = CITY_META[id]
+              const playing = playingId === id
+              const hasBgm = !!CITY_BGM[id]
+              return (
+                <button key={id} onClick={() => toggle(id)} disabled={!hasBgm}
+                  className={`flex items-center gap-4 p-3 rounded-lg border transition-colors text-left disabled:opacity-30 ${
+                    playing ? 'bg-[#0a2233]/80 border-[#4a9abb]/70' : 'bg-[#071826]/50 border-[#1a4a64]/40 hover:border-[#4a9abb]/60'
+                  }`}>
+                  <div className="w-14 h-14 rounded overflow-hidden border border-[#0d2233] shrink-0">
+                    <img src={c.img} alt={c.name} className="w-full h-full object-cover" draggable={false} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-serif text-[#cce8f5] tracking-[0.2em]">{c.name}</p>
+                    <p className="text-[9px] font-mono text-[#3a6880] mt-0.5">
+                      {!hasBgm ? '음악 없음' : playing ? '재생 중...' : '미리듣기'}
+                    </p>
+                  </div>
+                  <div className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 font-mono text-[12px] ${
+                    playing ? 'border-[#7eb8d4]/70 text-[#cce8f5]' : 'border-[#1a4a64]/60 text-[#7eb8d4]/70'
+                  }`}>
+                    {playing ? 'Ⅱ' : '▶'}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {nowCity && (
+            <div onClick={e => e.stopPropagation()}
+              className="cursor-default w-full mt-4 rounded-2xl border border-[#4a9abb]/35 bg-[#091622] px-5 pt-4 pb-5 flex flex-col gap-3 shrink-0"
+              style={{ maxWidth: 'min(92vw, 420px)' }}>
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl overflow-hidden bg-[#040d16] shrink-0" style={{ width: 52, height: 52 }}>
+                  <img src={nowCity.img} alt={nowCity.name} className="w-full h-full object-cover" draggable={false} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[17px] font-semibold text-[#e0f0fb] truncate">{nowCity.name}</p>
+                  <p className="text-[9px] font-mono text-[#3a6880] tracking-[0.3em] mt-1">NOW PLAYING</p>
+                </div>
+                <button onClick={cycleRate}
+                  className="px-3 py-1.5 rounded-lg border border-[#4a9abb]/40 bg-[#0a2233]/50 text-[13px] font-mono font-semibold text-[#7eb8d4]">
+                  {rate}×
+                </button>
+              </div>
+
+              <div
+                ref={barRef}
+                onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp}
+                className="relative w-full h-7 flex items-center cursor-pointer touch-none">
+                <div className="w-full h-1 rounded-full bg-[#10283a] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#5ab0d8]" style={{ width: `${pct}%` }} />
+                </div>
+                <div className="absolute w-3.5 h-3.5 rounded-full bg-[#cce8f5] border-2 border-[#091622] -translate-x-1/2"
+                  style={{ left: `${pct}%` }} />
+              </div>
+              <div className="flex justify-between -mt-1">
+                <span className="text-[11px] font-mono text-[#4a7a94]">{fmt(pos)}</span>
+                <span className="text-[11px] font-mono text-[#4a7a94]">{fmt(dur)}</span>
+              </div>
+
+              <div className="flex items-center justify-between px-2">
+                <button onClick={cycleRepeat} className="w-11 h-10 flex items-center justify-center">
+                  <span className={`text-[18px] font-semibold ${repeatMode !== 'off' ? 'text-[#5ab0d8]' : 'text-[#3a6880]'}`}>
+                    {repeatMode === 'one' ? '↻1' : '↻'}
+                  </span>
+                </button>
+                <button onClick={() => skip(-10)} className="w-12 h-10 flex items-center justify-center text-[14px] font-mono text-[#7eb8d4]">«10</button>
+                <button onClick={togglePause}
+                  className="w-14 h-14 rounded-full flex items-center justify-center bg-[#5ab0d8] text-[#04111c] text-[20px] font-bold">
+                  {paused ? '▶' : 'Ⅱ'}
+                </button>
+                <button onClick={() => skip(10)} className="w-12 h-10 flex items-center justify-center text-[14px] font-mono text-[#7eb8d4]">10»</button>
+                <div className="w-11" />
+              </div>
+              {repeatMode !== 'off' && (
+                <p className="text-center text-[10px] text-[#5ab0d8] tracking-wide -mt-1">
+                  {repeatMode === 'one' ? '한 곡 반복' : '목록 자동 재생'}
+                </p>
+              )}
+            </div>
+          )}
+
+          <button onClick={close}
+            className="mt-5 px-8 py-2 border border-[#1a4a64]/60 rounded text-[11px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-widest uppercase transition-colors cursor-pointer shrink-0">
+            닫기
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
+
 // ─── 항해록 ───────────────────────────────────────────────────────────────────
 function LogPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -405,9 +842,6 @@ function LogPanel() {
   const [gridOpen, setGridOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState<number | null>(null)
   const [musicOpen, setMusicOpen] = useState(false)
-  const [playingId, setPlayingId] = useState<number | null>(null)
-  const [seekPos, setSeekPos] = useState(0)
-  const [seekDur, setSeekDur] = useState(0)
   const [selectedEvent, setSelectedEvent] = useState<EventInfo | null>(null)
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({})
   const [detailLog, setDetailLog] = useState<LogEntry | null>(null)
@@ -454,36 +888,6 @@ function LogPanel() {
       setSaving(false)
     }
   }
-
-  const restoreBgm = () => {
-    const { voyageState, currentCity } = useVoyageStore.getState()
-    if (voyageState === 'SAILING' || voyageState === 'PAUSED') bgm.playVoyage()
-    else if (currentCity?.bgmUrl) bgm.playCity(currentCity.bgmUrl)
-    else bgm.stop()
-  }
-
-  const togglePreview = (id: number) => {
-    if (playingId === id) { setPlayingId(null); restoreBgm() }
-    else {
-      const url = CITY_BGM[id]
-      if (!url) return
-      setPlayingId(id)
-      bgm.playCity(url)
-    }
-  }
-
-  const closeMusic = () => {
-    setMusicOpen(false)
-    if (playingId !== null) { setPlayingId(null); restoreBgm() }
-  }
-
-  useEffect(() => {
-    if (playingId === null) { setSeekPos(0); setSeekDur(0); return }
-    const tick = () => { setSeekPos(bgm.getSeek()); setSeekDur(bgm.duration()) }
-    tick()
-    const id = setInterval(tick, 250)
-    return () => clearInterval(id)
-  }, [playingId])
 
   const visited = visitedCityIds.filter(id => CITY_META[id])
 
@@ -658,68 +1062,7 @@ function LogPanel() {
         document.body
       )}
 
-      {createPortal(
-        <AnimatePresence>
-          {musicOpen && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-              onClick={closeMusic}
-              className="fixed inset-0 z-[9998] flex flex-col items-center justify-center cursor-pointer py-10 px-6"
-              style={{ background: 'rgba(2,6,14,0.92)', backdropFilter: 'blur(6px)' }}>
-              <p className="text-[12px] font-mono text-[#7eb8d4] tracking-[0.4em] uppercase mb-6 pointer-events-none shrink-0">지나온 도시의 음악</p>
-              <div onClick={e => e.stopPropagation()}
-                className="cursor-default flex flex-col gap-2 overflow-y-auto min-h-0 w-full pb-28"
-                style={{ maxWidth: 'min(92vw, 420px)', scrollbarWidth: 'none' }}>
-                {visited.map(id => {
-                  const c = CITY_META[id]
-                  const isPlaying = playingId === id
-                  const hasBgm = !!CITY_BGM[id]
-                  return (
-                    <button key={id} onClick={() => togglePreview(id)} disabled={!hasBgm}
-                      className={`flex items-center gap-4 p-3 rounded-lg border transition-colors text-left disabled:opacity-30 ${
-                        isPlaying ? 'bg-[#0a2233]/80 border-[#4a9abb]/70' : 'bg-[#071826]/50 border-[#1a4a64]/40 hover:border-[#4a9abb]/60'
-                      }`}>
-                      <div className="w-14 h-14 rounded overflow-hidden border border-[#0d2233] shrink-0">
-                        <img src={c.img} alt={c.name} className="w-full h-full object-cover" draggable={false} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-serif text-[#cce8f5] tracking-[0.2em]">{c.name}</p>
-                        <p className="text-[9px] font-mono text-[#3a6880] mt-0.5">
-                          {!hasBgm ? '음악 없음' : isPlaying ? '재생 중...' : '미리듣기'}
-                        </p>
-                      </div>
-                      <div className={`w-9 h-9 rounded-full border flex items-center justify-center shrink-0 font-mono text-[12px] ${
-                        isPlaying ? 'border-[#7eb8d4]/70 text-[#cce8f5]' : 'border-[#1a4a64]/60 text-[#7eb8d4]/70'
-                      }`}>
-                        {isPlaying ? 'Ⅱ' : '▶'}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-              {playingId !== null && (
-                <div onClick={e => e.stopPropagation()}
-                  className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[9999] w-[min(92vw,420px)] rounded-lg border border-[#4a9abb]/40 bg-[#071826]/95 p-4 flex flex-col gap-2 cursor-default"
-                  style={{ backdropFilter: 'blur(8px)' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-[#cce8f5] tracking-widest">♫ {CITY_META[playingId]?.name}</span>
-                    <span className="text-[9px] font-mono text-[#4a7a94]">{fmtTime(seekPos)} / {fmtTime(seekDur)}</span>
-                  </div>
-                  <input type="range" min={0} max={seekDur || 0} step={0.1} value={seekPos}
-                    onChange={(e) => { const v = Number(e.target.value); setSeekPos(v); bgm.setSeek(v) }}
-                    className="w-full h-1 appearance-none rounded-full cursor-pointer"
-                    style={{ background: `linear-gradient(to right, #4a9abb ${seekDur > 0 ? (seekPos / seekDur) * 100 : 0}%, #0d2233 0%)` }} />
-                </div>
-              )}
-              <button onClick={closeMusic}
-                className="mt-6 px-8 py-2 border border-[#1a4a64]/60 rounded text-[11px] font-mono text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 tracking-widest uppercase transition-colors cursor-pointer shrink-0">
-                닫기
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+      <MusicModal open={musicOpen} visited={visited} onClose={() => setMusicOpen(false)} />
 
       {createPortal(
         <AnimatePresence>
@@ -1130,6 +1473,14 @@ const openEdit = () => {
 
       <div className="border-t border-[#0d2233]" />
       <CustomerCenter />
+      <a href="/privacy"
+        className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors text-center flex items-center justify-center gap-1.5">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        개인정보처리방침
+      </a>
       <button onClick={() => setDonateOpen(true)}
         className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors">
         ♡ 개발자 후원하기
@@ -1256,68 +1607,85 @@ useEffect(() => {
     }
   }, [])
 
-
   if (isNativeApp()) return null
+
+  const sailing = voyageState === 'SAILING' || voyageState === 'PAUSED'
+  const paused = voyageState === 'PAUSED'
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10" style={{ transition: 'opacity 1.5s ease', opacity: hudOpacity }}>
       {!isAnchored && (
-        <div className="absolute top-8 right-8 pointer-events-auto">
-          <div className="flex items-start gap-4">
-            <ProgressBar from={fromName} to={toName} progress={progress} voyageState={voyageState} />
-            <div className="flex flex-col items-center gap-3 mt-[2px]">
-              {(voyageState === 'SAILING' || voyageState === 'PAUSED') && (
-                <motion.button
-                  onClick={handlePauseResume}
-                  disabled={pauseLoading || !initReady}
-                  whileHover={{ scale: pauseLoading ? 1 : 1.04 }} whileTap={{ scale: pauseLoading ? 1 : 0.94 }}
-                  className={`relative w-12 h-12 rounded-full border flex items-center justify-center font-mono text-[13px] backdrop-blur-md transition-all duration-300 ${
-                    voyageState === 'PAUSED'
-                      ? 'bg-[#7eb8d4]/12 border-[#7eb8d4]/60 text-[#cce8f5] shadow-[0_0_24px_rgba(126,184,212,0.22)]'
-                      : 'bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/70 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 hover:shadow-[0_0_18px_rgba(126,184,212,0.16)]'
-                  }`}
-                  aria-label={voyageState === 'PAUSED' ? '항해 재개' : '항해 일시정지'}
-                >
-                  {voyageState === 'PAUSED' && (
-                    <motion.span className="absolute inset-0 rounded-full border border-[#7eb8d4]/30"
-                      animate={{ scale: [1, 1.35, 1], opacity: [0.6, 0, 0.6] }}
-                      transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} />
-                  )}
-                  <span className="relative z-10">{voyageState === 'PAUSED' ? '▶' : 'Ⅱ'}</span>
-                </motion.button>
-              )}
-              <motion.button
-                onClick={() => setMuted(bgm.toggleMute())}
-                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
-                className="w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all duration-300 bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/80 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70"
-                aria-label={muted ? '소리 켜기' : '소리 끄기'} title={muted ? '소리 켜기' : '소리 끄기'}
-              >
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
-                  {muted ? (
-                    <><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>
-                  ) : (
-                    <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></>
-                  )}
-                </svg>
-              </motion.button>
+        USE_TICKET ? (
+          sailing && (
+            <div className="absolute top-4 left-4 right-4 sm:top-8 sm:left-auto sm:right-8 pointer-events-auto">
+              <VoyageTicket
+                fromName={fromName} toName={toName} progress={progress}
+                paused={paused} initReady={initReady} muted={muted}
+                onPauseResume={handlePauseResume}
+                onToggleMute={() => setMuted(bgm.toggleMute())}
+              />
             </div>
+          )
+        ) : (
+          <div className="absolute top-6 right-6 md:top-8 md:right-8 pointer-events-auto flex flex-col items-end">
+            <div className="flex items-start gap-4">
+              <ProgressBar from={fromName} to={toName} progress={progress} voyageState={voyageState} />
+              <div className="flex flex-col items-center gap-3 mt-[2px]">
+                {sailing && (
+                  <motion.button
+                    onClick={handlePauseResume}
+                    disabled={pauseLoading || !initReady}
+                    whileHover={{ scale: pauseLoading ? 1 : 1.04 }} whileTap={{ scale: pauseLoading ? 1 : 0.94 }}
+                    className={`relative w-12 h-12 rounded-full border flex items-center justify-center font-mono text-[13px] backdrop-blur-md transition-all duration-300 ${
+                      paused
+                        ? 'bg-[#7eb8d4]/12 border-[#7eb8d4]/60 text-[#cce8f5] shadow-[0_0_24px_rgba(126,184,212,0.22)]'
+                        : 'bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/70 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 hover:shadow-[0_0_18px_rgba(126,184,212,0.16)]'
+                    }`}
+                    aria-label={paused ? '항해 재개' : '항해 일시정지'}
+                  >
+                    {paused && (
+                      <motion.span className="absolute inset-0 rounded-full border border-[#7eb8d4]/30"
+                        animate={{ scale: [1, 1.35, 1], opacity: [0.6, 0, 0.6] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} />
+                    )}
+                    <span className="relative z-10">{paused ? '▶' : 'Ⅱ'}</span>
+                  </motion.button>
+                )}
+                <motion.button
+                  onClick={() => setMuted(bgm.toggleMute())}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+                  className="w-12 h-12 rounded-full border flex items-center justify-center backdrop-blur-md transition-all duration-300 bg-[#050e18]/55 border-[#1a4a64]/70 text-[#7eb8d4]/80 hover:text-[#cce8f5] hover:border-[#7eb8d4]/70"
+                  aria-label={muted ? '소리 켜기' : '소리 끄기'} title={muted ? '소리 끄기' : '소리 끄기'}
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                    {muted ? (
+                      <><line x1="22" y1="9" x2="16" y2="15" /><line x1="16" y1="9" x2="22" y2="15" /></>
+                    ) : (
+                      <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></>
+                    )}
+                  </svg>
+                </motion.button>
+              </div>
+            </div>
+            {paused && (
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-3 text-right">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#050e18]/60 border border-[#1a4a64]/40 text-[10px] font-mono text-[#7eb8d4]/80 tracking-widest">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#7eb8d4]/70" />
+                  항해 정지 중
+                </span>
+              </motion.div>
+            )}
           </div>
-          {voyageState === 'PAUSED' && (
-            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-3 text-right">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#050e18]/60 border border-[#1a4a64]/40 text-[10px] font-mono text-[#7eb8d4]/80 tracking-widest">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#7eb8d4]/70" />
-                항해 정지 중
-              </span>
-            </motion.div>
-          )}
-        </div>
+        )
       )}
 
-      {/* 나침반 자리 → 남은 시간 카운트다운 다이얼 */}
-      {!isAnchored && (voyageState === 'SAILING' || voyageState === 'PAUSED') && (
-        <div className="absolute bottom-8 right-8 pointer-events-auto">
-          <CountdownDial remainingSeconds={remainingSeconds} progress={progress} paused={voyageState === 'PAUSED'} />
+      {/* 하단 우측 — 카운트다운: 티켓이면 캡슐, 아니면 다이얼 */}
+      {!isAnchored && sailing && (
+        <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 pointer-events-auto">
+          {USE_TICKET
+            ? <CapsuleTimer remainingSeconds={remainingSeconds} paused={paused} />
+            : <CountdownDial remainingSeconds={remainingSeconds} progress={progress} paused={paused} />}
         </div>
       )}
 

@@ -7,6 +7,7 @@ const MIN_DELAY = 25 * 60_000   // 25분
 const MAX_DELAY = 35 * 60_000   // 35분 (평균 30분)
 const SHOW_DURATION = 12_000    // 12초 표시
 
+
 export function useRandomEvent() {
   const voyageState = useVoyageStore((s) => s.voyageState)
   const addOccurredEvent = useVoyageStore((s) => s.addOccurredEvent)

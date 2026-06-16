@@ -1,14 +1,22 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const UPDATED = "2026년 6월 16일";
 const EFFECTIVE = "2026년 6월 16일";
 const CONTACT = "ia3264666@gmail.com";
 
-export default function PrivacyPage() {
+export default function PrivacyPage({ onBack }: { onBack?: () => void }) {
+  const navigate = useNavigate();
+
+  const goBack = () => {
+    if (onBack) return onBack()                     // 앱: 부모가 넘긴 뒤로가기
+    if (window.history.length > 1) navigate(-1)      // 웹: 직전 페이지
+    else navigate('/')                               // 히스토리 없으면 모드선택
+  }
+
   return (
     <div style={st.wrap}>
       <div style={st.inner}>
-        <Link to="/login" style={st.back}>‹ 돌아가기</Link>
+        <button onClick={goBack} style={{ ...st.back, background: "none", border: "none", cursor: "pointer", padding: 0 }}>‹ 돌아가기</button>
 
         <header style={st.header}>
           <div style={st.eyebrow}>DRIFTLOG · PRIVACY POLICY</div>
