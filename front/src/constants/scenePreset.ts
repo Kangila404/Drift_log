@@ -30,12 +30,12 @@ const TIME_BASE: Record<TimeOfDay, ScenePreset> = {
     effects: [],
   },
 day: {
-    waterNear: [0.07, 0.34, 0.5], waterFar: [0.04, 0.16, 0.28],
-    waveScale: 1.0, waveSpeed: 1.0, fogColor: "#0e2236", fogDensity: 0.012,
-    moonColor: "#fffde8", showMoon: true, celestialBody: "sun",
-    ambientIntensity: 1.1, skyTop: "#0e2236", skyBottom: "#1c4a70",
-    effects: [],
-  },
+  waterNear: [0.05, 0.14, 0.26], waterFar: [0.03, 0.08, 0.16],
+  waveScale: 1.0, waveSpeed: 1.0, fogColor: "#142844", fogDensity: 0.012,
+  moonColor: "#fff4dc", showMoon: true, celestialBody: "sun",
+  ambientIntensity: 1.0, skyTop: "#0e1c38", skyBottom: "#274a7e",
+  effects: [],
+},
  night: {
     waterNear: [0.04, 0.2, 0.3], waterFar: [0.02, 0.09, 0.16],
     waveScale: 1.0, waveSpeed: 1.0, fogColor: "#07111d", fogDensity: 0.012,

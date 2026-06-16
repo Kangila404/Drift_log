@@ -28,6 +28,9 @@ function rustMix(hex: string, amt: number) {
 // ── 따개비 색 (칙칙한 회백색) ──
 const BARNACLE_COLOR = '#b8b3a2'
 
+// 낮(sun)일 때 돛에 얹는 약한 self-illumination 강도
+const DAY_SAIL_EMISSIVE = 0.09
+
 function Line({ points, opacity = 0.55 }: { points: [number, number, number][]; opacity?: number }) {
   const obj = useMemo(() => {
     const g = new THREE.BufferGeometry()
@@ -38,7 +41,7 @@ function Line({ points, opacity = 0.55 }: { points: [number, number, number][]; 
   return <primitive object={obj} />
 }
 
-function Sail({ side, color }: { side: -1 | 1; color: string }) {
+function Sail({ side, color, daylight = false }: { side: -1 | 1; color: string; daylight?: boolean }) {
   const rows = 20, cols = 10
   const fold = useRef(0)
 
@@ -88,7 +91,15 @@ function Sail({ side, color }: { side: -1 | 1; color: string }) {
   return (
     <group position={[0, 1.86, -0.42]}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} roughness={0.84} transparent opacity={0.96} side={THREE.DoubleSide} />
+        <meshStandardMaterial
+          color={color}
+          emissive={daylight ? color : '#000000'}
+          emissiveIntensity={daylight ? DAY_SAIL_EMISSIVE : 0}
+          roughness={0.84}
+          transparent
+          opacity={0.96}
+          side={THREE.DoubleSide}
+        />
       </mesh>
     </group>
   )
@@ -153,7 +164,7 @@ function buildHullGeometry() {
   return g
 }
 
-function Jib({ color }: { color: string }) {
+function Jib({ color, daylight = false }: { color: string; daylight?: boolean }) {
   const rows = 16, cols = 6
   const fold = useRef(0)
 
@@ -202,7 +213,15 @@ function Jib({ color }: { color: string }) {
   return (
     <group position={[0, 1.5, -0.42]}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial color={color} roughness={0.84} transparent opacity={0.94} side={THREE.DoubleSide} />
+        <meshStandardMaterial
+          color={color}
+          emissive={daylight ? color : '#000000'}
+          emissiveIntensity={daylight ? DAY_SAIL_EMISSIVE : 0}
+          roughness={0.84}
+          transparent
+          opacity={0.94}
+          side={THREE.DoubleSide}
+        />
       </mesh>
     </group>
   )
@@ -286,8 +305,6 @@ function buildDeckGeometry() {
 }
 
 // ── 따개비 ─────────────────────────────────────────────────
-// 환공포증 방지: 군집/구멍 패턴 없이 드문드문 "각진 저폴리 덩어리 + 작은 동반 1개".
-// rust(시각용 추적값) 비례로 개수/크기/투명도 증가. 청소 시 부드럽게 사라짐.
 const BARNACLE_SLOTS = 10
 
 function Barnacles({ rust }: { rust: number }) {
@@ -324,12 +341,10 @@ function Barnacles({ rust }: { rust: number }) {
             position={[s.x, s.y, s.z]}
             rotation={[s.spin, s.spin * 0.7, s.side * (0.4 + s.tilt)]}
           >
-            {/* 각진 저폴리 덩어리 (납작하게 눌러 더께 느낌, 윤곽은 둥글어 안 징그러움) */}
             <mesh scale={[1, 0.55, 1]}>
               <dodecahedronGeometry args={[r, 0]} />
               <meshStandardMaterial color={BARNACLE_COLOR} roughness={0.95} flatShading transparent opacity={op} />
             </mesh>
-            {/* 작은 동반 1개 (군집 아님) */}
             {s.hasBuddy && grow > 0.45 && (
               <mesh
                 position={[Math.cos(s.buddyAng) * r * 1.6, 0, Math.sin(s.buddyAng) * r * 1.6]}
@@ -360,7 +375,6 @@ function Hull({ hull, hullShadow, lamp, rust }: { hull: string; hullShadow: stri
         <meshStandardMaterial color={hullShadow} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* 따개비 — 선체 하단에 rust 비례로 */}
       <Barnacles rust={rust} />
 
       <mesh geometry={deckGeo} position={[0, -0.015, -0.42]}>
@@ -607,7 +621,7 @@ function Anchor() {
   )
 }
 
-function BoatModel({ colors, rust }: { colors: BoatColors; rust: number }) {
+function BoatModel({ colors, rust, daylight = false }: { colors: BoatColors; rust: number; daylight?: boolean }) {
   const hullShadow = shade(colors.hull, 0.5)
   const sailMain = colors.sail
   const sailSub = shade(colors.sail, 0.93)
@@ -625,9 +639,9 @@ function BoatModel({ colors, rust }: { colors: BoatColors; rust: number }) {
         <cylinderGeometry args={[0.026,0.032,1.72,12]} />
         <meshStandardMaterial color="#24180f" roughness={0.78} />
       </mesh>
-      <Sail side={-1} color={sailSub} />
-      <Sail side={1} color={sailMain} />
-      <Jib color={tint(sailMain, 0.06)} />
+      <Sail side={-1} color={sailSub} daylight={daylight} />
+      <Sail side={1} color={sailMain} daylight={daylight} />
+      <Jib color={tint(sailMain, 0.06)} daylight={daylight} />
       <CrowsNest />
       <Line points={[[0,3.68,-0.42],[-1.25,0.26,-0.4]]} opacity={0.58} />
       <Line points={[[0,3.68,-0.42],[1.25,0.26,-0.4]]} opacity={0.58} />
@@ -695,6 +709,7 @@ export default function Boat({ preset, forceSailing, fireActive = false }: BoatP
   const isDark = preset?.celestialBody === 'moon'
   const isStorm = preset?.effects?.includes('wind') ?? false
   const lampOn = isDark || isStorm
+  const daylight = preset?.celestialBody === 'sun'   // 낮 = 돛 약하게 발광
 
   // 항해 중 녹 누적 (4초마다 store 반영)
   const rustAccum = useRef(0)
@@ -740,7 +755,7 @@ export default function Boat({ preset, forceSailing, fireActive = false }: BoatP
       <WakeFX forceSailing={forceSailing} />
 
       <group ref={boatRef}>
-        <BoatModel colors={displayColors} rust={displayRust} />
+        <BoatModel colors={displayColors} rust={displayRust} daylight={daylight} />
 
         {/* 모닥불 — 갑판 위, 배 출렁임 따라 흔들림 */}
         <Campfire active={fireActive} position={[0, 0.66, 0.2]} scale={0.6} />

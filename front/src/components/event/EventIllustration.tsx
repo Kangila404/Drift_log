@@ -95,7 +95,7 @@ function Rainbow() {
   const colors = ['#8a7fa8', '#7f8fb0', '#7fa6a8', '#86b08a', '#b0ac82', '#b8967e']
   // viewBox를 화면 전체로(가로 1600, 세로 900) → 실제 바다 수평선(약 화면 절반)과 맞춤
   // 수평선 y = 430 (바다 시작 지점에 맞춤)
-  const SEA = 330
+  const SEA = 460
   return (
     <svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg"
       width="100%" height="100%" preserveAspectRatio="xMidYMid slice"

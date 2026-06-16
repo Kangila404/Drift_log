@@ -61,6 +61,52 @@ function RainLayer({ stormMode = false }: { stormMode?: boolean }) {
   )
 }
 
+// 낮 갈매기 — 멀리 가로지르는 작은 V자 실루엣
+function BirdLayer() {
+  const birds = [
+    { top: 30, scale: 1, dur: 38, delay: 0 },
+    { top: 34, scale: 0.75, dur: 46, delay: -14 },
+    { top: 27, scale: 0.6, dur: 52, delay: -28 },
+  ]
+
+  return (
+    <div data-effect="birds" style={{ position: 'absolute', inset: 0, zIndex: 6, pointerEvents: 'none', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes birdCross {
+          0%   { transform: translateX(-10vw) translateY(0); }
+          50%  { transform: translateX(50vw) translateY(-2vh); }
+          100% { transform: translateX(110vw) translateY(0); }
+        }
+        @keyframes birdFlap {
+          0%, 100% { transform: scaleY(1); }
+          50%      { transform: scaleY(0.55); }
+        }
+      `}</style>
+      {birds.map((b, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            top: `${b.top}%`,
+            left: 0,
+            animation: `birdCross ${b.dur}s linear infinite`,
+            animationDelay: `${b.delay}s`,
+          }}
+        >
+          <div style={{
+            transformOrigin: 'center',
+            animation: `birdFlap ${1.1 + i * 0.2}s ease-in-out infinite`,
+          }}>
+            <svg width={28 * b.scale} height={10 * b.scale} viewBox="0 0 28 10" fill="none">
+              <path d="M1 8 Q7 1 14 6 Q21 1 27 8" stroke="rgba(20,32,52,0.55)" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+            </svg>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // 안개 낀 바다
 function FogEffect() {
   return (
@@ -109,8 +155,7 @@ function FogEffect() {
   )
 }
 
-// 탁한 안개 (황사)
-// 탁한 안개 (더 짙고 넓은 안개)
+// 탁한 안개 (황사) — 더 짙고 넓은 안개
 function DustFogEffect() {
   return (
     <div data-effect="dustFog" style={{ position: 'absolute', top: -100, left: 0, right: 0, bottom: 0, zIndex: 5, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -158,10 +203,13 @@ function DustFogEffect() {
   )
 }
 
+// 중앙(배 위치) 비우는 가로 마스크
+const BOAT_GAP = 'linear-gradient(to right, black 30%, transparent 50%, transparent 52%, black 70%)'
+
 // 흐린 수평선
 function HorizonBlur() {
   return (
-    <div data-effect="horizonBlur" style={{ position: 'absolute', top: -500, left: 0, right: 0, bottom: 0, zIndex: 5, pointerEvents: 'none', overflow: 'hidden' }}>
+    <div data-effect="horizonBlur" style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none', overflow: 'hidden' }}>
       <style>{`
         /* 진하게 덮였다(수평선 안보임) → 옅어졌다(수평선 보임) 크게 출렁 */
         @keyframes horizonFade {
@@ -180,29 +228,35 @@ function HorizonBlur() {
         }
       `}</style>
 
-{/* 1. 블러 띠 — 수평선 라인에만 얇게 */}
+      {/* 1. 블러 띠 — 수평선 라인에만 얇게 (세로 페이드 ∩ 배 자리 비움) */}
       <div style={{
-        position: 'absolute', top: '47%', left: '-5%', right: '-5%', height: '8%',
+        position: 'absolute', top: '49%', left: '-5%', right: '-5%', height: '8%',
         backdropFilter: 'blur(7px)',
         WebkitBackdropFilter: 'blur(7px)',
-        maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)',
+        maskImage: `linear-gradient(to bottom, transparent, black 40%, black 60%, transparent), ${BOAT_GAP}`,
+        WebkitMaskImage: `linear-gradient(to bottom, transparent, black 40%, black 60%, transparent), ${BOAT_GAP}`,
+        maskComposite: 'intersect',
+        WebkitMaskComposite: 'source-in',
         animation: 'horizonFade 7s ease-in-out infinite',
       }} />
 
       {/* 2. 뿌연 흐림 베일 */}
       <div style={{
-        position: 'absolute', top: '46%', left: '-6%', right: '-6%', height: '10%',
+        position: 'absolute', top: '48%', left: '-6%', right: '-6%', height: '10%',
         background: 'linear-gradient(to bottom, transparent, rgba(150,180,205,0.5) 50%, transparent)',
         filter: 'blur(6px)',
+        maskImage: BOAT_GAP,
+        WebkitMaskImage: BOAT_GAP,
         animation: 'horizonFadeSlow 11s ease-in-out infinite',
       }} />
 
       {/* 3. 옅은 빛 번짐 */}
       <div style={{
-        position: 'absolute', top: '48%', left: '-6%', right: '-6%', height: '5%',
+        position: 'absolute', top: '50%', left: '-6%', right: '-6%', height: '5%',
         background: 'linear-gradient(to bottom, transparent, rgba(135,165,195,0.3) 50%, transparent)',
         filter: 'blur(5px)',
+        maskImage: BOAT_GAP,
+        WebkitMaskImage: BOAT_GAP,
         animation: 'horizonDrift 13s ease-in-out infinite, horizonFade 9s ease-in-out infinite',
       }} />
     </div>
@@ -288,6 +342,7 @@ export default function WeatherEffects({ effects }: { effects: WeatherEffect[] }
       {effects.includes('dustFog') && <DustFogEffect />}
       {effects.includes('horizonBlur') && <HorizonBlur />}
       {effects.includes('wind') && <WindLayer />}
+      {effects.includes('birds') && <BirdLayer />}
     </>
   )
 }

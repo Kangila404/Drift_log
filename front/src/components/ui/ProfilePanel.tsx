@@ -62,6 +62,67 @@ function VisitedMiniMap({ visitedIds }: { visitedIds: number[] }) {
   )
 }
 
+// ─── 로그아웃 확인 모달 ───
+function LogoutConfirmModal({ open, warnStudy, loggingOut, onConfirm, onCancel }: {
+  open: boolean; warnStudy: boolean; loggingOut: boolean; onConfirm: () => void; onCancel: () => void
+}) {
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          onClick={() => !loggingOut && onCancel()}
+          className="fixed inset-0 z-[10000] flex items-center justify-center px-6 cursor-pointer"
+          style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(8px)' }}>
+          <motion.div onClick={e => e.stopPropagation()}
+            initial={{ y: 18, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 14, opacity: 0, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+            className="relative w-full max-w-xs bg-[#050e18] border border-[#1a4a64]/50 rounded-2xl px-7 pt-8 pb-6 flex flex-col items-center text-center cursor-default overflow-hidden"
+            style={{ boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(126,192,210,0.06)' }}>
+            {/* 상단 글로우 */}
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, rgba(229,115,115,0.12) 0%, transparent 70%)' }} />
+
+            {/* 아이콘 배지 */}
+            <div className="relative flex items-center justify-center rounded-2xl mb-4"
+              style={{
+                width: '52px', height: '52px',
+                background: 'linear-gradient(160deg, rgba(229,115,115,0.16) 0%, rgba(229,115,115,0.03) 100%)',
+                border: '1px solid rgba(229,115,115,0.24)',
+                boxShadow: 'inset 0 1px 0 rgba(229,115,115,0.12)',
+              }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3a3a3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </div>
+
+            <h3 className="relative text-[14px] font-mono text-[#cce8f5] tracking-[0.08em] leading-snug">로그아웃 하시겠습니까?</h3>
+            {warnStudy && (
+              <p className="relative text-[11.5px] font-mono text-[#f3a3a3]/80 leading-relaxed mt-2 max-w-[230px]">
+                진행 중인 공부 기록이 저장되지 않고 사라집니다.
+              </p>
+            )}
+
+            <div className="relative flex gap-2 w-full mt-6">
+              <button onClick={onCancel} disabled={loggingOut}
+                className="flex-1 py-2.5 border border-[#1a3a50] rounded-lg text-[12px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#1a4a64] tracking-[0.2em] uppercase transition-colors disabled:opacity-40">
+                취소
+              </button>
+              <button onClick={onConfirm} disabled={loggingOut}
+                className="flex-1 py-2.5 rounded-lg text-[12px] font-mono tracking-[0.2em] uppercase transition-colors border border-red-500/40 bg-red-950/30 text-red-300 hover:text-red-200 hover:border-red-400/60 disabled:opacity-50">
+                {loggingOut ? '나가는 중' : '로그아웃'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
+
 export default function ProfilePanel() {
   const [user, setUser] = useState({ name: '', email: '', joined: '', totalVoyages: 0, visitedCities: 0, userRole: 'USER', authType: 'LOCAL' })
   const [visitedCityIds, setVisitedCityIds] = useState<number[]>([])
@@ -77,6 +138,8 @@ export default function ProfilePanel() {
   const [mapOpen, setMapOpen] = useState(false)
   const [donateOpen, setDonateOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
+  const [warnStudy, setWarnStudy] = useState(false)
 
   useEffect(() => {
     apiClient.get('/users/me').then(res => {
@@ -137,13 +200,12 @@ export default function ProfilePanel() {
     }
   }
 
-  const handleLogout = async () => {
-    const hasActiveStudy = !!localStorage.getItem('studyStartAt')
-    const msg = hasActiveStudy
-      ? '진행 중인 공부 기록이 저장되지 않고 사라집니다. 로그아웃 하시겠습니까?'
-      : '로그아웃 하시겠습니까?'
-    if (!window.confirm(msg)) return
+  const openLogout = () => {
+    setWarnStudy(!!localStorage.getItem('studyStartAt'))
+    setLogoutOpen(true)
+  }
 
+  const handleLogout = async () => {
     setLoggingOut(true)
     // 진행 중 공부 세션도 함께 폐기 (study 모드에서 로그아웃 시 부활 방지)
     localStorage.removeItem('studyStartAt')
@@ -313,6 +375,15 @@ export default function ProfilePanel() {
         document.body
       )}
 
+      {/* ─── 로그아웃 확인 모달 ─── */}
+      <LogoutConfirmModal
+        open={logoutOpen}
+        warnStudy={warnStudy}
+        loggingOut={loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => setLogoutOpen(false)}
+      />
+
       <h2 className="text-[11px] font-mono text-[#7eb8d4] tracking-[0.3em] uppercase opacity-70">마이 페이지</h2>
 
       {/* 프로필 카드 + 수정 버튼 */}
@@ -344,6 +415,14 @@ export default function ProfilePanel() {
 
       <div className="border-t border-[#0d2233]" />
       <CustomerCenter />
+      <a href="/privacy"
+  className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors text-center flex items-center justify-center gap-1.5">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+  개인정보처리방침
+</a>
       <button onClick={() => setDonateOpen(true)}
         className="w-full py-2.5 border border-[#1a4a64]/40 rounded text-[10px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#4a9abb]/60 tracking-widest transition-colors">
         ♡ 개발자 후원하기
@@ -353,7 +432,7 @@ export default function ProfilePanel() {
           ⚙ 관리자 페이지
         </a>
       )}
-      <button onClick={handleLogout} disabled={loggingOut}
+      <button onClick={openLogout} disabled={loggingOut}
         className="w-full py-2.5 border border-[#1a3a50] rounded text-[10px] font-mono text-[#3a6880] hover:text-red-300 hover:border-red-500/50 tracking-widest transition-colors disabled:opacity-40">
         ⏻ 로그아웃
       </button>

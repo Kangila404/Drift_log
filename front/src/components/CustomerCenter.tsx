@@ -13,6 +13,62 @@ const fmtDate = (s: string) => {
 
 type CenterTab = 'notice' | 'inquiry'
 
+// ─── 삭제 확인 모달 ───
+function ConfirmDeleteModal({ open, busy, onConfirm, onCancel }: {
+  open: boolean; busy: boolean; onConfirm: () => void; onCancel: () => void
+}) {
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          onClick={() => !busy && onCancel()}
+          className="fixed inset-0 z-[10000] flex items-center justify-center px-6 cursor-pointer"
+          style={{ background: 'rgba(2,6,14,0.85)', backdropFilter: 'blur(8px)' }}>
+          <motion.div onClick={e => e.stopPropagation()}
+            initial={{ y: 18, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 14, opacity: 0, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+            className="relative w-full max-w-xs bg-[#050e18] border border-[#1a4a64]/50 rounded-2xl px-7 pt-8 pb-6 flex flex-col items-center text-center cursor-default overflow-hidden"
+            style={{ boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(126,192,210,0.06)' }}>
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full pointer-events-none"
+              style={{ background: 'radial-gradient(circle, rgba(229,115,115,0.12) 0%, transparent 70%)' }} />
+
+            <div className="relative flex items-center justify-center rounded-2xl mb-4"
+              style={{
+                width: '52px', height: '52px',
+                background: 'linear-gradient(160deg, rgba(229,115,115,0.16) 0%, rgba(229,115,115,0.03) 100%)',
+                border: '1px solid rgba(229,115,115,0.24)',
+                boxShadow: 'inset 0 1px 0 rgba(229,115,115,0.12)',
+              }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f3a3a3" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </div>
+
+            <h3 className="relative text-[14px] font-mono text-[#cce8f5] tracking-[0.08em] leading-snug">이 문의를 삭제할까요?</h3>
+            <p className="relative text-[11.5px] font-mono text-[#4a7a94] leading-relaxed mt-2 max-w-[230px]">삭제하면 되돌릴 수 없습니다.</p>
+
+            <div className="relative flex gap-2 w-full mt-6">
+              <button onClick={onCancel} disabled={busy}
+                className="flex-1 py-2.5 border border-[#1a3a50] rounded-lg text-[12px] font-mono text-[#3a6880] hover:text-[#7eb8d4] hover:border-[#1a4a64] tracking-[0.2em] uppercase transition-colors disabled:opacity-40">
+                취소
+              </button>
+              <button onClick={onConfirm} disabled={busy}
+                className="flex-1 py-2.5 rounded-lg text-[12px] font-mono tracking-[0.2em] uppercase transition-colors border border-red-500/40 bg-red-950/30 text-red-300 hover:text-red-200 hover:border-red-400/60 disabled:opacity-50">
+                {busy ? '삭제 중' : '삭제'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
+
 export default function CustomerCenter({ buttonClassName }: { buttonClassName?: string }) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<CenterTab>('notice')
@@ -165,6 +221,8 @@ function InquiryTab() {
   const [composing, setComposing] = useState(false)        // 작성 폼 열림
   const [editing, setEditing] = useState<Inquiry | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Inquiry | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   const load = () =>
     getMyInquiries()
@@ -178,15 +236,17 @@ function InquiryTab() {
       .catch(() => setLoaded(true))
   useEffect(() => { load() }, [])
 
-  const handleDelete = async (n: Inquiry) => {
-    if (busyId) return
-    if (!window.confirm('이 문의를 삭제할까요?')) return
-    setBusyId(n.inquiryId)
+  const confirmDelete = async () => {
+    if (!deleteTarget || busyId) return
+    const target = deleteTarget
+    setBusyId(target.inquiryId)
+    setDeleteError('')
     try {
-      await deleteInquiry(n.inquiryId)
-      setInquiries(prev => prev.filter(x => x.inquiryId !== n.inquiryId))
+      await deleteInquiry(target.inquiryId)
+      setInquiries(prev => prev.filter(x => x.inquiryId !== target.inquiryId))
+      setDeleteTarget(null)
     } catch {
-      alert('삭제에 실패했습니다.')
+      setDeleteError('삭제에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setBusyId(null)
     }
@@ -205,10 +265,19 @@ function InquiryTab() {
 
   return (
     <div className="flex flex-col gap-3">
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        busy={busyId !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
+      />
+
       <button onClick={() => setComposing(true)}
         className="w-full py-2.5 border border-[#4a9abb]/50 rounded text-[11px] font-mono text-[#4a9abb] hover:text-[#cce8f5] hover:border-[#4a9abb]/80 tracking-widest uppercase transition-colors">
         + 문의 작성
       </button>
+
+      {deleteError && <p className="text-[10px] font-mono text-red-400/70 text-center">{deleteError}</p>}
 
       {!loaded && <p className="text-[11px] font-mono text-[#2a5a74] animate-pulse">불러오는 중...</p>}
       {loaded && inquiries.length === 0 && (
@@ -265,7 +334,7 @@ function InquiryTab() {
                           className="px-3 py-1 rounded text-[9px] font-mono tracking-widest border border-[#1a4a64]/60 text-[#7eb8d4] hover:text-[#cce8f5] hover:border-[#7eb8d4]/70 transition-colors">
                           수정
                         </button>
-                        <button onClick={() => handleDelete(n)} disabled={busyId === n.inquiryId}
+                        <button onClick={() => { setDeleteError(''); setDeleteTarget(n) }} disabled={busyId === n.inquiryId}
                           className="px-3 py-1 rounded text-[9px] font-mono tracking-widest border border-red-900/50 text-red-400/70 hover:text-red-300 hover:border-red-500/60 transition-colors disabled:opacity-40">
                           삭제
                         </button>
@@ -290,16 +359,18 @@ function InquiryForm({ inquiry, onClose, onSaved }: {
   const [title, setTitle] = useState(inquiry?.title ?? '')
   const [content, setContent] = useState(inquiry?.content ?? '')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const save = async () => {
     if (!title.trim() || !content.trim() || saving) return
     setSaving(true)
+    setError('')
     try {
       if (isEdit) await updateInquiry(inquiry!.inquiryId, { title: title.trim(), content: content.trim() })
       else await writeInquiry({ title: title.trim(), content: content.trim() })
       onSaved()
     } catch {
-      alert('저장에 실패했습니다.')
+      setError('저장에 실패했습니다. 다시 시도해주세요.')
       setSaving(false)
     }
   }
@@ -324,6 +395,8 @@ function InquiryForm({ inquiry, onClose, onSaved }: {
           placeholder="문의 내용을 입력하세요"
           className="w-full bg-[#040d16] border border-[#1a3a50] rounded px-3 py-2.5 text-[13px] text-[#cce8f5] resize-none outline-none focus:border-[#4a9abb]/60 placeholder-[#1a3a50] leading-relaxed" />
       </div>
+
+      {error && <p className="text-[10px] font-mono text-red-400/70">{error}</p>}
 
       <div className="flex justify-end gap-2">
         <button onClick={onClose}

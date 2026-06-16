@@ -7,6 +7,11 @@ let currentTrack: Track = null
 let currentCityUrl: string | null = null
 let muted = false
 
+// ── 미리듣기 전용 플레이어 (메인 BGM과 분리) ──
+let preview: Howl | null = null
+let previewUrl: string | null = null
+let previewRate = 1
+
 const VOYAGE_URL = '/bgm/voyage.mp3'
 const ENDING_URL = '/bgm/ending.mp3'
 
@@ -71,20 +76,86 @@ export const bgm = {
     return muted
   },
 
-  // ── seek 바용 ──
-  // 현재 트랙 총 길이(초). 메타데이터 로드 전이면 0
+  // ── seek 바용 (메인 트랙) ──
   duration() {
     return current ? current.duration() : 0
   },
-  // 현재 재생 위치(초)
   getSeek() {
     if (!current) return 0
     const s = current.seek()
     return typeof s === 'number' ? s : 0
   },
-  // 위치 이동
   setSeek(sec: number) {
     if (current) current.seek(sec)
+  },
+
+  // ─────────────────────────────────────────────
+  // 미리듣기 전용 플레이어 — 메인 BGM(current)과 완전히 분리.
+  // 음악 모달에서만 사용. 메인 BGM 상태를 건드리지 않으므로
+  // 모달을 닫고 previewStop()만 부르면 항해/도시 BGM이 그대로 이어진다.
+  // 단, 메인 BGM과 동시에 울리지 않도록 preview 재생 중엔 메인을 음소거 처리한다.
+  // ─────────────────────────────────────────────
+  preview(url: string) {
+    if (!url) return
+    // 기존 미리듣기 정리
+    if (preview) { preview.stop(); preview.unload(); preview = null }
+    // 메인 BGM 잠시 죽이기 (겹침 방지)
+    if (current) current.volume(0)
+
+    previewUrl = url
+    previewRate = 1
+    const p = new Howl({
+      src: [url],
+      loop: false,
+      volume: muted ? 0 : 0.6,
+      rate: 1,
+    })
+    p.play()
+    preview = p
+  },
+  previewPause() {
+    if (preview) preview.pause()
+  },
+  previewResume() {
+    if (preview) preview.play()
+  },
+  previewStop() {
+    if (preview) { preview.stop(); preview.unload(); preview = null }
+    previewUrl = null
+    previewRate = 1
+    // 메인 BGM 볼륨 복원
+    if (current) current.volume(muted ? 0 : 0.5)
+  },
+  previewIsPlaying() {
+    return !!preview && preview.playing()
+  },
+  previewDuration() {
+    return preview ? preview.duration() : 0
+  },
+  previewGetSeek() {
+    if (!preview) return 0
+    const s = preview.seek()
+    return typeof s === 'number' ? s : 0
+  },
+  previewSetSeek(sec: number) {
+    if (preview) preview.seek(sec)
+  },
+  previewSeekBy(delta: number) {
+    if (!preview) return
+    const dur = preview.duration() || 0
+    const cur = typeof preview.seek() === 'number' ? (preview.seek() as number) : 0
+    const target = Math.max(0, Math.min(dur, cur + delta))
+    preview.seek(target)
+  },
+  previewSetRate(rate: number) {
+    previewRate = rate
+    if (preview) preview.rate(rate)
+  },
+  previewGetRate() {
+    return previewRate
+  },
+  previewUrl() {
+    return previewUrl
   },
 }
 
