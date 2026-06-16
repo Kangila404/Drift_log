@@ -2,7 +2,8 @@ import type { WeatherId, AbnormalType } from "./weather";
 import type { TimeOfDay } from "../hooks/useTimeOfDay";
 
 export type CelestialBody = "sun" | "moon" | "eclipse";
-export type WeatherEffect = "rain" | "fog" | "dustFog" | "horizonBlur" | "wind";
+// front/src/constants/scenePreset.ts
+export type WeatherEffect = 'rain' | 'fog' | 'dustFog' | 'horizonBlur' | 'wind' | 'birds';
 
 export interface ScenePreset {
   waterNear: [number, number, number];

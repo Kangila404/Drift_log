@@ -1,3 +1,4 @@
+// front/src/components/ui/cities/Daejeon.tsx
 import { useIsTall, layerStyle, SkyLayer, Stars, C } from './_cityKit'
 
 export default function Daejeon() {
@@ -6,7 +7,7 @@ export default function Daejeon() {
 
   return (
     <>
-      <SkyLayer idSuffix="DJ" waterY={760} mistY={700} rose />
+      <SkyLayer idSuffix="DJ" waterY={760} mistY={700} halo="#b56b85" halo2="#4d2a3c" />
 
       <svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg"
         style={layerStyle} preserveAspectRatio={align}>
