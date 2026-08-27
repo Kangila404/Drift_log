@@ -1,0 +1,107 @@
+name: driftlog
+
+services:
+  frontend:
+    image: kangila/driftlog-frontend:latest
+    container_name: driftlog-frontend
+    restart: unless-stopped
+    networks:
+      - app
+      - proxy
+
+  backend:
+    image: kangila/driftlog-backend:latest
+    container_name: driftlog-backend
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app
+      - proxy
+
+  mysql:
+    image: mysql:8.0
+    container_name: driftlog-mysql
+    env_file:
+      - .env
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: driftlog-loki
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+    networks:
+      - app
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: driftlog-prometheus
+    volumes:
+      - prometheus-data:/prometheus
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    restart: unless-stopped
+    networks:
+      - app
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: driftlog-grafana
+    ports:
+      - "30000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-12345678}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - app
+
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 15s
+      scrape_configs:
+        - job_name: 'drift_log'
+          metrics_path: '/actuator/prometheus'
+          static_configs:
+            - targets: ['backend:8080']
+
+volumes:
+  mysql-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  app:
+  proxy:
+    external: true
