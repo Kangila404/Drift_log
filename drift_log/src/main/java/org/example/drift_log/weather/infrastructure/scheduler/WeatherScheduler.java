@@ -13,7 +13,7 @@ public class WeatherScheduler {
 
     private final WeatherService weatherService;
 
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "${weather.scheduler.cron:0 10 6 * * *}", zone = "Asia/Seoul")
     public void updateTodayWeather(){
         log.info("날씨 업데이트 시작");
         weatherService.updateTodayWeather();
