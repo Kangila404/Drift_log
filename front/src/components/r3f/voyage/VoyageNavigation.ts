@@ -1,4 +1,5 @@
-export type VoyageSteeringInput = -1 | 0 | 1
+/** Normalized rudder input, from full port (-1) to full starboard (1). */
+export type VoyageSteeringInput = number
 
 export interface VoyageNavigationState {
   x: number
@@ -12,7 +13,7 @@ export interface VoyageNavigationState {
 export type VoyageNavigationRef = { current: VoyageNavigationState }
 
 export const VOYAGE_MAX_X = 3
-export const VOYAGE_MAX_HEADING = Math.PI / 15
+export const VOYAGE_MAX_HEADING = Math.PI / 9
 
 export function createVoyageNavigation(): VoyageNavigationState {
   return { x: 0, heading: 0, input: 0, speed: 0, resetView: 0 }
@@ -26,6 +27,7 @@ function damp(value: number, target: number, rate: number, delta: number) {
 /** Presentation only; delta is seconds. Mutates and returns the same state. */
 export function advanceVoyageNavigation(state: VoyageNavigationState, delta: number, sailing: boolean): VoyageNavigationState {
   if (!sailing) state.input = 0
+  state.input = Number.isFinite(state.input) ? Math.max(-1, Math.min(1, state.input)) : 0
   if (!Number.isFinite(delta) || delta <= 0) return state
 
   // Bound tab-resume jumps and substep the coupled heading/position response.
@@ -35,17 +37,14 @@ export function advanceVoyageNavigation(state: VoyageNavigationState, delta: num
   for (let step = 0; step < steps; step++) {
     state.speed = damp(state.speed, sailing ? 1 : 0, sailing ? 1.8 : 3, dt)
     const targetX = state.input * VOYAGE_MAX_X
-    const targetHeading = sailing
-      ? Math.max(-VOYAGE_MAX_HEADING, Math.min(VOYAGE_MAX_HEADING, Math.atan((state.x - targetX) * .45 / 2.8)))
-      : 0
-    state.heading = damp(state.heading, targetHeading, 3, dt)
+    // A held rudder keeps the bow turned, even at the local presentation boundary.
+    const held = state.input !== 0
+    const targetHeading = !sailing ? 0 : held
+      ? -state.input * VOYAGE_MAX_HEADING
+      : state.x * .025
+    state.heading = damp(state.heading, targetHeading, held ? 2.8 : 2, dt)
     if (sailing) {
-      state.x = Math.max(-VOYAGE_MAX_X, Math.min(VOYAGE_MAX_X,
-        state.x - Math.sin(state.heading) * 2.8 * state.speed * dt))
-      if (Math.abs(state.x - targetX) < .0001 && Math.abs(state.heading) < .0001) {
-        state.x = targetX
-        state.heading = 0
-      }
+      state.x = damp(state.x, targetX, (held ? .65 : .35) * state.speed, dt)
     }
   }
   return state

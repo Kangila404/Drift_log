@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { ArrowLeft, ArrowRight, Camera } from 'lucide-react'
-import type { VoyageNavigationRef, VoyageSteeringInput } from '../r3f/voyage/VoyageNavigation'
+import { advanceHelmAngle, HELM_MAX_ANGLE, helmSteering, wheelPointerAngle } from '@driftlog/shared'
+import type { VoyageNavigationRef } from '../r3f/voyage/VoyageNavigation'
+import { VOYAGE_VIEWING_EVENT } from '../r3f/voyage/VoyageView'
 import './VoyageControls.css'
 
 export interface VoyageControlsProps {
@@ -17,23 +18,21 @@ function isEditable(target: EventTarget | null) {
 }
 
 export default function VoyageControls({ navigation: navigationRef, enabled, className = '' }: VoyageControlsProps) {
-  const left = useRef<HTMLButtonElement>(null)
-  const right = useRef<HTMLButtonElement>(null)
-  const pointers = useRef(new Map<number, VoyageSteeringInput>())
-  const keys = useRef(new Map<string, VoyageSteeringInput>())
+  const wheel = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ id: number; previous: number; angle: number; cx: number; cy: number } | null>(null)
+  const keys = useRef(new Map<string, number>())
 
-  const publish = useCallback(() => {
-    const directions = new Set([...pointers.current.values(), ...keys.current.values()])
-    const input = (Number(directions.has(1)) - Number(directions.has(-1))) as VoyageSteeringInput
-    navigationRef.current.input = input
-    left.current?.setAttribute('data-held', String(input === -1))
-    right.current?.setAttribute('data-held', String(input === 1))
+  const publish = useCallback((angle: number, held: boolean) => {
+    navigationRef.current.input = helmSteering(angle)
+    wheel.current?.style.setProperty('--helm-angle', `${angle}deg`)
+    wheel.current?.setAttribute('data-held', String(held))
+    wheel.current?.setAttribute('aria-valuenow', String(Math.round(angle)))
   }, [navigationRef])
 
   const clear = useCallback(() => {
-    pointers.current.clear()
+    drag.current = null
     keys.current.clear()
-    publish()
+    publish(0, false)
   }, [publish])
 
   useEffect(() => {
@@ -41,70 +40,85 @@ export default function VoyageControls({ navigation: navigationRef, enabled, cla
     if (!enabled) return clear
     const keyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || isEditable(event.target)) return
+      if (event.target !== wheel.current && event.target instanceof Element && event.target.closest('button, a, [role="dialog"], dialog, [role="slider"]')) return
       const key = event.key.toLowerCase()
-      const ownButton = event.target === left.current ? -1 : event.target === right.current ? 1 : 0
-      // Leave arrows to other focused controls, menus and dialogs.
-      if (!ownButton && event.target instanceof Element && event.target.closest('button, a, [role="dialog"], dialog')) return
-      const input = key === 'arrowleft' || key === 'a' ? -1
-        : key === 'arrowright' || key === 'd' ? 1
-          : (key === ' ' || key === 'enter') ? ownButton : 0
-      if (!input || document.hidden) return
+      const direction = key === 'arrowleft' || key === 'a' ? -1 : key === 'arrowright' || key === 'd' ? 1 : 0
+      if (!direction || document.hidden || drag.current || document.documentElement.dataset.voyageViewing === 'true') return
       event.preventDefault()
-      keys.current.set(key, input)
-      publish()
+      keys.current.set(key, direction)
+      const values = [...keys.current.values()]
+      publish((Number(values.includes(1)) - Number(values.includes(-1))) * HELM_MAX_ANGLE, true)
     }
     const keyUp = (event: KeyboardEvent) => {
-      if (keys.current.delete(event.key.toLowerCase())) {
-        if (!isEditable(event.target)) event.preventDefault()
-        publish()
-      }
+      if (!keys.current.delete(event.key.toLowerCase()) || drag.current) return
+      const values = [...keys.current.values()]
+      publish((Number(values.includes(1)) - Number(values.includes(-1))) * HELM_MAX_ANGLE, values.length > 0)
     }
-    const focusIn = () => clear()
     window.addEventListener('keydown', keyDown)
     window.addEventListener('keyup', keyUp)
     window.addEventListener('blur', clear)
     document.addEventListener('visibilitychange', clear)
-    document.addEventListener('focusin', focusIn)
+    document.addEventListener('focusin', clear)
+    window.addEventListener(VOYAGE_VIEWING_EVENT, clear)
     return () => {
       window.removeEventListener('keydown', keyDown)
       window.removeEventListener('keyup', keyUp)
       window.removeEventListener('blur', clear)
       document.removeEventListener('visibilitychange', clear)
-      document.removeEventListener('focusin', focusIn)
+      document.removeEventListener('focusin', clear)
+      window.removeEventListener(VOYAGE_VIEWING_EVENT, clear)
       clear()
     }
   }, [clear, enabled, publish])
 
-  const hold = (event: ReactPointerEvent<HTMLButtonElement>, input: VoyageSteeringInput) => {
-    if (!enabled || event.button !== 0) return
+  const begin = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
+    if (!enabled || event.button !== 0 || drag.current) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2
+    if (Math.hypot(event.clientX - cx, event.clientY - cy) < 14) return
+    const glyph = event.currentTarget.querySelector('.voyage-helm-rotor')
+    const transform = glyph ? getComputedStyle(glyph).transform : 'none'
+    const matrix = transform === 'none' ? null : new DOMMatrixReadOnly(transform)
+    const angle = matrix ? Math.atan2(matrix.b, matrix.a) * 180 / Math.PI : 0
+    keys.current.clear()
+    drag.current = { id: event.pointerId, previous: wheelPointerAngle(event.clientX, event.clientY, cx, cy), angle, cx, cy }
     event.currentTarget.setPointerCapture(event.pointerId)
-    pointers.current.set(event.pointerId, input)
-    publish()
+    publish(angle, true)
   }
-  const release = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    pointers.current.delete(event.pointerId)
-    publish()
+  const move = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = drag.current
+    if (!current || current.id !== event.pointerId) return
+    // Crossing the hub has no reliable angle. Re-anchor on the next rim sample.
+    if (Math.hypot(event.clientX - current.cx, event.clientY - current.cy) < 14) {
+      current.previous = NaN
+      return
+    }
+    const next = wheelPointerAngle(event.clientX, event.clientY, current.cx, current.cy)
+    if (Number.isFinite(current.previous)) current.angle = advanceHelmAngle(current.angle, current.previous, next)
+    current.previous = next
+    publish(current.angle, true)
+  }
+  const release = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerId !== drag.current?.id) return
+    clear()
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
-  return <div className={`voyage-controls ${className}`} role="group" aria-label={'\uD56D\uD574 \uC870\uC885'}>
-    <button ref={left} type="button" disabled={!enabled}
-      aria-label={'\uC88C\uD604\uC73C\uB85C \uC870\uC885'} title={'\uC88C\uD604\uC73C\uB85C \uC870\uC885'}
-      onPointerDown={event => hold(event, -1)} onPointerUp={release} onPointerCancel={clear} onLostPointerCapture={clear}
+  return <div className={`voyage-controls ${className}`} role="group" aria-label="항해 조종">
+    <div ref={wheel} className="voyage-helm" role="slider" tabIndex={enabled ? 0 : -1}
+      aria-label="조타륜" aria-valuemin={-HELM_MAX_ANGLE} aria-valuemax={HELM_MAX_ANGLE} aria-valuenow={0}
+      aria-disabled={!enabled} title="조타륜" onPointerDown={begin} onPointerMove={move}
+      onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
       onContextMenu={event => event.preventDefault()}>
-      <ArrowLeft size={20} aria-hidden="true" />
-    </button>
-    <button type="button" aria-label={'\uC2DC\uC810 \uCD08\uAE30\uD654'} title={'\uC2DC\uC810 \uCD08\uAE30\uD654'}
-      onClick={() => { navigationRef.current.resetView++ }}>
-      <Camera size={18} aria-hidden="true" />
-    </button>
-    <button ref={right} type="button" disabled={!enabled}
-      aria-label={'\uC6B0\uD604\uC73C\uB85C \uC870\uC885'} title={'\uC6B0\uD604\uC73C\uB85C \uC870\uC885'}
-      onPointerDown={event => hold(event, 1)} onPointerUp={release} onPointerCancel={clear} onLostPointerCapture={clear}
-      onContextMenu={event => event.preventDefault()}>
-      <ArrowRight size={20} aria-hidden="true" />
-    </button>
+      <span className="voyage-helm-index" aria-hidden="true" />
+      <span className="voyage-helm-rotor" aria-hidden="true">
+        <span className="voyage-helm-rim" />
+        {[0, 120, 240].map(angle => <span key={angle} className="voyage-helm-spoke" style={{ transform: `rotate(${angle}deg)` }} />)}
+        <span className="voyage-helm-hub" />
+        <span className="voyage-helm-marker" />
+      </span>
+    </div>
   </div>
 }

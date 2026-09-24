@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import OceanEnvironment from '../components/r3f/OceanEnvironment'
 import Boat from '../components/r3f/Boat'
+import StudyCamera from '../components/r3f/StudyCamera'
 import StudyHUD from '../components/ui/StudyHUD'
 import { useViewport } from '../hooks/useViewport'
 import { useWeather } from '../contexts/WeatherContext'
@@ -24,6 +25,7 @@ export default function StudyPage() {
 
   // ── 웹 단독: localStorage / noise 이벤트 동기화 ──
   useEffect(() => {
+    if (isNativeApp()) return
     const sync = () => setStudying(!!localStorage.getItem(START_KEY))
     window.addEventListener('study-change', sync)
     window.addEventListener('storage', sync)
@@ -34,6 +36,7 @@ export default function StudyPage() {
   }, [])
 
   useEffect(() => {
+    if (isNativeApp()) return
     const sync = () => setActiveNoise(noise.getCurrent())
     window.addEventListener('noise-change', sync)
     return () => window.removeEventListener('noise-change', sync)
@@ -45,6 +48,7 @@ export default function StudyPage() {
     const onMsg = (e: MessageEvent) => {
       let msg: any = {}
       try { msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data } catch { return }
+      if (!msg || typeof msg !== 'object') return
       if (msg.type === 'study-state') {
         setStudying(!!msg.studying)
       } else if (msg.type === 'study-noise') {
@@ -53,6 +57,7 @@ export default function StudyPage() {
     }
     window.addEventListener('message', onMsg)
     document.addEventListener('message', onMsg as any)   // 안드로이드 WebView
+    window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'study-ready' }))
     return () => {
       window.removeEventListener('message', onMsg)
       document.removeEventListener('message', onMsg as any)
@@ -80,10 +85,10 @@ export default function StudyPage() {
 
       <Canvas
         dpr={[1.5, 2]}
-        camera={{ position: [0, 1.45, 10.8], fov: isMobile ? 60 : 46 }}
         gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.18 }}
         style={{ background: 'transparent' }}
       >
+        <StudyCamera mobile={isMobile} />
         <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
         <ambientLight intensity={0.48 * preset.ambientIntensity * (1 - coverage * 0.9)} color="#6fa4d8" />
         <directionalLight position={[0, 8, -12]} intensity={1.6 * (1 - coverage * 0.9)} color="#dcecff" />

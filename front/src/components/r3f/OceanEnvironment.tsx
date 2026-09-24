@@ -26,6 +26,7 @@ export default function OceanEnvironment({ preset, playing = true, eclipsePhase,
     <group position={skyOffset}><OceanSky preset={preset} playing={playing} eclipsePhase={eclipsePhase} eclipseCoverage={eclipseCoverage} starOpacityScale={starOpacityScale} /></group>
     <OceanWater preset={preset} playing={playing} waveStrength={sheltered ? .22 : 1} moonlightStrength={moonlightStrength} reflectArchitecture={reflectArchitecture} reflectionRevision={reflectionRevision + Math.round((eclipseCoverage ?? 0) * 12)}
       celestialPosition={[skyOffset[0], skyOffset[1] + 8.4, skyOffset[2] - 20]} />
-    {(weather.rain > 0 || rainOverride) && <Rain intensity={Math.max(weather.rain, rainOverride ? .45 : 0)} wind={weather.wind} playing={playing} />}
+    {(weather.rain > 0 || rainOverride) && <Rain intensity={Math.max(weather.rain, rainOverride ? .65 : 0)}
+      maxOpacity={rainOverride ? .42 : .3} wind={weather.wind} playing={playing} />}
   </group>
 }

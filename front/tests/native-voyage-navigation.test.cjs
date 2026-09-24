@@ -54,6 +54,18 @@ test('release, teardown and background all clear native steering', () => {
   assert.equal(f.navigation.current.resetView, 0)
 })
 
+test('analog native helm receives proportional input with the same lease safety', () => {
+  const f = fixture()
+  f.send('steer', .37)
+  assert.equal(f.navigation.current.input, .37)
+  assert.equal(f.timers.size, 1)
+  f.send('steer', -.6)
+  assert.equal(f.navigation.current.input, -.6)
+  f.send('steer', 0)
+  assert.equal(f.navigation.current.input, 0)
+  assert.equal(f.timers.size, 0)
+})
+
 test('capability handshake and camera reset are separate from sailing controls', () => {
   const paused = fixture(true, false)
   paused.send('navigation-state-request')
