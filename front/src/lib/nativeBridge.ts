@@ -62,6 +62,10 @@ export function sendVoyageState(state: {
   if (isNativeApp()) post({ type: "voyage", ...state });
 }
 
+export function sendNavigationAvailability(state: { available: boolean; canSteer: boolean }) {
+  if (isNativeApp()) post({ type: "voyage-navigation", version: 1, ...state });
+}
+
 // 앱이면 <html>에 클래스 부여 (CSS에서 모바일 대응 분기용)
 if (typeof document !== "undefined" && isNativeApp()) {
   document.documentElement.classList.add("is-native-app");

@@ -11,8 +11,11 @@ import VoyageNativeHud, { type VoyageInfo } from "../components/hud/VoyageNative
 import { nativeBgm } from "../api/nativeBgm";
 import { getUserProfile } from "../api/voyage";
 import { setVoyageInfo as setGlobalVoyageInfo } from "../stores/voyageHudStore";
+import VoyageNavigationControls from "../components/hud/VoyageNavigationControls";
+import { useVoyageNavigation } from "../hooks/useVoyageNavigation";
+import { navigationScript, resolveVoyageWebUrl, type VoyageNavigationCommand } from "../services/voyageNavigation";
 
-const WEB_URL = "https://driftlog.kro.kr/voyage";
+const WEB_URL = resolveVoyageWebUrl(process.env.EXPO_PUBLIC_VOYAGE_WEB_URL, __DEV__);
 
 export default function VoyageScreen() {
   const router = useRouter();
@@ -21,8 +24,30 @@ export default function VoyageScreen() {
   const webRef = useRef<WebView>(null);
   const [injectedJS, setInjectedJS] = useState<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const [muted, setMuted] = useState(nativeBgm.isMuted());
   const [voyageInfo, setVoyageInfo] = useState<VoyageInfo | null>(null);
+  const sendNavigation = useCallback((command: VoyageNavigationCommand) => {
+    webRef.current?.injectJavaScript(navigationScript(command));
+  }, []);
+  const navigation = useVoyageNavigation({
+    send: sendNavigation,
+    focused: isFocused,
+    hidden: overlayVisible || sheetVisible,
+    initialized: !!voyageInfo?.initReady,
+    voyageState: voyageInfo?.voyageState,
+  });
+  const { controller, invalidate: invalidateNavigation } = navigation;
+  const handleSheetVisibility = useCallback((visible: boolean) => {
+    if (visible) controller.setEnabled(false, false);
+    setSheetVisible(visible);
+  }, [controller]);
+  const onWebLoadStart = () => {
+    invalidateNavigation();
+    setVoyageInfo(null);
+    setGlobalVoyageInfo(null);
+    setOverlayVisible(false);
+  };
 
   // ── 진입 인사 (WebView 로딩 완료 후 1회) ──
   const [greeting, setGreeting] = useState<{ msg: string; name: string } | null>(null);
@@ -31,6 +56,7 @@ export default function VoyageScreen() {
   const webFade = useRef(new Animated.Value(0)).current;   // WebView 페이드인
 
   const onWebLoaded = () => {
+    controller.requestState();
     // 바다 3D 렌더 여유 후 부드럽게 페이드인
     setTimeout(() => {
       Animated.timing(webFade, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start();
@@ -83,6 +109,7 @@ export default function VoyageScreen() {
   useFocusEffect(
     useCallback(() => {
       return () => {
+        invalidateNavigation();
         nativeBgm.stop();
         setGlobalVoyageInfo(null);
         // WebView가 언마운트되므로 다음 진입 때 인사/페이드 다시 뜨도록 리셋
@@ -90,12 +117,14 @@ export default function VoyageScreen() {
         greetAnim.setValue(0);
         webFade.setValue(0);
       };
-    }, [])
+    }, [invalidateNavigation, greetAnim, webFade])
   );
 
   const handleMessage = async (e: WebViewMessageEvent) => {
     let msg: any = {};
     try { msg = JSON.parse(e.nativeEvent.data); } catch { return; }
+    if (!msg || typeof msg !== "object" || !isFocused) return;
+    if (navigation.receive(msg)) return;
 
     if (msg.type === "bgm") {
       if (msg.track === "voyage") nativeBgm.playVoyage();
@@ -107,6 +136,9 @@ export default function VoyageScreen() {
       if (msg.accessToken) await AsyncStorage.setItem("accessToken", msg.accessToken);
       if (msg.refreshToken) await AsyncStorage.setItem("refreshToken", msg.refreshToken);
     } else if (msg.type === "voyage") {
+      if (msg.voyageState !== "SAILING" || !msg.initReady) {
+        controller.setEnabled(navigation.visible && !!msg.initReady && msg.voyageState === "PAUSED", false);
+      }
       const vi = {
         voyageState: msg.voyageState,
         progress: msg.progress ?? 0,
@@ -118,8 +150,9 @@ export default function VoyageScreen() {
       setVoyageInfo(vi);
       setGlobalVoyageInfo(vi);
     } else if (msg.type === "navigate") {
-      if (msg.to === "mode-select") { nativeBgm.stop(); router.replace("/mode-select"); }
+      if (msg.to === "mode-select") { invalidateNavigation(); nativeBgm.stop(); router.replace("/mode-select"); }
     } else if (msg.type === "logout") {
+      invalidateNavigation();
       nativeBgm.stop();
       await AsyncStorage.removeItem("accessToken");
       await AsyncStorage.removeItem("refreshToken");
@@ -130,11 +163,13 @@ export default function VoyageScreen() {
         : Haptics.ImpactFeedbackStyle.Light;
       Haptics.impactAsync(style).catch(() => {});
     } else if (msg.type === "overlay") {
+      if (msg.visible) controller.setEnabled(false, false);
       setOverlayVisible(!!msg.visible);
     }
   };
 
   const sendControl = (action: "pause-resume") => {
+    controller.stop();
     webRef.current?.injectJavaScript(`
       window.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'voyage-control', action: '${action}' }) }));
       true;
@@ -163,7 +198,12 @@ export default function VoyageScreen() {
             source={{ uri: WEB_URL }}
             injectedJavaScriptBeforeContentLoaded={injectedJS}
             onMessage={handleMessage}
+            onLoadStart={onWebLoadStart}
             onLoadEnd={onWebLoaded}
+            onError={invalidateNavigation}
+            onHttpError={invalidateNavigation}
+            onContentProcessDidTerminate={invalidateNavigation}
+            onRenderProcessGone={invalidateNavigation}
             scrollEnabled={false}
             bounces={false}
             overScrollMode="never"
@@ -180,16 +220,18 @@ export default function VoyageScreen() {
         onControl={sendControl}
         muted={muted}
         onToggleMute={toggleMute}
-        hidden={overlayVisible}
+        hidden={overlayVisible || sheetVisible || !isFocused}
       />
 
-      {!overlayVisible && !(voyageInfo && (voyageInfo.voyageState === "SAILING" || voyageInfo.voyageState === "PAUSED")) && (
+      {navigation.visible && <VoyageNavigationControls controller={controller} canSteer={navigation.canSteer} />}
+
+      {isFocused && !overlayVisible && !sheetVisible && !(voyageInfo && (voyageInfo.voyageState === "SAILING" || voyageInfo.voyageState === "PAUSED")) && (
         <Pressable onPress={toggleMute} style={[st.muteBtn, { top: insets.top + 10 }]}>
           <Text style={st.muteText}>{muted ? "♪̸" : "♪"}</Text>
         </Pressable>
       )}
 
-      <VoyageHud hideFab={overlayVisible} />
+      {isFocused && <VoyageHud hideFab={overlayVisible} onOverlayChange={handleSheetVisibility} />}
 
       {/* 진입 인사 — 텍스트만 */}
       {greeting && (

@@ -280,6 +280,7 @@ export default function StudyHUD() {
       console.error('공부 기록 저장 실패:', e)
     } finally {
       clearStudySession()
+      emitStudyChange()
       setElapsed(0)
       setSubject('')
       setSaving(false)

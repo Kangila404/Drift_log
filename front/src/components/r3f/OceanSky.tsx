@@ -1,40 +1,38 @@
-import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useLayoutEffect, useRef, useMemo } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { ScenePreset } from '../../constants/scenePreset'
+import { skyVertexShader, skyFragmentShader, celestialVertexShader, celestialFragmentShader, getSkyWeather } from './OceanSkyShader'
+import { getWeatherAtmosphere } from '../../constants/weatherAtmosphere'
+import { sampleStormLightning } from './StormLightning'
+import OceanConstellations from './OceanConstellations'
+import { constellationVisibility } from './ConstellationField'
 
 interface OceanSkyProps {
   preset?: ScenePreset
   eclipsePhase?: number
   eclipseCoverage?: number
+  playing?: boolean
+  starOpacityScale?: number
 }
 
 const DEFAULT_MOON_COLOR = '#fffde8'
+const starRandom = (seed: number) => THREE.MathUtils.euclideanModulo(Math.sin(seed * 127.1 + 311.7) * 43758.5453, 1)
 
-// ── 별자리(북두칠성) ──
-const CONSTELLATION_COLOR = '#e3ecff'
-const CYCLE = 180                // 별자리 1주기(초) = 3분에 1번
-const SHOW_END = 15              // 그리기+글로우+페이드 모두 끝나는 시점(초). 이후 주기 끝까지 소등
-const DIPPER_RAW: [number, number][] = [
-  [0.0, 2.8], // 0 Dubhe
-  [0.4, 0.0], // 1 Merak
-  [3.0, 0.3], // 2 Phecda
-  [2.9, 2.6], // 3 Megrez
-  [4.6, 3.4], // 4 Alioth
-  [6.4, 3.8], // 5 Mizar
-  [8.4, 3.0], // 6 Alkaid
-]
-const DIPPER_EDGES: [number, number][] = [
-  [0, 1], [1, 2], [2, 3], [3, 0], // 바가지
-  [3, 4], [4, 5], [5, 6],         // 손잡이
-]
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
-  return t * t * (3 - 2 * t)
-}
-
-export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage = 0 }: OceanSkyProps) {
+export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage = 0, playing = true, starOpacityScale = 1 }: OceanSkyProps) {
+  const { gl, invalidate } = useThree()
+  const animationTime = useRef(0)
+  const lightningTime = useRef(0)
+  const lightning = useRef({ strength: 0, x: 0, y: .3 })
+  const reducedMotion = useRef(false)
+  const lightningLight = useRef<THREE.DirectionalLight>(null)
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => { reducedMotion.current = media.matches; invalidate() }
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [invalidate])
   const moonColor = preset?.moonColor ?? DEFAULT_MOON_COLOR
   const showMoon = preset?.showMoon ?? true
   const body = preset?.celestialBody ?? 'moon'
@@ -44,54 +42,75 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
   const isMoon = body === 'moon'   // 밤/새벽 → 별자리·유성우
 
   const radius = isSun || isEclipse ? 2.0 : 1.2
-  const glowRadius = isSun || isEclipse ? 4.5 : 2.35
-  const emissiveIntensity = isSun ? 1.8 : 1.0
   const baseLightIntensity = isSun || isEclipse ? 6.0 : 3.7
-  const glowOpacity = isSun || isEclipse ? 0.18 : 0.11
-
-  const sunRef = useRef<THREE.Mesh>(null)
-  const sunGlowRef = useRef<THREE.Mesh>(null)
-  const eclipseMoonRef = useRef<THREE.Mesh>(null)
-  const coronaRef = useRef<THREE.Mesh>(null)
   const lightRef = useRef<THREE.PointLight>(null)
+  const skyMaterialRef = useRef<THREE.ShaderMaterial>(null)
+  const celestialMaterialRef = useRef<THREE.ShaderMaterial>(null)
+  const starMaterialRef = useRef<THREE.ShaderMaterial>(null)
+  const coverage = isEclipse ? THREE.MathUtils.clamp(eclipseCoverage, 0, 1) : 0
+  const atmosphere = getWeatherAtmosphere(preset?.effects)
+  const skyUniforms = useMemo(() => ({
+    uTime: { value: 0 }, uCoverage: { value: 0 }, uCloudiness: { value: 0 }, uHaze: { value: 0 }, uWind: { value: 0 },
+    uTop: { value: new THREE.Color() }, uBottom: { value: new THREE.Color() },
+    uFog: { value: new THREE.Color() },
+    uLightning: { value: 0 }, uLightningDirection: { value: new THREE.Vector3(0, .3, -1).normalize() },
+  }), [])
+  const celestialUniforms = useMemo(() => ({
+    uColor: { value: new THREE.Color() }, uSun: { value: 0 },
+    uEclipse: { value: 0 }, uPhase: { value: -1.3 },
+    uCoverage: { value: 0 }, uTime: { value: 0 }, uTransmission: { value: 1 },
+  }), [])
+  const starUniforms = useMemo(() => ({
+    uTime: { value: 0 }, uOpacity: { value: .65 },
+  }), [])
+
+  useLayoutEffect(() => {
+    const skyUniforms = skyMaterialRef.current?.uniforms
+    const celestialUniforms = celestialMaterialRef.current?.uniforms
+    const starUniforms = starMaterialRef.current?.uniforms
+    if (!skyUniforms || !starUniforms) return
+    skyUniforms.uTop.value.set(preset?.skyTop ?? '#07111d')
+    skyUniforms.uBottom.value.set(preset?.skyBottom ?? '#0e2a44')
+    skyUniforms.uFog.value.set(preset?.fogColor ?? '#07111d')
+    skyUniforms.uCoverage.value = coverage
+    const atmosphere = getSkyWeather(preset)
+    skyUniforms.uCloudiness.value = atmosphere.cloudiness
+    skyUniforms.uHaze.value = atmosphere.haze
+    const optics = getWeatherAtmosphere(preset?.effects)
+    skyUniforms.uWind.value = optics.wind
+    if (import.meta.env.DEV) {
+      gl.domElement.setAttribute('data-sky-cloudiness', String(atmosphere.cloudiness))
+      gl.domElement.setAttribute('data-sky-haze', String(atmosphere.haze))
+    }
+    if (celestialUniforms) {
+      celestialUniforms.uColor.value.set(moonColor)
+      celestialUniforms.uSun.value = isSun || isEclipse ? 1 : 0
+      celestialUniforms.uEclipse.value = isEclipse ? 1 : 0
+      celestialUniforms.uPhase.value = eclipsePhase
+      celestialUniforms.uCoverage.value = coverage
+      celestialUniforms.uTransmission.value = optics.transmission
+    }
+    starUniforms.uOpacity.value = (isSun ? .045 : isEclipse ? .15 + coverage * .5 : .65) * THREE.MathUtils.clamp(starOpacityScale, 0, 1) * optics.stars
+  }, [preset, moonColor, showMoon, isSun, isEclipse, eclipsePhase, coverage, starOpacityScale, gl])
 
   const starPositions = useMemo(() => {
     const positions = []
     for (let i = 0; i < 1000; i++) {
       positions.push(
-        (Math.random() - 0.5) * 400,
-        Math.random() * 62 + 5,
-        (Math.random() - 0.5) * 400,
+        (starRandom(i * 3) - 0.5) * 400,
+        starRandom(i * 3 + 1) * 62 + 5,
+        (starRandom(i * 3 + 2) - 0.5) * 400,
       )
     }
     return new Float32Array(positions)
   }, [])
 
-  const starsRef = useRef<THREE.Points>(null)
-
   // 별마다 랜덤 반짝임 위상
   const starPhases = useMemo(() => {
     const phases = new Float32Array(1000)
-    for (let i = 0; i < 1000; i++) phases[i] = Math.random() * Math.PI * 2
+    for (let i = 0; i < 1000; i++) phases[i] = starRandom(i + 3000) * Math.PI * 2
     return phases
   }, [])
-
-  // ── 별자리 데이터 (중심정렬 + 스케일) ──
-  const constellation = useMemo(() => {
-    const cx = 3.74, cy = 2.27, scale = 0.85   // 배경 별 수준으로 작게
-    const pts = DIPPER_RAW.map(([x, y]) => new THREE.Vector3((x - cx) * scale, (y - cy) * scale, 0))
-    const edges = DIPPER_EDGES.map(([a, b]) => {
-      const g = new THREE.BufferGeometry()
-      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
-      const m = new THREE.LineBasicMaterial({
-        color: CONSTELLATION_COLOR, transparent: true, opacity: 0,
-        depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
-      })
-      return { line: new THREE.Line(g, m), mat: m, geo: g, a, b }
-    })
-    return { pts, edges }
-  }, [])
-  const dipperStarRefs = useRef<THREE.Mesh[]>([])
 
   // ── 유성우 풀 (드문드문) ──
   const meteorCfg = useMemo(() => {
@@ -116,91 +135,27 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
   }, [])
   const meteorRefs = useRef<THREE.Mesh[]>([])
 
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-
-    if (starsRef.current) {
-      const mat = starsRef.current.material as THREE.ShaderMaterial
-      mat.uniforms.uTime.value = t
+  useFrame((_, delta) => {
+    if (playing) animationTime.current += THREE.MathUtils.clamp(delta, 0, .05)
+    const t = animationTime.current
+    const storm = atmosphere.rain === 1 && atmosphere.wind === 1
+    if (!storm) lightningTime.current = 0
+    else if (playing && !reducedMotion.current) lightningTime.current += THREE.MathUtils.clamp(delta, 0, .05)
+    const flash = sampleStormLightning(lightningTime.current, storm && !reducedMotion.current, lightning.current)
+    if (skyMaterialRef.current) {
+      skyMaterialRef.current.uniforms.uLightning.value = flash.strength
+      skyMaterialRef.current.uniforms.uLightningDirection.value.set(flash.x, flash.y, -1).normalize()
     }
+    if (lightningLight.current) lightningLight.current.intensity = flash.strength * .12
+    if (import.meta.env.DEV) gl.domElement.setAttribute('data-lightning', flash.strength.toFixed(4))
 
-    if (sunRef.current) {
-      sunRef.current.position.y = 8.4 + Math.sin(t * 0.25) * 0.12
-      const mat = sunRef.current.material as THREE.MeshStandardMaterial
-      mat.color.set(moonColor)
-      mat.emissive.set(moonColor)
+    if (starMaterialRef.current) starMaterialRef.current.uniforms.uTime.value = t
+    if (skyMaterialRef.current) skyMaterialRef.current.uniforms.uTime.value = t
+    if (celestialMaterialRef.current) celestialMaterialRef.current.uniforms.uTime.value = t
+    if (lightRef.current) {
+      lightRef.current.intensity = baseLightIntensity * (1 - coverage * .92) * atmosphere.transmission
+      lightRef.current.color.set(coverage > .8 ? '#4a5a90' : moonColor)
     }
-    if (sunGlowRef.current) {
-      sunGlowRef.current.position.y = 8.4 + Math.sin(t * 0.25) * 0.12
-      const mat = sunGlowRef.current.material as THREE.MeshBasicMaterial
-      mat.color.set(moonColor)
-      mat.opacity = glowOpacity * (1 - eclipseCoverage * 0.9)
-    }
-
-    if (isEclipse) {
-      const moonX = eclipsePhase * radius * 1.2
-      if (eclipseMoonRef.current) {
-        eclipseMoonRef.current.visible = eclipseCoverage > 0.001
-        eclipseMoonRef.current.position.set(moonX, 8.4 + Math.sin(t * 0.25) * 0.12, -19.9)
-        const mat = eclipseMoonRef.current.material as THREE.MeshBasicMaterial
-        mat.color.set(preset?.fogColor ?? '#3a7398')
-      }
-      if (coronaRef.current) {
-        coronaRef.current.visible = eclipseCoverage > 0.8
-        const mat = coronaRef.current.material as THREE.MeshBasicMaterial
-        mat.opacity = eclipseCoverage > 0.8 ? (eclipseCoverage - 0.8) / 0.2 * (0.6 + Math.sin(t * 1.2) * 0.15) : 0
-      }
-      if (lightRef.current) {
-        lightRef.current.intensity = baseLightIntensity * (1 - eclipseCoverage * 0.92)
-        lightRef.current.color.set(eclipseCoverage > 0.8 ? '#4a5a90' : moonColor)
-      }
-    } else {
-      if (eclipseMoonRef.current) eclipseMoonRef.current.visible = false
-      if (coronaRef.current) coronaRef.current.visible = false
-      if (lightRef.current) {
-        lightRef.current.intensity = baseLightIntensity
-        lightRef.current.color.set(moonColor)
-      }
-    }
-
-    // ── 별자리 (밤/새벽만, 3분에 1회 그렸다 사라짐) ──
-    const tc = t % CYCLE
-    const active = isMoon && tc < SHOW_END           // 그리는 윈도우 밖이면 완전 소등
-    const fade = 1 - smoothstep(SHOW_END - 3, SHOW_END, tc)   // 12~15초 페이드아웃
-    const EDGE_START = 2.0
-    const EDGE_GAP = 0.5
-    const EDGE_DUR = 0.6
-    const drawEnd = EDGE_START + DIPPER_EDGES.length * EDGE_GAP + EDGE_DUR
-
-    constellation.pts.forEach((_, i) => {
-      const m = dipperStarRefs.current[i]
-      if (!m) return
-      const mat = m.material as THREE.MeshBasicMaterial
-      if (!active) { mat.opacity = 0; return }
-      const local = tc - i * 0.26
-      let on = 0
-      if (local > 0) {
-        on = Math.min(1, local / 0.4)
-        const blink = Math.max(0, 1 - local / 0.6)   // 켜질 때 오버슈트
-        on = Math.min(1.5, on + blink * 0.5)
-      }
-      mat.opacity = on * fade
-      m.scale.setScalar(0.85 + Math.min(1, on) * 0.35 + Math.sin(t * 2 + i) * 0.05)
-    })
-
-    constellation.edges.forEach((e, k) => {
-      if (!active) { e.mat.opacity = 0; return }
-      const A = constellation.pts[e.a], B = constellation.pts[e.b]
-      const ep = Math.max(0, Math.min(1, (tc - (EDGE_START + k * EDGE_GAP)) / EDGE_DUR))
-      const cur = A.clone().lerp(B, ep)
-      const pos = e.geo.attributes.position as THREE.BufferAttribute
-      pos.setXYZ(0, A.x, A.y, A.z)
-      pos.setXYZ(1, cur.x, cur.y, cur.z)
-      pos.needsUpdate = true
-      const done = tc > drawEnd
-      const glow = done ? 0.28 + Math.sin(t * 1.5) * 0.07 : ep * 0.24   // 선 은은하게
-      e.mat.opacity = (ep > 0 ? Math.max(glow, ep * 0.22) : 0) * fade
-    })
 
     // ── 유성우 (밤/새벽만) ──
     meteorRefs.current.forEach((m, i) => {
@@ -217,7 +172,7 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
           cfg.y0 + (cfg.y1 - cfg.y0) * p,
           cfg.z,
         )
-        mat.opacity = Math.sin(p * Math.PI) * cfg.maxOp
+        mat.opacity = Math.sin(p * Math.PI) * cfg.maxOp * atmosphere.stars
       } else {
         mat.opacity = 0
         m.visible = false
@@ -227,7 +182,22 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
 
   return (
     <>
-      <points ref={starsRef}>
+      <directionalLight ref={lightningLight} name="Distant storm lightning" position={[-12, 18, -35]} color="#b5c4d7" intensity={0} />
+      <mesh name="Shared sky dome" renderOrder={-1000} frustumCulled={false}>
+        <sphereGeometry args={[1, 32, 16]} />
+        <shaderMaterial
+          side={THREE.BackSide}
+          ref={skyMaterialRef}
+          depthWrite={false}
+          depthTest={false}
+          fog={false}
+          dithering
+          uniforms={skyUniforms}
+          vertexShader={skyVertexShader}
+          fragmentShader={skyFragmentShader}
+        />
+      </mesh>
+      <points renderOrder={-900}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[starPositions, 3]} />
           <bufferAttribute attach="attributes-phase" args={[starPhases, 1]} />
@@ -236,10 +206,8 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
           transparent
           depthWrite={false}
           fog={false}
-          uniforms={{
-            uTime: { value: 0 },
-            uOpacity: { value: isSun ? 0.12 : 0.9 },
-          }}
+          uniforms={starUniforms}
+          ref={starMaterialRef}
           vertexShader={`
             attribute float phase;
             varying float vTwinkle;
@@ -263,29 +231,7 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
         />
       </points>
 
-      {/* 별자리 — 북두칠성 (밤/새벽), 우상단, 배경 별 크기 수준 */}
-      <group position={[34, 26, -62]}>
-        {constellation.pts.map((p, i) => (
-          <mesh
-            key={`ds${i}`}
-            position={[p.x, p.y, p.z]}
-            ref={(el) => { if (el) dipperStarRefs.current[i] = el }}
-          >
-            <sphereGeometry args={[0.12, 12, 12]} />
-            <meshBasicMaterial
-              color={CONSTELLATION_COLOR}
-              transparent
-              opacity={0}
-              depthWrite={false}
-              fog={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-        ))}
-        {constellation.edges.map((e, i) => (
-          <primitive key={`de${i}`} object={e.line} />
-        ))}
-      </group>
+      <OceanConstellations visibility={constellationVisibility(isMoon, atmosphere.stars, starOpacityScale)} playing={playing} />
 
       {/* 유성우 (밤/새벽) */}
       {meteorCfg.map((cfg, i) => (
@@ -310,26 +256,18 @@ export default function OceanSky({ preset, eclipsePhase = -1.3, eclipseCoverage 
 
       {showMoon && (
         <>
-          <mesh ref={sunGlowRef} position={[0, 8.4, -20]}>
-            <sphereGeometry args={[glowRadius, 48, 48]} />
-            <meshBasicMaterial color={moonColor} transparent opacity={glowOpacity} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </mesh>
-
-          <mesh ref={sunRef} position={[0, 8.4, -20]}>
-            <sphereGeometry args={[radius, 48, 48]} />
-            <meshStandardMaterial color={moonColor} emissive={moonColor} emissiveIntensity={emissiveIntensity} roughness={0.72} />
-          </mesh>
-
-          {/* 해를 가리는 달 — 해와 동일 크기, 하늘색(구멍처럼) */}
-          <mesh ref={eclipseMoonRef} position={[-radius * 1.2, 8.4, -19.9]} visible={false} renderOrder={2}>
-            <circleGeometry args={[radius, 96]} />
-            <meshBasicMaterial color="#0a1020" depthWrite={false} depthTest={false} side={THREE.DoubleSide} />
-          </mesh>
-
-          {/* 코로나 링 */}
-          <mesh ref={coronaRef} position={[0, 8.4, -19.95]} visible={false} renderOrder={1}>
-            <ringGeometry args={[radius * 0.98, radius * 1.5, 96]} />
-            <meshBasicMaterial color={moonColor} transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
+          {/* Celestial light sits beyond atmospheric distance fog; geometry still occludes it. */}
+          <mesh name="Shared celestial disc" position={[0, 8.4, -20]} renderOrder={-800} frustumCulled={false}>
+            <planeGeometry args={[radius * 2.7, radius * 2.7]} />
+            <shaderMaterial
+              transparent
+              depthWrite={false}
+              fog={false}
+              uniforms={celestialUniforms}
+              ref={celestialMaterialRef}
+              vertexShader={celestialVertexShader}
+              fragmentShader={celestialFragmentShader}
+            />
           </mesh>
 
           <pointLight ref={lightRef} position={[0, 8.4, -20]} color={moonColor} intensity={baseLightIntensity} distance={300} />

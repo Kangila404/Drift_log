@@ -5,31 +5,16 @@ export interface RandomEvent {
   imageUrl: string | null
 }
 
-// eventId → SVG 일러스트 키
-export const EVENT_ILLUST: Record<number, string> = {
-  1: 'whale',
-  2: 'rainbow',
-  3: 'dolphin',
-  4: 'sign',
-  5: 'cityLight',
+export const EVENT_DURATION_MS = 12_000
+
+export const EVENT_COPY: Readonly<Partial<Record<number, string>>> = {
+  1: '혼자가 아니라는 생각이 들었다.',
+  2: '잠시, 마음에도 빛이 들었다.',
+  3: '나란히 가는 길이 반가웠다.',
+  4: '잊고 있던 하루가 떠올랐다.',
+  5: '저 불빛이 누군가의 집이기를.',
 }
 
-// eventId → 화면상 일러스트 배치 (top/left는 %, width/height는 CSS 값)
-export interface EventLayout {
-  top: string
-  left: string
-  width: string
-  height: string
-}
-
-export const EVENT_LAYOUT: Record<number, EventLayout> = {
-  1: { top: '50%', left: '58%', width: 'min(55vw, 520px)', height: 'min(26vw, 220px)' }, // 고래
-  2: { top: '150%', left: '7%', width: 'min(85vw, 900px)', height: 'min(42vw, 440px)' }, // 무지개
-  3: { top: '40%', left: '100%', width: 'min(50vw, 420px)', height: 'min(26vw, 220px)' }, // 돌고래
-  4: { top: '50%', left: '70%', width: 'min(40vw, 340px)', height: 'min(24vw, 200px)' }, // 간판
-  5: { top: '50%', left: '50%', width: 'min(60vw, 560px)', height: 'min(20vw, 180px)' }, // 도시불빛
-}
-
-export const DEFAULT_LAYOUT: EventLayout = {
-  top: '34%', left: '50%', width: 'min(50vw, 420px)', height: 'min(26vw, 220px)',
+export function getEventCaption(event: RandomEvent): string {
+  return EVENT_COPY[event.eventId] ?? (event.textContent.trim() || event.type)
 }

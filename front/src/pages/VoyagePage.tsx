@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerspectiveCamera } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as THREE from 'three'
-import OceanWater from '../components/r3f/OceanWater'
-import OceanSky from '../components/r3f/OceanSky'
-import Boat, { Wake } from '../components/r3f/Boat'
+import OceanEnvironment from '../components/r3f/OceanEnvironment'
+import Boat from '../components/r3f/Boat'
+import VoyageOrbit from '../components/r3f/voyage/VoyageOrbit'
+import { createVoyageNavigation } from '../components/r3f/voyage/VoyageNavigation'
+import VoyageControls from '../components/ui/VoyageControls'
 import HUD from '../components/ui/HUD'
 import CityView from '../components/ui/CityView'
-import WeatherEffects from '../components/weather/WeatherEffects'
 import EndingSequence from '../components/EndingSequence'
 import { useVoyageStore } from '../stores/voyageStore'
 import { useVoyageInit } from '../hooks/useVoyageInit'
@@ -19,13 +19,15 @@ import { useEclipse } from '../hooks/useEclipse'
 import { useViewport } from '../hooks/useViewport'
 import { resolveScene } from '../constants/scenePreset'
 import EventOverlay from '../components/event/EventOverlay'
+import VoyageEncounter from '../components/r3f/events/VoyageEncounter'
 import { useRandomEvent } from '../hooks/useRandomEvent'
 import { apiClient } from '../api/client'
 import CityArrivalSequence from '../components/CityArrivalSequence'
 import { bgm } from '../audio/bgmManager'
 import OpeningSequence from '../components/OpeningSequence'
 import { getDiscoveredTraces } from '../api/trace'
-import { sendBgmToNative } from '../lib/nativeBridge'
+import { isNativeApp, sendBgmToNative } from '../lib/nativeBridge'
+import { useNativeVoyageNavigation } from '../hooks/useNativeVoyageNavigation'
 
 type Scene = 'ocean' | 'arriving' | 'cityIntro' | 'city'
 
@@ -46,6 +48,7 @@ export default function VoyagePage() {
   const [scene, setScene] = useState<Scene>('ocean')
   const randomEvent = useRandomEvent()
   const { isMobile } = useViewport()
+  const navigation = useRef(createVoyageNavigation())
 
   const completedRef = useRef(false)
   const prevStateRef = useRef(voyageState)   // 직전 항해 상태
@@ -53,6 +56,10 @@ export default function VoyagePage() {
   const [showOpening, setShowOpening] = useState<boolean | null>(null)
   const [firstVoyage, setFirstVoyage] = useState(false)   // 항해 0건 = 첫 유저
   const introCheckedRef = useRef(false)
+  const navigationAvailable = ready && scene === 'ocean' && !showEnding && showOpening === false
+    && (voyageState === 'SAILING' || voyageState === 'PAUSED')
+  const canSteer = navigationAvailable && voyageState === 'SAILING'
+  useNativeVoyageNavigation(navigation, navigationAvailable, canSteer)
 
   // ── BGM (항해/도시) ──
   useEffect(() => {
@@ -180,7 +187,7 @@ export default function VoyagePage() {
           />
 
            <Canvas
-            dpr={[1.5, 2]}
+            dpr={[1, 1.25]}
             gl={{
               antialias: true,
               alpha: true,
@@ -189,11 +196,7 @@ export default function VoyagePage() {
             }}
             style={{ background: 'transparent' }}
           >
-            <PerspectiveCamera
-              makeDefault
-              position={[0, 1.7, 10.2]}
-              fov={isMobile ? 64 : 52}
-            />
+            <VoyageOrbit mobile={isMobile} navigation={navigation} reservedLeft={isNativeApp() && isMobile ? 82 : 0} />
 
             {/* <color attach="background" .../> 제거 — 그라데이션 div가 배경 담당 */}
             <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
@@ -201,22 +204,21 @@ export default function VoyagePage() {
             <directionalLight position={[0, 8, -12]} intensity={1.6 * (1 - coverage * 0.9)} color="#dcecff" />
             <pointLight position={[0, 1.6, 2.8]} intensity={1.1 * (1 - coverage * 0.9)} color="#ffd28a" />
             <pointLight position={[0, 3.2, -3.5]} intensity={0.75 * (1 - coverage * 0.9)} color="#9ed8ff" />
-            <OceanSky preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} />
-            <OceanWater preset={preset} />
-            <Wake />
-            <Boat preset={preset} />
+            <OceanEnvironment preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} />
+            <Boat preset={preset} navigation={navigation} />
+            <VoyageEncounter event={randomEvent} preset={preset} />
           </Canvas>
 
           {/* 일식 어둠 오버레이 */}
           {eclipseActive && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none',
-              background: '#01030a', opacity: coverage * 0.88, transition: 'opacity 0.2s linear',
+              background: '#01030a', opacity: coverage * 0.36, transition: 'opacity 0.2s linear',
             }} />
           )}
 
-          <WeatherEffects effects={preset.effects} />
           <EventOverlay event={randomEvent} />
+          {!isNativeApp() && <VoyageControls navigation={navigation} enabled={canSteer} />}
           <HUD initReady={ready} />
         </motion.div>
       )}

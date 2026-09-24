@@ -6,6 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc -b && vite build",
+        "city:bake": "node design/bake-chinatown-occlusion.cjs",
+        "city:bake:daejeon": "node design/bake-daejeon-occlusion.cjs",
+        "city:bake:gangneung": "node design/bake-gangneung-occlusion.cjs",
         "lint": "eslint .",
         "preview": "vite preview"
     },
@@ -17,6 +20,7 @@
         "axios": "^1.16.1",
         "framer-motion": "^12.40.0",
         "howler": "^2.2.4",
+        "lucide-react": "^1.42.0",
         "pixi.js": "^8.18.1",
         "react": "^19.2.6",
         "react-dom": "^19.2.6",
@@ -37,6 +41,8 @@
         "eslint-plugin-react-hooks": "^7.1.1",
         "eslint-plugin-react-refresh": "^0.5.2",
         "globals": "^17.6.0",
+        "jsdom": "^29.1.1",
+        "three-mesh-bvh": "0.7.8",
         "typescript": "~6.0.2",
         "typescript-eslint": "^8.59.2",
         "vite": "^8.0.12"
