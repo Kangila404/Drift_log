@@ -196,7 +196,7 @@ export default function VoyagePage() {
             }}
             style={{ background: 'transparent' }}
           >
-            <VoyageOrbit mobile={isMobile} navigation={navigation} reservedLeft={isNativeApp() && isMobile ? 82 : 0} />
+            <VoyageOrbit mobile={isMobile} navigation={navigation} />
 
             {/* <color attach="background" .../> 제거 — 그라데이션 div가 배경 담당 */}
             <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />

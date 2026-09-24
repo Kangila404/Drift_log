@@ -63,7 +63,7 @@ export function sendVoyageState(state: {
 }
 
 export function sendNavigationAvailability(state: { available: boolean; canSteer: boolean }) {
-  if (isNativeApp()) post({ type: "voyage-navigation", version: 1, ...state });
+  if (isNativeApp()) post({ type: "voyage-navigation", version: 1, analogSteering: true, ...state });
 }
 
 // 앱이면 <html>에 클래스 부여 (CSS에서 모바일 대응 분기용)

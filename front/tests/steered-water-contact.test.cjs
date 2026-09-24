@@ -1,7 +1,24 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
 const path = require('node:path')
-const { load } = require('../design/check-city-geometry.cjs')
+const { readFileSync } = require('node:fs')
+const vm = require('node:vm')
+const ts = require('typescript')
+
+function load(file) {
+  const source = ts.transpileModule(readFileSync(file, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText
+  const exports = {}
+  vm.runInNewContext(source, {
+    exports,
+    require: id => {
+      if (id !== './OceanWaves') throw new Error(`Unexpected dependency: ${id}`)
+      return load(path.join(path.dirname(file), 'OceanWaves.ts'))
+    },
+  }, { filename: file })
+  return exports
+}
 const { sampleOceanSurface } = load(path.join(__dirname, '../src/components/r3f/OceanWaves.ts'))
 const { sampleBoatMotionTarget, BOAT_MAX_TILT } = load(path.join(__dirname, '../src/components/r3f/BoatMotion.ts'))
 

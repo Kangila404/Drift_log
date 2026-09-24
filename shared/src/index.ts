@@ -1,4 +1,5 @@
 export const SHARED_OK = "shared connected";
+export { HELM_MAX_ANGLE, wheelPointerAngle, advanceHelmAngle, helmSteering } from "./helm";
 
 export { createApiClient } from "./api/createApiClient";
 export type { ApiClientDeps } from "./api/createApiClient";

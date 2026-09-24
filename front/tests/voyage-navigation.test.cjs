@@ -46,7 +46,7 @@ for (const input of [-1, 1]) {
       assert(state.speed >= 0 && state.speed <= 1)
     }
     assert.equal(state.x, input * VOYAGE_MAX_X)
-    assert.equal(state.heading, 0, 'At the lateral bound the boat resumes its forward heading')
+    assert.equal(state.heading, -input * VOYAGE_MAX_HEADING, 'A held helm keeps the bow turned at the local bound')
   })
 
   test(`release from ${input} returns position and heading without a snap`, () => {
@@ -70,6 +70,18 @@ test('automatic voyage reaches cruise speed without steering or lateral drift', 
   assert.equal(state.x, 0)
   assert.equal(state.heading, 0)
   assert.equal(state.speed, 1)
+})
+
+test('partial helm input holds a proportional route offset and invalid input is neutral', () => {
+  const state = createVoyageNavigation()
+  state.input = .35
+  run(state, 120)
+  assert.equal(state.x, VOYAGE_MAX_X * .35)
+  assert.equal(state.heading, -VOYAGE_MAX_HEADING * .35)
+  state.input = Infinity
+  run(state, 40)
+  assert.equal(state.input, 0)
+  assert.equal(state.x, 0)
 })
 
 test('pause clears held input, holds lateral position, settles and resumes toward the route', () => {

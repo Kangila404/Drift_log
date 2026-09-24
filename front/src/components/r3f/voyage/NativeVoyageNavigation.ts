@@ -33,7 +33,7 @@ export function createNativeNavigationReceiver(
     if (message.action === 'navigation-state-request') { publish(); return }
     if (message.action === 'steer') {
       const direction = message.direction
-      if (direction !== -1 && direction !== 0 && direction !== 1) return
+      if (typeof direction !== 'number' || !Number.isFinite(direction) || Math.abs(direction) > 1) return
       clear()
       if (!availability.available || !availability.canSteer || hidden()) return
       navigation.current.input = direction
