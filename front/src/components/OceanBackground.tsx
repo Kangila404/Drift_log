@@ -1,7 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
-import OceanWater from './r3f/OceanWater'
-import OceanSky from './r3f/OceanSky'
+import OceanEnvironment from './r3f/OceanEnvironment'
 import Boat, { Wake } from './r3f/Boat'
 import { resolveScene } from '../constants/scenePreset'
 
@@ -12,7 +11,7 @@ export default function OceanBackground() {
   return (
     <div className="absolute inset-0">
       <Canvas
-        dpr={[1.5, 2]}
+        dpr={[1, 1.25]}
         camera={{ position: [0, 1.45, 10.8], fov: 46 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.18 }}
       >
@@ -22,8 +21,7 @@ export default function OceanBackground() {
         <directionalLight position={[0, 8, -12]} intensity={1.6} color="#dcecff" />
         <pointLight position={[0, 1.6, 2.8]} intensity={1.1} color="#ffd28a" />
         <pointLight position={[0, 3.2, -3.5]} intensity={0.75} color="#9ed8ff" />
-        <OceanSky preset={preset} eclipsePhase={2.5} eclipseCoverage={0} />
-        <OceanWater preset={preset} />
+        <OceanEnvironment preset={preset} eclipsePhase={2.5} eclipseCoverage={0} />
         <Wake />
         <Boat preset={preset} />
       </Canvas>

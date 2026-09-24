@@ -1,0 +1,9 @@
+.voyage-event-caption {
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 640px) {
+  .voyage-event-caption { bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 639px) and (min-height: 500px) and (max-height: 680px) {
+  .voyage-event-caption { top: 232px; bottom: auto; }
+}

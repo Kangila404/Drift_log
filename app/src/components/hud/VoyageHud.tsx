@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, Pressable, StyleSheet, Animated, PanResponder, useWindowDimensions,
 } from "react-native";
@@ -19,7 +19,10 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: "profile", icon: "○", label: "나" },
 ];
 
-export default function VoyageHud({ hideFab = false }: { hideFab?: boolean }) {
+export default function VoyageHud({ hideFab = false, onOverlayChange }: {
+  hideFab?: boolean;
+  onOverlayChange?: (visible: boolean) => void;
+}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
@@ -34,20 +37,30 @@ export default function VoyageHud({ hideFab = false }: { hideFab?: boolean }) {
   });
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
 
-  const animateTo = (toValue: number, cb?: () => void) => {
-    Animated.timing(translateY, { toValue, duration: 220, useNativeDriver: true }).start(cb);
-  };
+  const animateTo = useCallback((toValue: number, cb?: () => void) => {
+    Animated.timing(translateY, { toValue, duration: 220, useNativeDriver: true })
+      .start(({ finished }) => { if (finished) cb?.(); });
+  }, [translateY]);
+
+  useEffect(() => () => {
+    translateY.stopAnimation();
+    onOverlayChange?.(false);
+  }, [onOverlayChange, translateY]);
 
   const openSheet = () => {
+    onOverlayChange?.(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setOpen(true);
     translateY.setValue(SHEET_H);
     requestAnimationFrame(() => animateTo(0));
   };
 
-  const closeSheet = () => {
-    animateTo(SHEET_H, () => setOpen(false));
-  };
+  const closeSheet = useCallback(() => {
+    animateTo(SHEET_H, () => {
+      setOpen(false);
+      onOverlayChange?.(false);
+    });
+  }, [SHEET_H, animateTo, onOverlayChange]);
 
   const selectTab = (id: Tab) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -55,19 +68,18 @@ export default function VoyageHud({ hideFab = false }: { hideFab?: boolean }) {
     if (!mounted[id]) setMounted((m) => ({ ...m, [id]: true }));
   };
 
-  const pan = useRef(
-    PanResponder.create({
+  const pan = useMemo(() => PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 2,
       onPanResponderMove: (_, g) => {
         if (g.dy > 0) translateY.setValue(g.dy);
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 60 || g.vy > 0.5) animateTo(SHEET_H, () => setOpen(false));
+        if (g.dy > 60 || g.vy > 0.5) closeSheet();
         else animateTo(0);
       },
-    })
-  ).current;
+      onPanResponderTerminate: () => animateTo(0),
+    }), [animateTo, closeSheet, translateY]);
 
   return (
     <View style={styles.root} pointerEvents="box-none">

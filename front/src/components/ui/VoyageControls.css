@@ -1,0 +1,66 @@
+.voyage-controls {
+  position: absolute;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  gap: 8px;
+  width: 148px;
+  height: 44px;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.voyage-controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #6b879580;
+  border-radius: 8px;
+  background: #101e26e6;
+  color: #d8e4e5;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+
+.voyage-controls button:focus-visible {
+  outline: 2px solid #e3c78c;
+  outline-offset: 3px;
+}
+
+.voyage-controls button:active:not(:disabled),
+.voyage-controls button[data-held="true"] {
+  background: #344b56;
+  border-color: #e3c78c;
+  color: #fff1d5;
+}
+
+.voyage-controls button:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .voyage-controls button:hover:not(:disabled) { border-color: #c5d7d9; }
+}
+
+@media (max-width: 639px) {
+  .voyage-controls {
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voyage-controls button { transition: none; }
+}

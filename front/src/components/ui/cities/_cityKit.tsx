@@ -1,149 +1,264 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 
-/* ───────── 공용 ───────── */
-export const layerStyle: React.CSSProperties = {
-  position: 'absolute', bottom: 0, left: 0, width: '100%', height: '100%',
+export const layerStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
 }
 
-/* 모바일(세로)에서도 항상 바닥 정렬 + 중앙 유지. 양옆은 잘림 → 조형물은 x 620~980에. */
-export const ALIGN = 'xMidYMax slice' as const
+export const ALIGN = 'xMidYMax meet' as const
 
-/* (구버전 호환용 — 더는 쓰지 않음) */
 export function useIsTall(threshold = 0.9) {
   const [isTall, setIsTall] = useState(false)
+
   useEffect(() => {
     const check = () => setIsTall(window.innerHeight / window.innerWidth > threshold)
-    check(); window.addEventListener('resize', check)
+    check()
+    window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [threshold])
+
   return isTall
 }
 
-/* ───────── 기본 팔레트 (차가운 몽환 베이스) ─────────
-   건물 실루엣은 도시 공통(어두움). 무드는 하늘·수면·조형물 accent로 낸다. */
 export const C = {
-  waterTop: '#1a2146', waterBot: '#090d1e', ripple: '#5a64a6', mist: '#bcb9dc',
-  bldgBase: '#202744', bldgFace: '#2b3358',
-  edgeLight: '#5d6cb4', edgeShade: '#0b0e1e',
-  window: '#0a0c1a', windowGlow: '#90b8e2',
-  stone: '#2a3158', stoneLit: '#4b5896', metal: '#aab4e6',
-  moon: '#ece7f6', cyan: '#a9cbe9', star: '#e2e2f6',
-  ridgeFar: '#1b2042', ridgeMid: '#222a52',
-  faceLit: '#3c4778', faceShade: '#1d2444', faceDeep: '#10152c',
+  ink: '#050814',
+  deep: '#0b1228',
+  harbor: '#111b37',
+  harbor2: '#1b294b',
+  glass: '#263d66',
+  glass2: '#33527e',
+  lit: '#7fb4d8',
+  gold: '#f4c46b',
+  coral: '#ee7e73',
+  mint: '#8bcfb2',
+  violet: '#b6a0e8',
+  green: '#5fa76d',
+  stone: '#34394a',
+  stone2: '#54586a',
+  foam: '#bcd6de',
+  shadow: '#07101f',
 }
 
-/* ───────── 레이어 A: 달무리 + 안개 + 수면 (none, 항상 꽉 참) ─────────
-   도시별 무드: halo(하늘 글로우) / water(수면 색) / accent(2차 글로우) 주입. */
-export function SkyLayer({
-  waterY = 720, mistY = 656, idSuffix = '',
-  halo = '#3a3a6e', halo2 = '#22244a', water = C.waterTop,
-  accent, accentY = 0.34,
+type SceneTone = 'blue' | 'gold' | 'green' | 'violet' | 'coral'
+
+const tones: Record<SceneTone, { glow: string; glow2: string; water: string; accent: string }> = {
+  blue: { glow: '#2d5f8a', glow2: '#102849', water: '#123452', accent: C.lit },
+  gold: { glow: '#8f5e25', glow2: '#2b1f24', water: '#183044', accent: C.gold },
+  green: { glow: '#2f6b57', glow2: '#102d32', water: '#133848', accent: C.mint },
+  violet: { glow: '#594685', glow2: '#211d42', water: '#1b2448', accent: C.violet },
+  coral: { glow: '#89445a', glow2: '#2c1f35', water: '#18334c', accent: C.coral },
+}
+
+export function CityScene({
+  id,
+  tone = 'blue',
+  waterY = 720,
+  children,
 }: {
-  waterY?: number; mistY?: number; idSuffix?: string
-  halo?: string; halo2?: string; water?: string
-  accent?: string; accentY?: number
+  id: string
+  tone?: SceneTone
+  waterY?: number
+  children: ReactNode
 }) {
-  const u = (s: string) => `${s}${idSuffix}`
+  const isTall = useIsTall()
+  const align = isTall ? 'xMidYMax slice' : ALIGN
+  const t = tones[tone]
+
   return (
-    <svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg"
-      style={layerStyle} preserveAspectRatio="none">
-      <defs>
-        <radialGradient id={u('halo')} cx="0.5" cy="0.24" r="0.68">
-          <stop offset="0%" stopColor={halo} stopOpacity="0.62" />
-          <stop offset="54%" stopColor={halo2} stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#0c0f22" stopOpacity="0" />
-        </radialGradient>
-        {accent && (
-          <radialGradient id={u('acc')} cx="0.5" cy={`${accentY}`} r="0.5">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
+    <>
+      <svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" style={layerStyle} preserveAspectRatio="none">
+        <defs>
+          <radialGradient id={`${id}-glow`} cx="50%" cy="35%" r="62%">
+            <stop offset="0%" stopColor={t.glow} stopOpacity="0.58" />
+            <stop offset="58%" stopColor={t.glow2} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={C.ink} stopOpacity="0" />
           </radialGradient>
-        )}
-        <linearGradient id={u('water')} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={water} stopOpacity="0.65" />
-          <stop offset="100%" stopColor={C.waterBot} stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id={u('mist')} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={C.mist} stopOpacity="0" />
-          <stop offset="100%" stopColor={C.mist} stopOpacity="0.4" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="1600" height="900" fill={`url(#${u('halo')})`} />
-      {accent && <rect x="0" y="0" width="1600" height="900" fill={`url(#${u('acc')})`} />}
-      <rect x="0" y={mistY} width="1600" height={waterY - mistY + 80} fill={`url(#${u('mist')})`} />
-      <rect x="0" y={waterY} width="1600" height={900 - waterY} fill={`url(#${u('water')})`} />
-      {Array.from({ length: 7 }, (_, i) => (
-        <path key={i}
-          d={`M 0 ${waterY + 42 + i * 22} Q 400 ${waterY + 36 + i * 22} 800 ${waterY + 42 + i * 22} T 1600 ${waterY + 42 + i * 22}`}
-          fill="none" stroke={C.ripple} strokeWidth="1.5" opacity={0.4 - i * 0.045} />
-      ))}
-    </svg>
+          <linearGradient id={`${id}-water`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={t.water} stopOpacity="0.68" />
+            <stop offset="100%" stopColor={C.ink} stopOpacity="0.08" />
+          </linearGradient>
+          <linearGradient id={`${id}-mist`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.foam} stopOpacity="0" />
+            <stop offset="100%" stopColor={C.foam} stopOpacity="0.34" />
+          </linearGradient>
+        </defs>
+        <rect width="1600" height="900" fill={`url(#${id}-glow)`} />
+        <rect x="0" y={waterY - 78} width="1600" height="134" fill={`url(#${id}-mist)`} />
+        <rect x="0" y={waterY} width="1600" height={900 - waterY} fill={`url(#${id}-water)`} />
+        {Array.from({ length: 8 }, (_, i) => (
+          <path
+            key={i}
+            d={`M -80 ${waterY + 30 + i * 22} C 260 ${waterY + 16 + i * 22} 430 ${waterY + 48 + i * 22} 780 ${waterY + 30 + i * 22} S 1260 ${waterY + 16 + i * 22} 1680 ${waterY + 28 + i * 22}`}
+            fill="none"
+            stroke={i % 2 ? t.accent : C.foam}
+            strokeWidth={i < 2 ? 1.8 : 1.1}
+            opacity={0.3 - i * 0.022}
+          />
+        ))}
+      </svg>
+
+      <svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg" style={layerStyle} preserveAspectRatio={align}>
+        <defs>
+          <linearGradient id={`${id}-tower`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={C.glass2} />
+            <stop offset="52%" stopColor={C.harbor2} />
+            <stop offset="100%" stopColor={C.shadow} />
+          </linearGradient>
+          <linearGradient id={`${id}-stone`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.stone2} />
+            <stop offset="100%" stopColor={C.stone} />
+          </linearGradient>
+          <linearGradient id={`${id}-hill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.green} />
+            <stop offset="100%" stopColor={C.harbor} />
+          </linearGradient>
+          <filter id={`${id}-soft`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
+        </defs>
+        <Stars id={id} seed={id.length * 11} color={t.accent} />
+        {children}
+        <HarborBand id={id} y={waterY} accent={t.accent} />
+      </svg>
+    </>
   )
 }
 
-/* 수면 반사 — 조형물을 waterY 기준으로 뒤집어 흐릿하게. (가볍게, opacity 낮춤) */
-export function Reflect({ waterY, opacity = 0.12, children }: { waterY: number; opacity?: number; children: React.ReactNode }) {
-  return (
-    <g transform={`translate(0, ${2 * waterY}) scale(1, -1)`} opacity={opacity}
-      style={{ filter: 'blur(0.6px)' }}>
-      {children}
-    </g>
-  )
-}
+export function Stars({ id, seed = 1, n = 22, color = C.foam }: { id: string; seed?: number; n?: number; color?: string }) {
+  const pts = useMemo(() => Array.from({ length: n }, (_, i) => ({
+    x: ((seed * 83 + i * 137) % 1500) + 50,
+    y: ((seed * 47 + i * 61) % 250) + 44,
+    r: 0.8 + ((seed + i) % 3) * 0.45,
+    o: 0.22 + ((seed + i * 5) % 5) * 0.07,
+  })), [seed, n])
 
-/* 별빛 (은은히 깜빡) */
-export function Stars({ seed = 1, n = 18, color = C.star }: { seed?: number; n?: number; color?: string }) {
-  const pts = Array.from({ length: n }, (_, i) => ({
-    x: ((seed * 97 + i * 131) % 1560) + 20,
-    y: ((seed * 53 + i * 71) % 280) + 36,
-    r: 0.7 + ((i * seed) % 3) * 0.4,
-    o: 0.28 + ((i * 7) % 5) * 0.08,
-    d: 3 + (i % 4),
-  }))
   return (
     <g>
       {pts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={p.r} fill={color} opacity={p.o}>
-          <animate attributeName="opacity" values={`${p.o};${p.o * 0.25};${p.o}`} dur={`${p.d}s`} repeatCount="indefinite" />
+        <circle key={`${id}-star-${i}`} cx={p.x} cy={p.y} r={p.r} fill={color} opacity={p.o}>
+          <animate attributeName="opacity" values={`${p.o};${p.o * 0.28};${p.o}`} dur={`${3 + (i % 4)}s`} repeatCount="indefinite" />
         </circle>
       ))}
     </g>
   )
 }
 
-/* ───────── 건물 한 채 — 옥상 디테일·드문 불빛, 변형 다양 ─────────
-   roof: 'flat' | 'antenna' | 'tank' | 'step'. lit: 켜진 창 밀도(0~6). */
-export function Building({
-  x, y, w, h, lit = 0, idx = 0, roof = 'flat', glow = C.windowGlow,
-}: { x: number; y: number; w: number; h: number; lit?: number; idx?: number; roof?: 'flat' | 'antenna' | 'tank' | 'step'; glow?: string }) {
-  const cols = Math.max(1, Math.floor(w / 15))
-  const rows = Math.max(1, Math.floor(h / 22))
+export function Skyline({
+  id,
+  y = 650,
+  from = 90,
+  to = 1510,
+  count = 18,
+  accent = C.lit,
+}: {
+  id: string
+  y?: number
+  from?: number
+  to?: number
+  count?: number
+  accent?: string
+}) {
+  const width = (to - from) / count
+  return (
+    <g opacity="0.74">
+      {Array.from({ length: count }, (_, i) => {
+        const h = 54 + ((i * 37 + id.length * 9) % 116)
+        const w = Math.max(24, width * (0.5 + ((i * 19) % 34) / 100))
+        const x = from + i * width
+        const roof = i % 5
+        return (
+          <g key={`${id}-b-${i}`}>
+            <rect x={x} y={y - h} width={w} height={h} fill={i % 2 ? C.harbor : C.harbor2} />
+            <rect x={x} y={y - h} width="2.5" height={h} fill={accent} opacity="0.24" />
+            {roof === 1 && <polygon points={`${x},${y - h} ${x + w / 2},${y - h - 22} ${x + w},${y - h}`} fill={C.harbor} />}
+            {roof === 2 && <rect x={x + w * 0.25} y={y - h - 12} width={w * 0.5} height="12" fill={C.harbor2} />}
+            {roof === 3 && <line x1={x + w / 2} y1={y - h} x2={x + w / 2} y2={y - h - 28} stroke={accent} strokeWidth="1.3" opacity="0.55" />}
+            {Array.from({ length: Math.floor(w / 16) }, (_, c) =>
+              Array.from({ length: Math.floor(h / 24) }, (_, r) => {
+                const on = (i * 7 + c * 5 + r * 3) % 9 < 2
+                return (
+                  <rect
+                    key={`${c}-${r}`}
+                    x={x + 7 + c * 16}
+                    y={y - h + 13 + r * 24}
+                    width="5"
+                    height="8"
+                    fill={on ? accent : C.ink}
+                    opacity={on ? 0.5 : 0.55}
+                  />
+                )
+              }),
+            )}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+export function HarborBand({ id, y = 720, accent = C.lit }: { id: string; y?: number; accent?: string }) {
   return (
     <g>
-      <rect x={x} y={y} width={w} height={h} fill={C.bldgBase} />
-      <rect x={x} y={y} width="2.5" height={h} fill={C.edgeLight} opacity="0.42" />
-      <rect x={x + w - 6} y={y} width="6" height={h} fill={C.edgeShade} />
-      <rect x={x} y={y} width={w} height="2" fill={C.stoneLit} opacity="0.3" />
-      {/* 옥상 */}
-      {roof === 'antenna' && (
-        <>
-          <rect x={x + w / 2 - 0.8} y={y - 18} width="1.6" height="18" fill={C.stone} />
-          <circle cx={x + w / 2} cy={y - 20} r="1.4" fill={glow} opacity="0.7" />
-        </>
-      )}
-      {roof === 'tank' && <rect x={x + w * 0.3} y={y - 8} width={w * 0.4} height="8" rx="2" fill={C.bldgFace} />}
-      {roof === 'step' && <rect x={x + w * 0.2} y={y - 10} width={w * 0.6} height="10" fill={C.bldgBase} />}
-      {/* 창 */}
-      {Array.from({ length: cols }, (_, c) =>
-        Array.from({ length: rows }, (_, ri) => {
-          const wx = x + 6 + c * 15, wy = y + 12 + ri * 22
-          if (wy > y + h - 12 || wx > x + w - 8) return null
-          const seed = (idx * 7 + c * 13 + ri * 17) % 23
-          const on = seed < lit
-          return <rect key={`${c}-${ri}`} x={wx} y={wy} width="5.5" height="8"
-            fill={on ? glow : C.window} opacity={on ? 0.5 : 0.8} />
-        })
-      )}
+      <path d={`M 0 ${y + 8} C 280 ${y - 10} 500 ${y + 28} 800 ${y + 8} S 1320 ${y - 10} 1600 ${y + 10} L 1600 900 L 0 900 Z`} fill={C.shadow} opacity="0.7" />
+      <path d={`M 0 ${y + 3} C 320 ${y - 15} 520 ${y + 22} 800 ${y + 4} S 1280 ${y - 16} 1600 ${y + 4}`} fill="none" stroke={accent} strokeWidth="2" opacity="0.25" />
+      {Array.from({ length: 16 }, (_, i) => (
+        <ellipse key={`${id}-glint-${i}`} cx={90 + i * 96} cy={y + 36 + (i % 4) * 18} rx={18 + (i % 3) * 8} ry="1.2" fill={accent} opacity={0.12 + (i % 3) * 0.04} />
+      ))}
+    </g>
+  )
+}
+
+export function Reflect({ waterY, opacity = 0.13, children }: { waterY: number; opacity?: number; children: ReactNode }) {
+  return (
+    <g transform={`translate(0, ${2 * waterY}) scale(1, -1)`} opacity={opacity} filter="blur(0.8px)">
+      {children}
+    </g>
+  )
+}
+
+export function Bridge({ id, x1 = 230, x2 = 1370, y = 625, towerY = 360, accent = C.lit }: { id: string; x1?: number; x2?: number; y?: number; towerY?: number; accent?: string }) {
+  const left = x1 + (x2 - x1) * 0.32
+  const right = x1 + (x2 - x1) * 0.68
+  const cable = (x: number) => {
+    const t = (x - left) / (right - left)
+    return towerY + 14 + (y - towerY - 44) * 4 * t * (1 - t)
+  }
+
+  return (
+    <g>
+      <path d={`M ${x1} ${y} L ${x2} ${y}`} stroke={`url(#${id}-stone)`} strokeWidth="14" />
+      <path d={`M ${x1} ${y - 8} L ${x2} ${y - 8}`} stroke={accent} strokeWidth="2" opacity="0.5" />
+      {[left, right].map((x) => (
+        <g key={x}>
+          <rect x={x - 13} y={towerY} width="26" height={y - towerY + 56} fill={C.harbor2} />
+          <rect x={x - 13} y={towerY} width="4" height={y - towerY + 56} fill={accent} opacity="0.35" />
+          <rect x={x - 22} y={towerY + 76} width="44" height="8" fill={C.stone} />
+          <circle cx={x} cy={towerY - 8} r="5" fill={accent} opacity="0.8" />
+        </g>
+      ))}
+      {Array.from({ length: 42 }, (_, i) => {
+        const x = left + ((right - left) * i) / 41
+        return <line key={i} x1={x} y1={cable(x)} x2={x} y2={y - 8} stroke={accent} strokeWidth="1" opacity="0.32" />
+      })}
+      <path d={Array.from({ length: 50 }, (_, i) => {
+        const x = left + ((right - left) * i) / 49
+        return `${i ? 'L' : 'M'} ${x} ${cable(x)}`
+      }).join(' ')} fill="none" stroke={accent} strokeWidth="3" opacity="0.56" />
+    </g>
+  )
+}
+
+export function MoonGate({ x = 800, y = 640, scale = 1, accent = C.gold }: { x?: number; y?: number; scale?: number; accent?: string }) {
+  return (
+    <g transform={`translate(${x},${y}) scale(${scale})`}>
+      <path d="M -260 60 L 260 60 L 260 92 L -260 92 Z" fill={C.stone} />
+      <path d="M -210 58 Q 0 -128 210 58 L 170 58 Q 0 -72 -170 58 Z" fill={C.stone2} />
+      <path d="M -156 58 Q 0 -42 156 58" fill="none" stroke={accent} strokeWidth="4" opacity="0.55" />
+      {[-220, -150, 150, 220].map((px) => <rect key={px} x={px - 10} y="60" width="20" height="96" fill={C.harbor2} />)}
+      <circle cx="0" cy="-62" r="6" fill={accent} opacity="0.9" />
     </g>
   )
 }

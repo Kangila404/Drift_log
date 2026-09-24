@@ -1,7 +1,8 @@
 import Boat from '../r3f/Boat'
-import { useEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as THREE from 'three'
 import {
@@ -18,6 +19,43 @@ const previewPreset = {
   waveScale: 0.5,
   waveSpeed: 0.9,
 } as ScenePreset
+
+const PREVIEW_TARGET: [number, number, number] = [0, 0.75, -4]
+const PREVIEW_DIRECTION = new THREE.Vector3(10, 2.2, 8).normalize()
+const PREVIEW_FOV = 45
+// World-space enclosure includes deployed sails, lowered anchor and boat motion at scale 1.8.
+const PREVIEW_RADIUS = 7.1
+
+function MaintenanceCamera() {
+  const controls = useRef<OrbitControlsImpl>(null)
+  const { camera, size, invalidate } = useThree()
+  const verticalHalfFov = THREE.MathUtils.degToRad(PREVIEW_FOV / 2)
+  const aspect = Math.max(1, size.width) / Math.max(1, size.height)
+  const horizontalHalfFov = Math.atan(Math.tan(verticalHalfFov) * aspect)
+  const distance = PREVIEW_RADIUS / Math.sin(Math.min(verticalHalfFov, horizontalHalfFov)) * 1.06
+
+  useLayoutEffect(() => {
+    camera.position.copy(PREVIEW_DIRECTION).multiplyScalar(distance).add(new THREE.Vector3(...PREVIEW_TARGET))
+    camera.lookAt(...PREVIEW_TARGET)
+    controls.current?.target.set(...PREVIEW_TARGET)
+    controls.current?.update()
+    invalidate()
+  }, [camera, distance, invalidate])
+
+  return <OrbitControls
+    ref={controls}
+    target={PREVIEW_TARGET}
+    enablePan={false}
+    minDistance={11}
+    maxDistance={Math.max(26, distance * 1.3)}
+    minPolarAngle={0.2}
+    maxPolarAngle={Math.PI - 0.15}
+    enableDamping
+    dampingFactor={0.08}
+    autoRotate
+    autoRotateSpeed={0.6}
+  />
+}
 
 function Swatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
   return (
@@ -86,7 +124,13 @@ export default function BoatMaintenanceModal({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [cleanKey, setCleanKey] = useState(0)
+  const [wasOpen, setWasOpen] = useState(open)
   const cleanTimer = useRef<number | null>(null)
+
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) { setSaved(false); setCleanKey(0) }
+  }
 
   const activePreset = Object.entries(BOAT_PRESETS).find(
     ([, p]) => p.sail === colors.sail && p.hull === colors.hull && p.lamp === colors.lamp,
@@ -120,10 +164,6 @@ export default function BoatMaintenanceModal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
-
-  useEffect(() => {
-    if (open) { setSaved(false); setCleanKey(0) }
-  }, [open])
 
   useEffect(() => {
     if (cleanKey === 0) return
@@ -171,29 +211,18 @@ export default function BoatMaintenanceModal({
             {/* 3D 미리보기 + 청소 오버레이 */}
             <div className="relative mx-5 h-[160px] shrink-0 overflow-hidden rounded-xl border border-white/8 bg-[#0a141e]">
               <Canvas
-                camera={{ position: [0.7, 1.8, 4.0], fov: 45 }}
+                camera={{ position: [1.4, 2.35, 12], fov: PREVIEW_FOV }}
                 gl={{ antialias: true }}
                 onCreated={({ scene }) => {
-                  scene.fog = new THREE.FogExp2('#0a141e', 0.05)
+                  scene.fog = new THREE.FogExp2('#0a141e', 0.008)
                 }}
               >
                 <color attach="background" args={['#0a141e']} />
-                <ambientLight intensity={0.55} />
-                <directionalLight position={[3, 5, 4]} intensity={0.7} color="#bcd0e0" />
+                <ambientLight intensity={0.8} />
+                <directionalLight position={[3, 5, 4]} intensity={1.15} color="#bcd0e0" />
                 <directionalLight position={[-3, 2, -2]} intensity={0.25} color="#6a86a0" />
-                <Boat preset={previewPreset} />
-                <OrbitControls
-                  target={[0, 1.0, -4]}
-                  enablePan={false}
-                  minDistance={3.5}
-                  maxDistance={11}
-                  minPolarAngle={0.2}
-                  maxPolarAngle={Math.PI - 0.15}
-                  enableDamping
-                  dampingFactor={0.08}
-                  autoRotate
-                  autoRotateSpeed={0.6}
-                />
+                <Boat preset={previewPreset} presentationOnly />
+                <MaintenanceCamera />
               </Canvas>
               <CleanOverlay playKey={cleanKey} />
               <span className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-white/30">

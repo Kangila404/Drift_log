@@ -1,9 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
-import OceanWater from '../components/r3f/OceanWater'
-import OceanSky from '../components/r3f/OceanSky'
+import OceanEnvironment from '../components/r3f/OceanEnvironment'
 import Boat from '../components/r3f/Boat'
-import Rain from '../components/r3f/Rain'
 import StudyHUD from '../components/ui/StudyHUD'
 import { useViewport } from '../hooks/useViewport'
 import { useWeather } from '../contexts/WeatherContext'
@@ -91,18 +89,14 @@ export default function StudyPage() {
         <directionalLight position={[0, 8, -12]} intensity={1.6 * (1 - coverage * 0.9)} color="#dcecff" />
         <pointLight position={[0, 1.6, 2.8]} intensity={1.1 * (1 - coverage * 0.9)} color="#ffd28a" />
         <pointLight position={[0, 3.2, -3.5]} intensity={0.75 * (1 - coverage * 0.9)} color="#9ed8ff" />
-        <OceanSky preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} />
-        <OceanWater preset={preset} />
+        <OceanEnvironment preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} rainOverride={activeNoise === 'rain'} />
         <Boat preset={preset} forceSailing={studying} fireActive={activeNoise === 'fire'} />
-
-        {/* 비는 월드 공간 — 배 따라 안 흔들림 */}
-        <Rain active={activeNoise === 'rain'} />
       </Canvas>
 
       {eclipseActive && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none',
-          background: '#01030a', opacity: coverage * 0.88, transition: 'opacity 0.2s linear',
+          background: '#01030a', opacity: coverage * 0.36, transition: 'opacity 0.2s linear',
         }} />
       )}
 

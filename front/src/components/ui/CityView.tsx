@@ -1,77 +1,34 @@
-import { useEffect, useState, useRef } from 'react'
+import { lazy, Suspense, useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { motion } from 'framer-motion'
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import HUD from './HUD'
 import TraceModal from './TraceModal'
 import VoyageSelectModal from './VoyageSelectModal'
 import BoatMaintenanceModal from './BoatMaintenanceModal'
 import { useVoyageStore } from '../../stores/voyageStore'
 import { useVoyageActions } from '../../hooks/useVoyageActions'
-import OceanWater from '../r3f/OceanWater'
-import OceanSky from '../r3f/OceanSky'
-import WeatherEffects from '../weather/WeatherEffects'
 import { useWeather } from '../../contexts/WeatherContext'
 import { useTimeOfDay } from '../../hooks/useTimeOfDay'
 import { useEclipse } from '../../hooks/useEclipse'
 import { resolveScene } from '../../constants/scenePreset'
 import { bgm } from '../../audio/bgmManager'
 import { haptic, notifyOverlay, isNativeApp } from '../../lib/nativeBridge'
+import type { CityCameraAction } from '../r3f/FloodedCityScene'
 
-
-// 도시 SVG
-import Seoul from './cities/Seoul'
-import Incheon from './cities/Incheon'
-import Daejeon from './cities/Daejeon'
-import Gangneung from './cities/Gangneung'
-import Busan from './cities/Busan'
-import Suwon from './cities/Suwon'
-import Gwangju from './cities/Gwangju'
-import Daegu from './cities/Daegu'
-import Pohang from './cities/Pohang'
-import Jeju from './cities/Jeju'
-
-// cityId → SVG (DB city 테이블 id 순서와 동일)
-const CITY_COMPONENTS: Record<number, React.ComponentType> = {
-  1: Seoul,
-  2: Incheon,
-  3: Daejeon,
-  4: Gangneung,
-  5: Busan,
-  6: Suwon,
-  7: Gwangju,
-  8: Daegu,
-  9: Pohang,
-  10: Jeju,
-}
-
-// 물 반사 shimmer 레이어
-function WaterReflection() {
-  return (
-    <div style={{
-      position: 'absolute', bottom: 0, left: 0, right: 0, height: '35%',
-      background: 'linear-gradient(to bottom, transparent, rgba(4, 12, 28, 0.6))',
-      pointerEvents: 'none', zIndex: 2,
-    }}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: `${10 + i * 15}%`, bottom: `${8 + (i % 3) * 12}%`,
-          width: `${40 + i * 8}px`, height: '1px',
-          background: 'rgba(120, 180, 220, 0.25)', borderRadius: '50%',
-          animation: `shimmer ${2.5 + i * 0.4}s ease-in-out infinite`, animationDelay: `${i * 0.3}s`,
-        }} />
-      ))}
-    </div>
-  )
-}
+const CityWorld = lazy(() => import('../r3f/city/CityScene').then(module => ({ default: module.CityWorld })))
 
 // 파티클 (먼지/물방울)
 function Particles() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
-    id: i, x: Math.random() * 100, y: Math.random() * 100,
-    size: Math.random() * 2 + 0.5, duration: Math.random() * 8 + 6,
-    delay: Math.random() * 5, opacity: Math.random() * 0.3 + 0.1,
-  }))
+  const particles = Array.from({ length: 20 }, (_, i) => {
+    const sample = (salt: number) => ((i * 73 + salt * 41) % 97) / 97
+    return {
+      id: i, x: sample(1) * 100, y: sample(2) * 100,
+      size: sample(3) * 2 + .5, duration: sample(4) * 8 + 6,
+      delay: sample(5) * 5, opacity: sample(6) * .3 + .1,
+    }
+  })
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4 }}>
       {particles.map(p => (
@@ -114,6 +71,7 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
   const [maintOpen, setMaintOpen] = useState(false)
   const [muted, setMuted] = useState(bgm.isMuted())
   const [voyageStarted, setVoyageStarted] = useState(false)   // 첫 항해 시작 여부
+  const [cameraAction, setCameraAction] = useState<CityCameraAction>({ id: 0, kind: 'reset' })
 
   // 첫 방문 흔적 자동 오픈 — 한 번만
   const autoOpenedRef = useRef(false)
@@ -141,8 +99,10 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
 
   if (!currentCity) return null
 
-  // cityId로 도시 SVG 선택 (없으면 Suwon 폴백)
-  const CityComponent = CITY_COMPONENTS[currentCity.cityId] ?? Suwon
+  const adjustCamera = (kind: CityCameraAction['kind']) => {
+    haptic('light')
+    setCameraAction(current => ({ id: current.id + 1, kind }))
+  }
 
   const handleVoyageStart = async (cityId: string) => {
     try {
@@ -159,10 +119,6 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', backgroundColor: '#040c1a' }}>
       <style>{`
-        @keyframes shimmer {
-          0%, 100% { opacity: 0.2; transform: scaleX(1); }
-          50% { opacity: 0.6; transform: scaleX(1.3); }
-        }
         @keyframes float {
           0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0; }
           20% { opacity: 1; }
@@ -171,19 +127,16 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
         }
       `}</style>
 
-      {/* 레이어 1: 하늘 + 바다 (Three.js) */}
+      {/* All cities share one sky, water surface and camera inside this Canvas. */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
         <Canvas
-          dpr={[1, 1.5]}
-          camera={{ position: [0, 1.2, 10], fov: 50 }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
+          dpr={[1, 1.25]}
+          camera={{ position: [3.24, 1.25, 72], fov: 28, near: .2, far: 650 }}
+          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: .94 }}
         >
-          <color attach="background" args={[preset.fogColor]} />
-          <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
-          <ambientLight intensity={preset.ambientIntensity * (1 - coverage * 0.9)} color="#4a6fa8" />
-          <directionalLight position={[5, 8, -10]} intensity={0.8 * (1 - coverage * 0.9)} color="#c8d8f0" />
-          <OceanSky preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} />
-          <OceanWater preset={preset} />
+          <Suspense fallback={null}>
+            <CityWorld key={currentCity.cityId} cityId={currentCity.cityId} preset={preset} eclipsePhase={phase} eclipseCoverage={coverage} cameraAction={cameraAction} />
+          </Suspense>
         </Canvas>
       </div>
 
@@ -191,23 +144,12 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
       {eclipseActive && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 3, pointerEvents: 'none',
-          background: '#01030a', opacity: coverage * 0.88, transition: 'opacity 0.2s linear',
+          background: '#01030a', opacity: coverage * 0.36, transition: 'opacity 0.2s linear',
         }} />
       )}
 
-      {/* 레이어 3: 도시 SVG 실루엣 */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none' }}>
-        <CityComponent />
-      </div>
-
-      {/* 레이어 5: 물 반사 shimmer */}
-      <WaterReflection />
-
       {/* 레이어 6: 파티클 */}
       <Particles />
-
-      {/* 레이어 7: 날씨별 연출 (비/안개/블러/바람) */}
-      <WeatherEffects effects={preset.effects} />
 
       {/* 상단 그라디언트 */}
       <div style={{
@@ -246,6 +188,21 @@ export default function CityView({ isFirstVoyage = false }: CityViewProps) {
           </svg>
         </motion.button>
       )}
+
+      <div className="absolute top-[5.5rem] right-8 z-20 flex flex-col overflow-hidden rounded border border-[#1a4a64]/70 bg-[#050e18]/55 backdrop-blur-md">
+        <button type="button" data-camera-control="in" aria-label="확대" title="확대" onClick={() => adjustCamera('in')}
+          className="grid h-10 w-12 place-items-center border-b border-[#1a4a64]/55 text-[#7eb8d4]/80 transition-colors hover:bg-[#0a2233]/70 hover:text-[#cce8f5]">
+          <ZoomIn size={17} />
+        </button>
+        <button type="button" data-camera-control="out" aria-label="축소" title="축소" onClick={() => adjustCamera('out')}
+          className="grid h-10 w-12 place-items-center border-b border-[#1a4a64]/55 text-[#7eb8d4]/80 transition-colors hover:bg-[#0a2233]/70 hover:text-[#cce8f5]">
+          <ZoomOut size={17} />
+        </button>
+        <button type="button" data-camera-control="reset" aria-label="시점 초기화" title="시점 초기화" onClick={() => adjustCamera('reset')}
+          className="grid h-10 w-12 place-items-center text-[#7eb8d4]/80 transition-colors hover:bg-[#0a2233]/70 hover:text-[#cce8f5]">
+          <RotateCcw size={17} />
+        </button>
+      </div>
 
       {/* 도시 이름 */}
       <div style={{
