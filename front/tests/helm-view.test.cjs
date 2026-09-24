@@ -16,13 +16,16 @@ const helm = load('../../shared/src/helm.ts')
 const view = load('../src/components/r3f/voyage/VoyageView.ts')
 const framing = load('../src/components/r3f/voyage/BoatFraming.ts')
 
-test('shared framing is centered and only four percent farther than deployed voyage', () => {
+test('both modes restore the former study camera size and viewing ray', () => {
   for (const [width, height, mobile] of [[390, 844, true], [320, 568, true], [844, 390, true], [1440, 900, false]]) {
     const frame = framing.boatFraming(width, height, mobile)
-    const tangent = Math.tan((mobile ? 64 : 52) * Math.PI / 360)
-      * (width - (mobile ? 82 : 0)) / height * .9
-    const oldDistance = Math.max(14.2, 5.5 * Math.sqrt(1 + 1 / tangent ** 2))
-    assert(Math.abs(frame.distance / oldDistance - 1.04) < 1e-12)
+    assert.equal(frame.fov, mobile ? 60 : 46)
+    assert.deepEqual(Array.from(frame.position), [0, 1.45, 10.8])
+    const rise = frame.position[1] - frame.target[1]
+    const reach = frame.position[2] - frame.target[2]
+    assert(Math.abs(rise / reach - 1.45 / 10.8) < 1e-12)
+    assert(Math.abs(frame.targetY + Math.cos(frame.polar) * frame.distance - 1.45) < 1e-12)
+    assert(Math.abs(-4 + Math.sin(frame.polar) * frame.distance - 10.8) < 1e-12)
     assert.equal(frame.position[0], 0)
     assert.equal(frame.target[0], 0)
     assert(Math.abs(Math.hypot(...frame.position.map((v, i) => v - frame.target[i])) - frame.distance) < 1e-12)

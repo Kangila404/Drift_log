@@ -74,7 +74,7 @@ export default function VoyageOrbit({ navigation: navigationRef, mobile }: Voyag
     const x = navigationRef.current.x
     if (previousDistance.current === 0) {
       orbit.target.set(x, targetY, -4)
-      camera.position.set(x, targetY + .5, -4 + Math.sqrt(distance * distance - .25))
+      camera.position.set(x, targetY + Math.cos(polar) * distance, -4 + Math.sin(polar) * distance)
     } else {
       // Resize preserves the chosen view and relative zoom, including portrait rotation.
       camera.position.sub(orbit.target).multiplyScalar(distance / previousDistance.current)
@@ -85,7 +85,7 @@ export default function VoyageOrbit({ navigation: navigationRef, mobile }: Voyag
     lastReset.current = navigationRef.current.resetView
     orbit.update()
     invalidate()
-  }, [activeCamera, distance, fov, get, invalidate, navigationRef, targetY, size.width, size.height])
+  }, [activeCamera, distance, fov, get, invalidate, navigationRef, polar, targetY, size.width, size.height])
 
   useFrame(({ camera }, delta) => {
     const orbit = controls.current
