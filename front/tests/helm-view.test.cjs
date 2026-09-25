@@ -75,5 +75,21 @@ test('release returns smoothly by the shortest route and is frame-rate independe
     return angle
   })
   assert(Math.max(...results) - Math.min(...results) < 1e-12)
+  assert(results[0] / 2 > .49 && results[0] / 2 < .51, 'gentle return retains about half the angle after one second')
+  let settling = 2
+  for (let i = 0; i < 240; i++) settling = view.returnViewAngle(settling, 1/60)
+  assert(settling / 2 > .05 && settling / 2 < .07, 'gentle return covers about 94% after four seconds')
+  for (const initial of [-2, -.5, .5, 2]) {
+    let angle = initial, previousStep = Infinity
+    for (let i = 0; i < 240; i++) {
+      const next = view.returnViewAngle(angle, 1/60)
+      const step = Math.abs(angle - next)
+      assert(Math.abs(next) < Math.abs(angle), 'return always approaches the center')
+      assert.equal(Math.sign(next), Math.sign(initial), 'return never overshoots')
+      assert(step < previousStep, 'return progressively slows down')
+      previousStep = step
+      angle = next
+    }
+  }
   assert.equal(view.returnViewAngle(NaN, .1), 0)
 })
