@@ -22,6 +22,6 @@ export function returnViewAngle(angle: number, delta: number) {
   if (!Number.isFinite(angle)) return 0
   if (!Number.isFinite(delta) || delta <= 0) return angle
   const wrapped = Math.atan2(Math.sin(angle), Math.cos(angle))
-  const next = wrapped * Math.exp(-4.2 * Math.min(delta, .1))
+  const next = wrapped * Math.exp(-0.7 * Math.min(delta, .1))
   return Math.abs(next) < .0001 ? 0 : next
 }
