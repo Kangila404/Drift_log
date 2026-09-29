@@ -12,6 +12,7 @@ import { nativeBgm } from "../api/nativeBgm";
 import { getUserProfile } from "../api/voyage";
 import { setVoyageInfo as setGlobalVoyageInfo } from "../stores/voyageHudStore";
 import VoyageNavigationControls from "../components/hud/VoyageNavigationControls";
+import VoyageLookJoystick from "../components/hud/VoyageLookJoystick";
 import { useVoyageNavigation } from "../hooks/useVoyageNavigation";
 import { navigationScript, resolveVoyageWebUrl, type VoyageNavigationCommand } from "../services/voyageNavigation";
 
@@ -214,6 +215,8 @@ export default function VoyageScreen() {
           />
         )}
       </Animated.View>
+
+      <VoyageLookJoystick send={sendNavigation} enabled={navigation.canLook} />
 
       <VoyageNativeHud
         info={voyageInfo}

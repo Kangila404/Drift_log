@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAccountDeletion } from "../../../hooks/useAccountDeletion";
 import {
   View, Text, Pressable, TextInput, ScrollView, ActivityIndicator,
   Modal, KeyboardAvoidingView, Linking, Platform, Alert, StyleSheet,
@@ -13,6 +14,7 @@ const PRIVACY_URL = "https://driftlog.kro.kr/privacy";
 type EditTab = "nickname" | "password";
 
 export default function ProfilePanel() {
+  const { deleting, removeAccount } = useAccountDeletion();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
@@ -64,6 +66,11 @@ export default function ProfilePanel() {
 
       <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); Linking.openURL(PRIVACY_URL); }} style={s.menuBtn}>
         <Text style={s.menuText}>개인정보처리방침</Text>
+      </Pressable>
+
+      <Pressable accessibilityRole="button" accessibilityLabel="계정 삭제" disabled={deleting}
+        onPress={removeAccount} style={[s.menuBtn, s.deleteBtn, deleting && s.disabled]}>
+        <Text style={s.deleteText}>{deleting ? "계정 삭제 중..." : "계정 삭제"}</Text>
       </Pressable>
 
       {isAdmin && (
@@ -234,6 +241,9 @@ const s = StyleSheet.create({
 
   menuBtn: { paddingVertical: 13, borderWidth: 1, borderColor: "rgba(26,74,100,0.4)", borderRadius: 10, alignItems: "center" },
   menuText: { color: "#5a8aa4", fontSize: 13, letterSpacing: 2 },
+  deleteBtn: { borderColor: "rgba(176,83,83,0.55)" },
+  deleteText: { color: "#c57b7b", fontSize: 13, letterSpacing: 2 },
+  disabled: { opacity: 0.55 },
 
   overlay: { flex: 1, backgroundColor: "rgba(2,6,14,0.82)", alignItems: "center", justifyContent: "center", paddingHorizontal: 20 },
   editCard: { width: "100%", maxWidth: 460 },

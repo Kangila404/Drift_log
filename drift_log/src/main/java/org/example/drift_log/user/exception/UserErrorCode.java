@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum UserErrorCode {
+    APPLE_REAUTH_REQUIRED(HttpStatus.BAD_REQUEST, "가입한 Apple 계정으로 다시 인증해 주세요."),
+    APPLE_REVOCATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "Apple 연결 해제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요. 계정은 삭제되지 않았습니다."),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT,        "이메일이 이미 존재합니다."),
     PASSWORD_NOT_MATCHED(HttpStatus.BAD_REQUEST,     "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,             "로그인 실패입니다."),

@@ -6,7 +6,8 @@ declare global {
 }
 
 export const isNativeApp = (): boolean =>
-  typeof window !== "undefined" && window.isNativeApp === true;
+  typeof window !== "undefined" && (window.isNativeApp === true
+    || typeof window.ReactNativeWebView?.postMessage === "function");
 
 const post = (payload: object) => {
   window.ReactNativeWebView?.postMessage(JSON.stringify(payload));
@@ -63,7 +64,7 @@ export function sendVoyageState(state: {
 }
 
 export function sendNavigationAvailability(state: { available: boolean; canSteer: boolean }) {
-  if (isNativeApp()) post({ type: "voyage-navigation", version: 1, analogSteering: true, ...state });
+  if (isNativeApp()) post({ type: "voyage-navigation", version: 1, analogSteering: true, lookJoystick: true, ...state });
 }
 
 // 앱이면 <html>에 클래스 부여 (CSS에서 모바일 대응 분기용)

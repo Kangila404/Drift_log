@@ -13,7 +13,7 @@ export function useVoyageNavigation({ send, focused, hidden, initialized, voyage
   voyageState?: string;
 }) {
   const controller = useMemo(() => createVoyageNavigationController(send), [send]);
-  const [capability, setCapability] = useState({ available: false, canSteer: false });
+  const [capability, setCapability] = useState<{ available: boolean; canSteer: boolean; lookJoystick?: boolean }>({ available: false, canSteer: false });
   const [active, setActive] = useState(AppState.currentState === "active");
   const visible = capability.available && focused && active && !hidden && initialized
     && (voyageState === "SAILING" || voyageState === "PAUSED");
@@ -57,5 +57,5 @@ export function useVoyageNavigation({ send, focused, hidden, initialized, voyage
     return true;
   };
 
-  return { controller, visible, canSteer, invalidate, receive };
+  return { controller, visible, canSteer, canLook: visible && capability.lookJoystick === true, invalidate, receive };
 }

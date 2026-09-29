@@ -23,7 +23,7 @@ function run(state, seconds, sailing = true, fps = 60) {
 test('factory owns independent mutable state; advance preserves identity and reset counter', () => {
   const a = createVoyageNavigation(), b = createVoyageNavigation()
   assert.notEqual(a, b)
-  assert.deepEqual({ ...a }, { x: 0, heading: 0, input: 0, speed: 0, resetView: 0 })
+  assert.deepEqual({ ...a }, { x: 0, heading: 0, input: 0, speed: 0, resetView: 0, lookX: 0, lookY: 0 })
   a.input = -1
   a.resetView = 7
   assert.equal(advanceVoyageNavigation(a, 1 / 60, true), a)

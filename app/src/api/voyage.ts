@@ -97,6 +97,12 @@ export async function updatePassword(body: {
   await apiClient.patch("/users/me/password", body);
 }
 
+export type DeleteAccountRequest = { appleIdentityToken: string; appleAuthorizationCode: string };
+
+export async function deleteAccount(credentials?: DeleteAccountRequest): Promise<void> {
+  await apiClient.delete("/users/me", { data: credentials, timeout: 45000 });
+}
+
 // ─── 흔적 ───
 export type Trace = {
   familyMember: string;

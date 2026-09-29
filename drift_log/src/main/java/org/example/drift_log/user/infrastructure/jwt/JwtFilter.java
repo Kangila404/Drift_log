@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.user.domain.repository.UserRepository;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -26,13 +28,13 @@ public class JwtFilter extends OncePerRequestFilter {
         // 유저가 올바른 토큰을 지니고 있을 때
         if(token != null && jwtTokenProvider.validateToken(token)) {
             String userId = jwtTokenProvider.getUserId(token);
-            String role = jwtTokenProvider.getRole(token);
-
-            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-
-            UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userId, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            // A signed token must not keep a deleted account authenticated.
+            // Use the current role, not privileges cached in an old token.
+            userRepository.findByUserId(userId).ifPresent(user -> {
+                var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getUserRole().name()));
+                var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            });
         }
 
         filterChain.doFilter(request, response);

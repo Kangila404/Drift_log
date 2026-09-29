@@ -39,3 +39,4 @@ out/
 ### .env ###
 .env
 node_modules
+*.p8
