@@ -66,6 +66,21 @@ test('analog native helm receives proportional input with the same lease safety'
   assert.equal(f.timers.size, 0)
 })
 
+test('native look input is bounded, leases safely, and never steers the boat', () => {
+  const f = fixture()
+  f.receiver.receive(JSON.stringify({ type: 'voyage-control', action: 'look', x: .7, y: -.4 }))
+  assert.equal(f.navigation.current.input, 0)
+  assert.equal(f.navigation.current.lookX, .7)
+  assert.equal(f.navigation.current.lookY, -.4)
+  const lease = [...f.timers.values()][0]
+  assert.equal(lease.ms, 250)
+  lease.fn()
+  assert.equal(f.navigation.current.lookX, 0)
+  assert.equal(f.navigation.current.lookY, 0)
+  f.receiver.receive(JSON.stringify({ type: 'voyage-control', action: 'look', x: 1.1, y: 0 }))
+  assert.equal(f.navigation.current.lookX, 0)
+})
+
 test('capability handshake and camera reset are separate from sailing controls', () => {
   const paused = fixture(true, false)
   paused.send('navigation-state-request')

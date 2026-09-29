@@ -8,6 +8,9 @@ export interface VoyageNavigationState {
   input: VoyageSteeringInput
   speed: number
   resetView: number
+  /** Native virtual-look stick, normalized horizontal/vertical displacement. */
+  lookX: number
+  lookY: number
 }
 
 export type VoyageNavigationRef = { current: VoyageNavigationState }
@@ -16,7 +19,7 @@ export const VOYAGE_MAX_X = 3
 export const VOYAGE_MAX_HEADING = Math.PI / 9
 
 export function createVoyageNavigation(): VoyageNavigationState {
-  return { x: 0, heading: 0, input: 0, speed: 0, resetView: 0 }
+  return { x: 0, heading: 0, input: 0, speed: 0, resetView: 0, lookX: 0, lookY: 0 }
 }
 
 function damp(value: number, target: number, rate: number, delta: number) {
@@ -26,8 +29,12 @@ function damp(value: number, target: number, rate: number, delta: number) {
 
 /** Presentation only; delta is seconds. Mutates and returns the same state. */
 export function advanceVoyageNavigation(state: VoyageNavigationState, delta: number, sailing: boolean): VoyageNavigationState {
-  if (!sailing) state.input = 0
+  if (!sailing) {
+    state.input = 0
+  }
   state.input = Number.isFinite(state.input) ? Math.max(-1, Math.min(1, state.input)) : 0
+  state.lookX = Number.isFinite(state.lookX) ? Math.max(-1, Math.min(1, state.lookX)) : 0
+  state.lookY = Number.isFinite(state.lookY) ? Math.max(-1, Math.min(1, state.lookY)) : 0
   if (!Number.isFinite(delta) || delta <= 0) return state
 
   // Bound tab-resume jumps and substep the coupled heading/position response.

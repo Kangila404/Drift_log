@@ -1,5 +1,6 @@
 export type SteeringDirection = -1 | 0 | 1;
 export type VoyageNavigationCommand =
+  | { type: "voyage-control"; action: "look"; x: number; y: number }
   | { type: "voyage-control"; action: "steer"; direction: SteeringDirection }
   | { type: "voyage-control"; action: "reset-view" }
   | { type: "voyage-control"; action: "navigation-state-request" };
@@ -21,12 +22,13 @@ export function resolveVoyageWebUrl(override: string | undefined, development: b
   }
 }
 
-export function readNavigationCapability(message: unknown): { available: boolean; canSteer: boolean } | null {
+export function readNavigationCapability(message: unknown): { available: boolean; canSteer: boolean; lookJoystick?: boolean } | null {
   if (!message || typeof message !== "object") return null;
   const msg = message as Record<string, unknown>;
   if (msg.type !== "voyage-navigation") return null;
   const available = msg.version === 1 && msg.available === true && typeof msg.canSteer === "boolean";
-  return { available, canSteer: available && msg.canSteer === true };
+  return { available, canSteer: available && msg.canSteer === true,
+    ...(typeof msg.lookJoystick === "boolean" ? { lookJoystick: msg.lookJoystick } : {}) };
 }
 
 export function navigationScript(command: VoyageNavigationCommand) {

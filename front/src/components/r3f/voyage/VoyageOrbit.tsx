@@ -17,7 +17,7 @@ export default function VoyageOrbit({ navigation: navigationRef, mobile }: Voyag
   const { camera: activeCamera, get, size, invalidate } = useThree()
   const previousDistance = useRef(0)
   const lastReset = useRef(0)
-  const view = useRef({ pitch: 0, interacting: false, returning: false, resetZoom: false, previousInput: 0 })
+  const view = useRef({ pitch: 0, interacting: false, returning: false, resetZoom: false, previousInput: 0, previousLook: false })
   const lookTarget = useRef(new Vector3())
   const { fov, targetY, distance, polar } = boatFraming(size.width, size.height, mobile)
 
@@ -99,6 +99,19 @@ export default function VoyageOrbit({ navigation: navigationRef, mobile }: Voyag
     }
     if (!sight.interacting && sight.previousInput !== 0 && state.input === 0) sight.returning = true
     sight.previousInput = state.input
+    const looking = state.lookX !== 0 || state.lookY !== 0
+    if (looking) {
+      sight.interacting = true
+      sight.returning = false
+      const dt = Math.max(0, Math.min(delta, .1))
+      orbit.setAzimuthalAngle(orbit.getAzimuthalAngle() - state.lookX * dt * 1.35)
+      sight.pitch = dragSkyPitch(sight.pitch, -state.lookY * dt * size.height * .9, size.height)
+      invalidate()
+    } else if (sight.previousLook) {
+      sight.interacting = false
+      sight.returning = true
+    }
+    sight.previousLook = looking
     const dx = state.x - orbit.target.x
     camera.position.x += dx
     orbit.target.x = state.x
