@@ -49,8 +49,8 @@ class AccountDeletionIntegrationTest {
         // JDBC fixtures bypass JPA auditing; keep its mandatory timestamps.
         for (String table : new String[]{"city", "trace", "study_time", "custom_boats", "ending_feedback",
                 "voyage_log", "inquiry", "random_event", "voyage_event", "inquiry_answer", "notice"}) {
-            db.execute("alter table " + table + " alter column created_at set default CURRENT_TIMESTAMP");
-            db.execute("alter table " + table + " alter column updated_at set default CURRENT_TIMESTAMP");
+            db.execute("alter table " + table + " alter column created_at set default '2026-09-29 00:00:00'");
+            db.execute("alter table " + table + " alter column updated_at set default '2026-09-29 00:00:00'");
         }
         db.update("insert into city (id,name,description,img_url,bgm_url,is_start_city) values (1,'Seoul','test','','',true)");
         db.update("insert into trace (id,city_id,name,family_member,content) values (5,1,'Test','MOM','test')");
