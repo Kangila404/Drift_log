@@ -1,6 +1,7 @@
 package org.example.drift_log.common.config;
 
 import lombok.RequiredArgsConstructor;
+import org.example.drift_log.user.domain.repository.UserRepository;
 import org.example.drift_log.user.infrastructure.jwt.JwtFilter;
 import org.example.drift_log.user.infrastructure.jwt.JwtTokenProvider;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
 
     @Bean
@@ -34,7 +36,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()                // 나머지 토큰
             )
-            .addFilterBefore(new JwtFilter(jwtTokenProvider),  // JwtFilter 등록
+            .addFilterBefore(new JwtFilter(jwtTokenProvider, userRepository),  // JwtFilter 등록
                 UsernamePasswordAuthenticationFilter.class)
             .build();
     }

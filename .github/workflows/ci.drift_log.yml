@@ -8,6 +8,37 @@ on:
       - 'develop'
 
 jobs:
+  account-deletion-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-test-only
+          MYSQL_DATABASE: driftlog_account_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pisolated-test-only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: Verify deletion against disposable MySQL 8
+        working-directory: drift_log
+        env:
+          RUN_MYSQL_ACCOUNT_TEST: '1'
+        run: bash ./gradlew test --tests '*AccountDeletionIntegrationTest'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: account-deletion-mysql-results
+          path: drift_log/build/test-results/test/
+
   build-and-test:
     runs-on: ubuntu-latest
 

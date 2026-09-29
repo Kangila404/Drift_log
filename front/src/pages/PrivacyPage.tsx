@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 
-const UPDATED = "2026년 6월 16일";
+const UPDATED = "2026년 9월 29일";
 const EFFECTIVE = "2026년 6월 16일";
 const CONTACT = "ia3264666@gmail.com";
+const ACCOUNT_DELETION = "앱의 프로필 > 계정 삭제";
 
 export default function PrivacyPage({ onBack }: { onBack?: () => void }) {
   const navigate = useNavigate();
@@ -82,7 +83,18 @@ export default function PrivacyPage({ onBack }: { onBack?: () => void }) {
         <Section n="06" title="이용자의 권리">
           <p style={st.p}>
             이용자는 언제든지 자신의 개인정보를 조회·수정할 수 있으며, 회원 탈퇴를 통해
-            개인정보의 삭제를 요청할 수 있습니다. 권리 행사는 아래 문의처를 통해 가능합니다.
+            개인정보를 삭제할 수 있습니다. 계정 삭제는 앱에서 직접 진행할 수 있으며,
+            그 밖의 권리 행사에 도움이 필요한 경우 아래 문의처로 연락할 수 있습니다.
+          </p>
+        </Section>
+
+        <Section n="06A" title="계정 삭제">
+          <p style={st.p}>
+            이용자는 {ACCOUNT_DELETION} 메뉴에서 언제든지 계정 삭제를 직접 요청할 수 있습니다.
+            삭제를 한 번 더 확인한 뒤 계정 정보, 공부·항해 기록, 배 설정 및 작성한 문의를 영구 삭제합니다.
+            삭제한 계정과 기록은 복구할 수 없으며, 계정 삭제를 위해 이메일이나 전화 문의를 할 필요가 없습니다.
+            Apple로 가입한 경우 같은 Apple 계정으로 본인 확인 후 Apple 로그인 연결도 해제합니다.
+            법령상 보관 의무가 있는 정보가 있다면 해당 법령이 정한 기간 동안만 분리 보관합니다.
           </p>
         </Section>
 

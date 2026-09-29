@@ -38,7 +38,7 @@ public class AppleTokenVerifier {
 
             String email = (String) payload.get("email");
 
-            return new AppleUserInfo(sub, email);
+            return new AppleUserInfo(sub, email, aud);
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -55,5 +55,5 @@ public class AppleTokenVerifier {
         return false;
     }
 
-    public record AppleUserInfo(String sub, String email) {}
+    public record AppleUserInfo(String sub, String email, String audience) {}
 }

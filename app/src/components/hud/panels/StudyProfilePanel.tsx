@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAccountDeletion } from "../../../hooks/useAccountDeletion";
 import {
   View, Text, Pressable, TextInput, ScrollView, ActivityIndicator,
   Modal, KeyboardAvoidingView, Linking, Platform, Alert, StyleSheet,
@@ -30,6 +31,7 @@ const fmtSummary = (sec: number) => {
 };
 
 export default function StudyProfilePanel() {
+  const { deleting, removeAccount } = useAccountDeletion();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<StudySummary>({ todaySeconds: 0, totalSeconds: 0 });
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,11 @@ export default function StudyProfilePanel() {
 
       <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); Linking.openURL(PRIVACY_URL); }} style={s.menuBtn}>
         <Text style={s.menuText}>개인정보처리방침</Text>
+      </Pressable>
+
+      <Pressable accessibilityRole="button" accessibilityLabel="계정 삭제" disabled={deleting}
+        onPress={removeAccount} style={[s.menuBtn, { borderColor: "rgba(176,83,83,0.55)", opacity: deleting ? 0.55 : 1 }]}>
+        <Text style={[s.menuText, { color: "#c57b7b" }]}>{deleting ? "계정 삭제 중..." : "계정 삭제"}</Text>
       </Pressable>
 
       {isAdmin && (
